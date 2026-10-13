@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>文章 - Eraser 的小站</title>
+<link rel="stylesheet" href="../style.css">
+<style>
+  .post-head{ margin-bottom:26px; }
+  .post-head h1{ font-size:28px; line-height:1.35; margin:0 0 10px; }
+  .post-meta{ color:#888; font-size:13.5px; display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
+  .tagline{ display:flex; gap:6px; flex-wrap:wrap; }
+  .tagline span{ background:#f1f5f9; color:#64748b; font-size:12px; border-radius:20px; padding:1px 9px; }
+  .article{ font-size:16px; line-height:1.85; color:#24292f; overflow-wrap:break-word; }
+  .article h1,.article h2,.article h3,.article h4{ margin:28px 0 12px; line-height:1.4; }
+  .article h1{ font-size:23px; } .article h2{ font-size:20px; } .article h3{ font-size:17px; }
+  .article p{ margin:14px 0; }
+  .article ul,.article ol{ margin:14px 0; padding-left:24px; }
+  .article li{ margin:6px 0; }
+  .article pre{ background:#f6f8fa; border:1px solid #e5e7eb; border-radius:8px; padding:14px; overflow:auto; font-size:13.5px; }
+  .article code{ background:#f1f5f9; border-radius:4px; padding:1px 5px; font-size:14px;
+                 font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+  .article pre code{ background:none; padding:0; font-size:13.5px; }
+  .article blockquote{ border-left:3px solid #e5e7eb; margin:16px 0; padding:2px 0 2px 14px; color:#666; }
+  .article hr{ border:none; border-top:1px solid #e5e7eb; margin:26px 0; }
+  .article a{ color:#2563eb; }
+  .article table{ border-collapse:collapse; width:100%; font-size:14px; margin:16px 0; }
+  .article th,.article td{ border:1px solid #e5e7eb; padding:7px 10px; text-align:left; }
+  .loading{ color:#888; padding:40px 0; text-align:center; }
+  .back{ display:inline-block; margin-top:34px; font-size:14px; }
+</style>
+</head>
+<body>
+<div class="navbar">
+  <span class="logo">🧩 Eraser 的小站</span>
+  <nav>
+    <a href="../index.html">首页</a>
+    <a href="../tools/index.html">工具箱</a>
+    <a href="../files/index.html">文件仓库</a>
+    <a href="index.html" class="active">博客</a>
+    <a href="../nav/index.html">导航</a>
+    <a href="../about/index.html">关于</a>
+  </nav>
+</div>
+<div class="container" id="container">
+  <div class="loading">正在加载…</div>
+</div>
+
+<script src="../md.js"></script>
+<script>
+(function(){
+  var box = document.getElementById("container");
+
+  function esc(s){
+    return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+  /* 用 DOM 拼提示，不拼 HTML 字符串 */
+  function say(text, withBack){
+    box.innerHTML = "";
+    var d = document.createElement("div");
+    d.className = "loading";
+    d.appendChild(document.createTextNode(text));
+    if (withBack){
+      d.appendChild(document.createElement("br"));
+      var a = document.createElement("a");
+      a.href = "index.html";
+      a.textContent = "回到博客列表";
+      d.appendChild(a);
+    }
+    box.appendChild(d);
+  }
+  function param(name){
+    var m = new RegExp("[?&]" + name + "=([^&#]*)").exec(location.search);
+    return m ? decodeURIComponent(m[1].replace(/\+/g, " ")) : "";
+  }
+
+  var slug = param("slug");
+  if (!slug){ say("没有指定文章。", true); return; }
+
+  if (!window.fetch){ say("这个浏览器不支持读取文章。", true); return; }
+
+  fetch("/api/content?type=post", { headers: { Accept: "application/json" } })
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){
+      var items = (j && j.items) || [];
+      var found = null;
+      for (var i = 0; i < items.length; i++){
+        if (items[i].data && items[i].data.slug === slug){ found = items[i]; break; }
+      }
+      if (!found || found.data.published === false){
+        say("找不到这篇文章。", true);
+        return;
+      }
+
+      var d = found.data;
+      document.title = d.title + " - 博客";
+
+      box.innerHTML = "";
+      var head = document.createElement("div");
+      head.className = "post-head";
+
+      var h1 = document.createElement("h1");
+      h1.textContent = d.title;
+      head.appendChild(h1);
+
+      var meta = document.createElement("div");
+      meta.className = "post-meta";
+      var when = document.createElement("span");
+      when.textContent = String(found.updated_at || "").slice(0, 10);
+      meta.appendChild(when);
+
+      if (d.tags && d.tags.length){
+        var tl = document.createElement("span");
+        tl.className = "tagline";
+        d.tags.forEach(function(t){
+          var s = document.createElement("span");
+          s.textContent = t;
+          tl.appendChild(s);
+        });
+        meta.appendChild(tl);
+      }
+      head.appendChild(meta);
+      box.appendChild(head);
+
+      var art = document.createElement("div");
+      art.className = "article";
+      /* MD.render 会先把内容整体转义再生成标签，所以这里赋值是安全的 */
+      art.innerHTML = window.MD ? MD.render(d.content) : esc(d.content);
+      box.appendChild(art);
+
+      var back = document.createElement("a");
+      back.className = "back";
+      back.href = "index.html";
+      back.textContent = "← 回到博客列表";
+      box.appendChild(back);
+    })
+    .catch(function(){
+      say("加载失败，请稍后再试。", true);
+    });
+})();
+</script>
+</body>
+</html>

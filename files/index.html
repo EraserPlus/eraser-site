@@ -20,14 +20,62 @@
 </div>
 <div class="container">
   <h1>📦 文件仓库</h1>
-  <p class="muted">把文件放进仓库的 files/ 文件夹，然后在下面加一条记录即可。</p>
+  <p class="muted">把文件传进仓库的 <code>files/</code> 目录，然后在管理后台的「文件」标签加一条记录。</p>
 
-  <div class="list-item">
-    <div><div class="name">示例文件.txt</div><div class="desc">演示用，可删除</div></div>
-    <a href="demo.txt" download><button class="ghost">下载</button></a>
+  <!-- 静态兜底：接口不可用时显示这些 -->
+  <div id="list">
+    <div class="list-item">
+      <div><div class="name">示例文件.txt</div><div class="desc">演示用，可删除</div></div>
+      <a href="demo.txt" download><button class="ghost">下载</button></a>
+    </div>
   </div>
-
-  <!-- 新文件：把文件丢进本文件夹（files/），然后复制上面这段 list-item 改名字 -->
 </div>
+
+<script>
+(function(){
+  var list = document.getElementById("list");
+  if (!window.fetch) return;
+
+  fetch("/api/content?type=file", { headers: { Accept: "application/json" } })
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){
+      var items = (j && j.items) || [];
+      if (!items.length) return;   // 数据库里还没内容，保留静态兜底
+
+      list.innerHTML = "";
+      items.forEach(function(f){
+        var d = f.data;
+        var row = document.createElement("div");
+        row.className = "list-item";
+
+        var left = document.createElement("div");
+        var name = document.createElement("div");
+        name.className = "name";
+        name.textContent = d.name;
+        left.appendChild(name);
+
+        var desc = document.createElement("div");
+        desc.className = "desc";
+        desc.textContent = d.desc || "";
+        left.appendChild(desc);
+        row.appendChild(left);
+
+        var a = document.createElement("a");
+        a.href = d.url;
+        var external = /^https?:/i.test(d.url);
+        if (external){ a.target = "_blank"; a.rel = "noopener noreferrer"; }
+        else { a.setAttribute("download", ""); }
+        var b = document.createElement("button");
+        b.className = "ghost";
+        b.textContent = external ? "打开" : "下载";
+        a.appendChild(b);
+        row.appendChild(a);
+
+        list.appendChild(row);
+      });
+    })
+    .catch(function(){ /* 接口挂了就保留静态兜底 */ });
+})();
+</script>
 </body>
 </html>

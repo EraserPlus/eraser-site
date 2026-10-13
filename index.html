@@ -19,8 +19,8 @@
   </nav>
 </div>
 <div class="container">
-  <h1>你好，我是 Eraser 👋</h1>
-  <p class="muted">这是一个跑在 Vercel 上的纯静态小站，放些工具、文件和随笔。</p>
+  <h1 id="welcomeTitle">你好，我是 Eraser 👋</h1>
+  <p class="muted" id="welcomeText">这是一个跑在 Vercel 上的纯静态小站，放些工具、文件和随笔。</p>
 
   <div class="cards">
     <a href="tools/index.html" style="color:inherit"><div class="card">
@@ -37,5 +37,31 @@
     </div></a>
   </div>
 </div>
+
+<script src="md.js"></script>
+<script>
+/* 首页欢迎语可以在管理后台的「页面」标签里改（标识 home）。
+   接口不可用时保留上面的静态文字，页面永远不会白屏。 */
+(function(){
+  var h = document.getElementById("welcomeTitle");
+  var p = document.getElementById("welcomeText");
+  if (!window.fetch || !h || !p) return;
+
+  fetch("/api/content?type=page", { headers: { Accept: "application/json" } })
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){
+      var items = (j && j.items) || [];
+      var page = null;
+      for (var i = 0; i < items.length; i++){
+        if (items[i].data && items[i].data.key === "home"){ page = items[i]; break; }
+      }
+      if (!page) return;
+
+      h.textContent = page.data.title;
+      if (window.MD) p.innerHTML = MD.render(page.data.content);
+    })
+    .catch(function(){ /* 保留静态兜底 */ });
+})();
+</script>
 </body>
 </html>

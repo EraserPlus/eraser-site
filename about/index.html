@@ -5,6 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>关于 - Eraser 的小站</title>
 <link rel="stylesheet" href="../style.css">
+<style>
+  .article{ font-size:15.5px; line-height:1.85; overflow-wrap:break-word; }
+  .article h1,.article h2,.article h3{ margin:26px 0 12px; line-height:1.4; }
+  .article h1{ font-size:22px; } .article h2{ font-size:19px; } .article h3{ font-size:16.5px; }
+  .article p{ margin:13px 0; }
+  .article ul,.article ol{ margin:13px 0; padding-left:24px; }
+  .article li{ margin:5px 0; }
+  .article pre{ background:#f6f8fa; border:1px solid #e5e7eb; border-radius:8px; padding:14px; overflow:auto; font-size:13.5px; }
+  .article code{ background:#f1f5f9; border-radius:4px; padding:1px 5px; font-size:14px;
+                 font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+  .article pre code{ background:none; padding:0; }
+  .article blockquote{ border-left:3px solid #e5e7eb; margin:16px 0; padding:2px 0 2px 14px; color:#666; }
+  .article a{ color:#2563eb; }
+</style>
 </head>
 <body>
 <div class="navbar">
@@ -19,11 +33,37 @@
   </nav>
 </div>
 <div class="container">
-  <h1>关于我</h1>
-  <p>你好，我是 Eraser。这个站是我的个人小角落，放点工具、文件和随笔。</p>
-  <h2>联系方式</h2>
-  <p>GitHub：<a href="https://github.com/" target="_blank">你的 GitHub</a></p>
-  <p>邮箱：你的邮箱</p>
+  <!-- 静态兜底：接口不可用时显示这些 -->
+  <div class="article" id="article">
+    <h1>关于我</h1>
+    <p>你好，我是 Eraser。这个站是我的个人小角落，放点工具、文件和随笔。</p>
+    <h2>联系方式</h2>
+    <p>GitHub：<a href="https://github.com/EraserPlus" target="_blank" rel="noopener noreferrer">EraserPlus</a></p>
+  </div>
 </div>
+
+<script src="../md.js"></script>
+<script>
+(function(){
+  var art = document.getElementById("article");
+  if (!window.fetch) return;
+
+  fetch("/api/content?type=page", { headers: { Accept: "application/json" } })
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){
+      var items = (j && j.items) || [];
+      var page = null;
+      for (var i = 0; i < items.length; i++){
+        if (items[i].data && items[i].data.key === "about"){ page = items[i]; break; }
+      }
+      if (!page) return;   // 还没在后台写过，保留静态兜底
+
+      document.title = page.data.title + " - Eraser 的小站";
+      /* MD.render 会先整体转义再生成标签 */
+      art.innerHTML = window.MD ? MD.render(page.data.content) : "";
+    })
+    .catch(function(){ /* 接口挂了就保留静态兜底 */ });
+})();
+</script>
 </body>
 </html>

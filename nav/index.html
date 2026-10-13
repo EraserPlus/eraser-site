@@ -670,18 +670,57 @@ document.addEventListener("keydown", function(e){
 });
 
 /* ---------- 启动 ---------- */
+/* ---------- 数据来源 ----------
+   优先用数据库里的内容（在 admin 里改的），
+   接口不可用或还没数据时，回落到 links.js 里的静态数据。
+   这样即使接口挂了、或者本地双击打开，页面照样能看。 */
+function applyData(data){
+  state.data = data;
+  $("total").textContent = C.countLinks(state.data);
+  $("totalCat").textContent = C.categoriesOf(state.data).length;
+  render();
+  syncFoldButton();
+}
+
+function navFromApi(j){
+  var cats = (j.categories || []);
+  var links = (j.links || []);
+  return {
+    categories: cats.map(function(c){
+      return {
+        id: "c" + c.id,
+        name: c.data.name,
+        links: links.filter(function(l){ return l.parent_id === c.id; })
+          .map(function(l){
+            return { name: l.data.name, url: l.data.url, desc: l.data.desc, tags: l.data.tags || [] };
+          })
+      };
+    }).filter(function(c){ return c.links.length; })
+  };
+}
+
 (function boot(){
-  if (!window.NAV_DATA || !Array.isArray(window.NAV_DATA.categories)){
+  var hasStatic = window.NAV_DATA && Array.isArray(window.NAV_DATA.categories);
+  if (!hasStatic){
     content.appendChild(el("div", "empty")).innerHTML =
       "读不到链接数据。<br>请确认 <b>nav/links.js</b> 和本页在同一个目录，并且已经被加载。";
     $("total").textContent = "0";
     $("totalCat").textContent = "0";
     return;
   }
-  $("total").textContent = C.countLinks(state.data);
-  $("totalCat").textContent = C.categoriesOf(state.data).length;
-  render();
-  syncFoldButton();
+
+  /* 先用静态数据渲染，避免等接口时白屏 */
+  applyData(window.NAV_DATA);
+
+  if (!window.fetch) return;
+  fetch("/api/content?type=nav", { headers: { Accept: "application/json" } })
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){
+      if (!j || !(j.categories || []).length) return;   // 数据库里还没内容，保持静态
+      var d = navFromApi(j);
+      if (d.categories.length) applyData(d);
+    })
+    .catch(function(){ /* 接口不可用，静默保留静态数据 */ });
 })();
 
 })();

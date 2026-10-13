@@ -167,6 +167,40 @@ label.fl{ display:block; font-size:12.5px; color:var(--ink2); margin:12px 0 5px;
 label.fl.first{ margin-top:0; }
 .form-acts{ display:flex; gap:8px; margin-top:16px; }
 .form-acts .btn{ flex:1; }
+
+/* ---------- 内容管理 ---------- */
+.tabs{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.tabs button{ flex:0 0 auto; padding:10px 14px; }
+textarea{ width:100%; padding:11px 12px; border:1px solid var(--line2); border-radius:10px;
+          font-size:14px; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+          background:var(--card); color:var(--ink); line-height:1.6; resize:vertical; }
+textarea:focus{ outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgba(37,99,235,.14); }
+.cf-actions{ display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+.cf-catops{ margin-left:auto; display:flex; gap:6px; flex-wrap:wrap; }
+.card h2{ flex-wrap:wrap; }
+.btn.danger{ color:var(--red); border-color:var(--red); }
+.cf-bool{ display:flex; align-items:center; gap:8px; font-size:13.5px; color:var(--ink2); }
+.cf-bool input{ width:auto; }
+.mdprev{ margin-top:10px; padding:12px 14px; background:var(--sunk); border:1px solid var(--line);
+         border-radius:10px; font-size:14px; line-height:1.7; overflow-wrap:break-word; }
+.mdprev h1,.mdprev h2,.mdprev h3,.mdprev h4{ font-size:1.05em; margin:12px 0 6px; }
+.mdprev p{ margin:8px 0; }
+.mdprev ul,.mdprev ol{ margin:8px 0; padding-left:22px; }
+.mdprev pre{ background:var(--card); border:1px solid var(--line); border-radius:8px; padding:10px;
+             overflow:auto; font-size:12.5px; }
+.mdprev code{ background:var(--sunk); border-radius:4px; padding:1px 5px; font-size:12.5px; }
+.mdprev pre code{ background:none; padding:0; }
+.mdprev blockquote{ border-left:3px solid var(--line2); margin:8px 0; padding-left:12px; color:var(--ink2); }
+.mdprev a{ color:var(--blue); }
+.mdprevbtn{ margin-top:8px; }
+.cf-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:100;
+             display:flex; align-items:flex-end; justify-content:center; }
+.cf-panel{ background:var(--bg); width:100%; max-width:640px; max-height:92vh; display:flex;
+           flex-direction:column; border-radius:16px 16px 0 0; overflow:hidden; }
+.cf-head{ display:flex; align-items:center; justify-content:space-between; padding:14px 16px;
+          border-bottom:1px solid var(--line); background:var(--card); }
+.cf-body{ padding:16px; overflow:auto; }
+@media(min-width:640px){ .cf-overlay{ align-items:center; padding:20px; } .cf-panel{ border-radius:16px; } }
 </style>
 </head>
 <body>
@@ -198,6 +232,10 @@ label.fl.first{ margin-top:0; }
       <button data-tab="today" class="on">今天</button>
       <button data-tab="todos">待办</button>
       <button data-tab="events">日程</button>
+      <button data-tab="nav">导航</button>
+      <button data-tab="post">博客</button>
+      <button data-tab="file">文件</button>
+      <button data-tab="page">页面</button>
     </div>
 
     <section id="tab-today">
@@ -291,9 +329,48 @@ label.fl.first{ margin-top:0; }
       </div>
     </section>
 
+    <section id="tab-nav" class="hide">
+      <div class="card"><h2>🧭 网址导航</h2>
+        <p style="font-size:13px;color:var(--ink2);margin:0">
+          这里改的内容会直接显示在 <b>eraser.de5.net/nav/</b>。分类可以折叠收起，链接按你排的顺序显示。
+        </p>
+      </div>
+      <div id="navHost"></div>
+    </section>
+
+    <section id="tab-post" class="hide">
+      <div class="card"><h2>✏️ 博客文章</h2>
+        <p style="font-size:13px;color:var(--ink2);margin:0">
+          用 Markdown 写正文。文章地址是 <b>/blog/post.html?slug=短链接</b>，列表在 <b>/blog/</b>。
+        </p>
+      </div>
+      <div id="postHost"></div>
+    </section>
+
+    <section id="tab-file" class="hide">
+      <div class="card"><h2>📦 文件仓库</h2>
+        <p style="font-size:13px;color:var(--ink2);margin:0">
+          这里只管「列表」。文件本身要先传到仓库的 <b>files/</b> 目录，再在这里加一条指向它。
+        </p>
+      </div>
+      <div id="fileHost"></div>
+    </section>
+
+    <section id="tab-page" class="hide">
+      <div class="card"><h2>📄 页面文字</h2>
+        <p style="font-size:13px;color:var(--ink2);margin:0">
+          内置两个页面标识：<b>about</b>（关于页）、<b>home</b>（首页欢迎语）。用 Markdown 写。
+        </p>
+      </div>
+      <div id="pageHost"></div>
+    </section>
+
     <p class="foot">数据存在服务器上，手机和电脑看到同一份<br>登录状态保留 30 天</p>
   </div>
 </div>
+
+<script src="../md.js"></script>
+<script src="content.js"></script>
 
 <script>
 "use strict";
@@ -676,14 +753,14 @@ $("calToday").addEventListener("click", function(){
   selDay = todayStr(); renderCalendar(); renderDayEvents();
 });
 
+var TABS = ["today", "todos", "events", "nav", "post", "file", "page"];
+
 document.querySelectorAll(".tabs button").forEach(function(btn){
   btn.addEventListener("click", function(){
     document.querySelectorAll(".tabs button").forEach(function(b){ b.classList.remove("on"); });
     btn.classList.add("on");
     tab = btn.dataset.tab;
-    $("tab-today").classList.toggle("hide", tab !== "today");
-    $("tab-todos").classList.toggle("hide", tab !== "todos");
-    $("tab-events").classList.toggle("hide", tab !== "events");
+    TABS.forEach(function(t){ $("tab-" + t).classList.toggle("hide", t !== tab); });
     say("app","");
     renderAll();
   });
@@ -692,7 +769,8 @@ document.querySelectorAll(".tabs button").forEach(function(btn){
 function renderAll(){
   if (tab === "today") renderToday();
   else if (tab === "todos") renderTodos();
-  else { renderCalendar(); renderDayEvents(); }
+  else if (tab === "events") { renderCalendar(); renderDayEvents(); }
+  else if (window.ContentAdmin) ContentAdmin.render(tab);
 }
 function refresh(){
   return Promise.all([loadTodos(), loadEvents()]).then(renderAll);
@@ -700,6 +778,7 @@ function refresh(){
 
 function enterApp(){
   showApp();
+  if (window.ContentAdmin) ContentAdmin.init({ api: api, say: say });
   cancelEditTodo();
   cancelEditEvent();
   refresh().catch(function(e){ say("app", e.message, "err"); });
