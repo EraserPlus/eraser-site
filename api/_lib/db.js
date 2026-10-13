@@ -56,6 +56,25 @@ export function ensureSchema() {
         )`;
       /* 后续加的列，用 IF NOT EXISTS 保证对已有数据库也安全 */
       await sql`ALTER TABLE todos ADD COLUMN IF NOT EXISTS priority smallint NOT NULL DEFAULT 1`;
+
+      /* ------------------------------------------------------------------
+         站点内容：导航、博客、文件、页面统一放这一张表。
+         type 取值：nav_category / nav_link / post / file / page
+         parent_id 用于 nav_link 指向它所属的 nav_category
+         data 存该类型自己的字段（jsonb），避免为每种内容单独建表
+         ------------------------------------------------------------------ */
+      await sql`
+        CREATE TABLE IF NOT EXISTS content (
+          id          serial PRIMARY KEY,
+          type        text NOT NULL,
+          parent_id   integer,
+          data        jsonb NOT NULL,
+          sort_order  integer NOT NULL DEFAULT 0,
+          created_at  timestamptz NOT NULL DEFAULT now(),
+          updated_at  timestamptz NOT NULL DEFAULT now()
+        )`;
+      await sql`CREATE INDEX IF NOT EXISTS content_type_idx ON content (type, sort_order, id)`;
+
       await sql`CREATE INDEX IF NOT EXISTS todos_due_idx ON todos (due_date)`;
       await sql`CREATE INDEX IF NOT EXISTS events_start_idx ON events (start_at)`;
     })().catch((e) => {

@@ -20,12 +20,83 @@
 </div>
 <div class="container">
   <h1>✏️ 博客</h1>
-  <p class="muted">在 blog/posts/ 里新建 html 文件写文章，然后来这里加一条链接。</p>
+  <p class="muted">文章在管理后台里用 Markdown 写，这里自动列出。</p>
 
-  <div class="list-item">
-    <div><div class="name">我的第一篇文章：这个站是怎么搭的</div><div class="desc">2026-10-13</div></div>
-    <a href="posts/hello.html"><button class="ghost">阅读</button></a>
+  <!-- 静态兜底：接口不可用时显示这些 -->
+  <div id="list">
+    <div class="list-item">
+      <div><div class="name">我的第一篇文章：这个站是怎么搭的</div><div class="desc">2026-10-13</div></div>
+      <a href="posts/hello.html"><button class="ghost">阅读</button></a>
+    </div>
   </div>
+  <p class="muted" id="hint" style="display:none">还没有文章。去管理后台的「博客」标签写一篇。</p>
 </div>
+
+<script>
+(function(){
+  var list = document.getElementById("list");
+  var hint = document.getElementById("hint");
+  if (!window.fetch) return;
+
+  function esc(s){
+    return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+
+  fetch("/api/content?type=post", { headers: { Accept: "application/json" } })
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){
+      var items = ((j && j.items) || []).filter(function(p){
+        return p.data && p.data.published !== false;
+      });
+      if (!items.length) return;   // 数据库里还没内容，保留静态兜底
+
+      /* 新的排前面 */
+      items.sort(function(a, b){
+        return String(b.updated_at || "").localeCompare(String(a.updated_at || ""));
+      });
+
+      list.innerHTML = "";
+      items.forEach(function(p){
+        var d = p.data;
+        var row = document.createElement("div");
+        row.className = "list-item";
+
+        var left = document.createElement("div");
+        var name = document.createElement("div");
+        name.className = "name";
+        name.textContent = d.title;
+        left.appendChild(name);
+
+        var desc = document.createElement("div");
+        desc.className = "desc";
+        var bits = [String(p.updated_at || "").slice(0, 10)];
+        var summary = d.summary || (window.MD ? MD.plain(d.content, 60) : "");
+        if (summary) bits.push(summary);
+        desc.textContent = bits.filter(Boolean).join(" · ");
+        left.appendChild(desc);
+
+        if (d.tags && d.tags.length){
+          var tags = document.createElement("div");
+          tags.className = "desc";
+          tags.style.marginTop = "3px";
+          tags.textContent = d.tags.map(function(t){ return "#" + t; }).join(" ");
+          left.appendChild(tags);
+        }
+        row.appendChild(left);
+
+        var a = document.createElement("a");
+        a.href = "post.html?slug=" + encodeURIComponent(d.slug);
+        var b = document.createElement("button");
+        b.className = "ghost";
+        b.textContent = "阅读";
+        a.appendChild(b);
+        row.appendChild(a);
+
+        list.appendChild(row);
+      });
+    })
+    .catch(function(){ /* 接口挂了就保留静态兜底 */ });
+})();
+</script>
 </body>
 </html>
