@@ -163,6 +163,8 @@ input[type=date], input[type=datetime-local]{ min-height:44px; }
 .foot{ text-align:center; color:var(--muted); font-size:12px; margin-top:26px; line-height:1.9; }
 .foot b{ color:var(--ink2); }
 .row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.row3{ display:grid; grid-template-columns:repeat(auto-fit, minmax(86px, 1fr)); gap:10px; }
+.hintline{ font-size:12.5px; color:var(--muted); margin:8px 0 0; }
 label.fl{ display:block; font-size:12.5px; color:var(--ink2); margin:12px 0 5px; }
 label.fl.first{ margin-top:0; }
 .form-acts{ display:flex; gap:8px; margin-top:16px; }
@@ -275,9 +277,12 @@ textarea:focus{ outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgb
           <button type="button" data-p="0">低</button>
         </div>
         <div class="row2" style="margin-top:12px">
-          <div><label class="fl first">截止日期（可空）</label><input type="date" id="tDue"></div>
-          <div><label class="fl first">备注（可空）</label><input type="text" id="tNote" placeholder="补充说明" autocomplete="off"></div>
+          <div><label class="fl first">截止日期（可空）</label>
+            <input type="text" id="tDue" placeholder="10-15 / 明天 / +3" autocomplete="off"></div>
+          <div><label class="fl first">备注（可空）</label>
+            <input type="text" id="tNote" placeholder="补充说明" autocomplete="off"></div>
         </div>
+        <p class="hintline">日期直接打字：<b>2026-10-15</b>、<b>10-15</b>、<b>15</b>、<b>明天</b>、<b>周三</b>、<b>+3</b>（三天后）都认。</p>
         <div class="form-acts">
           <button class="btn" id="btnTodoSave">添加</button>
           <button class="btn ghost hide" id="btnTodoCancel">取消</button>
@@ -316,10 +321,15 @@ textarea:focus{ outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgb
         <h2 id="eventFormTitle">➕ 添加日程</h2>
         <label class="fl first">什么事</label>
         <input type="text" id="eTitle" placeholder="比如：和客户开会" autocomplete="off">
-        <div class="row2" style="margin-top:12px">
-          <div><label class="fl first">开始</label><input type="datetime-local" id="eStart"></div>
-          <div><label class="fl first">结束（可空）</label><input type="datetime-local" id="eEnd"></div>
+        <div class="row3" style="margin-top:12px">
+          <div><label class="fl first">日期</label>
+            <input type="text" id="eDate" placeholder="10-15 / 明天" autocomplete="off"></div>
+          <div><label class="fl first">开始（可空）</label>
+            <input type="text" id="eStart" placeholder="09:00" autocomplete="off"></div>
+          <div><label class="fl first">结束（可空）</label>
+            <input type="text" id="eEnd" placeholder="10:30" autocomplete="off"></div>
         </div>
+        <p class="hintline">日期直接打字（<b>10-15</b>、<b>明天</b>、<b>+3</b>）。时间填 <b>9:00</b>、<b>9点半</b>、<b>900</b> 都认；<b>开始时间留空就是「全天」</b>。</p>
         <label class="fl">备注（可空）</label>
         <input type="text" id="eNote" placeholder="补充说明" autocomplete="off">
         <div class="form-acts">
@@ -450,6 +460,89 @@ function ymd(d){ return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDat
 function ymdhm(d){ return ymd(d)+"T"+pad(d.getHours())+":"+pad(d.getMinutes()); }
 function todayStr(){ return ymd(new Date()); }
 var WEEK = ["周日","周一","周二","周三","周四","周五","周六"];
+var WEEK_NUM = { "一":1, "二":2, "三":3, "四":4, "五":5, "六":6, "日":0, "天":0 };
+
+/* ---------- 日期 / 时间的智能解析 ----------
+   日期：返回 {ok:true, value:'2026-10-15'}（value 为 null 表示没填）、{ok:false} 表示看不懂
+   时间：返回 'HH:MM'、null（没填）或 false（看不懂） */
+function _ok(v){ return { ok:true, value:v }; }
+function _validDay(y, m, d){
+  if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+  var dt = new Date(y, m - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) return null;
+  return ymd(dt);
+}
+
+function parseDateInput(raw){
+  var s = String(raw == null ? "" : raw).trim();
+  if (!s) return _ok(null);
+  var now = new Date(), y = now.getFullYear(), mo = now.getMonth(), d = now.getDate();
+  var m;
+
+  if (/^(今天|今日)$/.test(s)) return _ok(ymd(new Date(y, mo, d)));
+  if (/^(明天|明日)$/.test(s)) return _ok(ymd(new Date(y, mo, d + 1)));
+  if (s === "后天") return _ok(ymd(new Date(y, mo, d + 2)));
+  if (s === "昨天") return _ok(ymd(new Date(y, mo, d - 1)));
+  if (s === "大后天") return _ok(ymd(new Date(y, mo, d + 3)));
+
+  m = s.match(/^([+-])\s*(\d{1,4})$/);
+  if (m) return _ok(ymd(new Date(y, mo, d + (m[1] === "-" ? -1 : 1) * Number(m[2]))));
+  m = s.match(/^(\d{1,4})\s*天后$/);
+  if (m) return _ok(ymd(new Date(y, mo, d + Number(m[1]))));
+
+  m = s.match(/^(下{0,2})([一二三四五六日天])$/);
+  if (m){
+    var target = WEEK_NUM[m[2]];
+    var add = (target - now.getDay() + 7) % 7;
+    if (add === 0) add = 7;
+    if (m[1] === "下") add += 7;
+    else if (m[1] === "下下") add += 14;
+    return _ok(ymd(new Date(y, mo, d + add)));
+  }
+
+  m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  if (m){ var v1 = _validDay(+m[1], +m[2], +m[3]); return v1 ? _ok(v1) : { ok:false }; }
+  m = s.match(/^(\d{1,2})[-/.](\d{1,2})$/);
+  if (m){ var v2 = _validDay(y, +m[1], +m[2]); return v2 ? _ok(v2) : { ok:false }; }
+  m = s.match(/^(\d{1,2})$/);
+  if (m){ var v3 = _validDay(y, mo + 1, +m[1]); return v3 ? _ok(v3) : { ok:false }; }
+  m = s.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (m){ var v4 = _validDay(+m[1], +m[2], +m[3]); return v4 ? _ok(v4) : { ok:false }; }
+
+  return { ok:false };
+}
+
+function _validTime(h, mi){
+  if (h < 0 || h > 23 || mi < 0 || mi > 59) return false;
+  return pad(h) + ":" + pad(mi);
+}
+
+function parseTimeInput(raw){
+  var s = String(raw == null ? "" : raw).trim();
+  if (!s) return null;
+  s = s.replace(/：/g, ":").replace(/[点時时]/g, "点").replace(/分$/, "");
+  var m;
+
+  m = s.match(/^(\d{1,2}):(\d{1,2})$/);
+  if (m) return _validTime(+m[1], +m[2]);
+  m = s.match(/^(\d{1,2})点半$/);
+  if (m) return _validTime(+m[1], 30);
+  m = s.match(/^(\d{1,2})点(\d{1,2})?$/);
+  if (m) return _validTime(+m[1], m[2] ? +m[2] : 0);
+  m = s.match(/^(\d{3,4})$/);
+  if (m){ var t = m[1]; return _validTime(+t.slice(0, t.length - 2), +t.slice(-2)); }
+  m = s.match(/^(\d{1,2})$/);
+  if (m) return _validTime(+m[1], 0);
+
+  return false;
+}
+
+/* 把「日期 + 时间」拼成 ISO；time 为空表示全天 */
+function buildISO(dateStr, timeStr){
+  var t = timeStr || "00:00";
+  var d = new Date(dateStr + "T" + t + ":00");
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
 function dayDiff(fromStr, toStr){
   return Math.round((new Date(toStr+"T00:00:00") - new Date(fromStr+"T00:00:00")) / 86400000);
 }
@@ -514,8 +607,13 @@ function eventNode(ev, opts){
   var main = el("div", "main");
   main.appendChild(el("div", "t", ev.title));
   var sub = el("div", "sub");
-  var tm = hhmm(ev.start_at);
-  if (ev.end_at) tm += " – " + hhmm(ev.end_at);
+  var tm;
+  if (ev.all_day){
+    tm = "全天";
+  } else {
+    tm = hhmm(ev.start_at);
+    if (ev.end_at) tm += " – " + hhmm(ev.end_at);
+  }
   sub.appendChild(el("span", "pill time", tm));
   if (opts.showDate) sub.appendChild(el("span", null, String(ev.start_at).slice(0,10)));
   main.appendChild(sub);
@@ -666,7 +764,12 @@ function cancelEditTodo(){
 function saveTodo(){
   var title = $("tTitle").value.trim();
   if (!title){ say("app","标题不能为空","err"); return; }
-  var payload = { title:title, due_date: $("tDue").value || null, note: $("tNote").value.trim() || null, priority:newPri };
+  var due = parseDateInput($("tDue").value);
+  if (!due.ok){
+    say("app", "日期看不懂。可以写 2026-10-15、10-15、15、明天、周三 或 +3", "err");
+    return;
+  }
+  var payload = { title:title, due_date: due.value, note: $("tNote").value.trim() || null, priority:newPri };
   var wasEdit = !!editingTodo;
   if (wasEdit){ payload.id = editingTodo.id; payload.done = editingTodo.done; }
   var b = $("btnTodoSave"); b.disabled = true;
@@ -699,9 +802,16 @@ $("todoFilters").addEventListener("click", function(e){
 
 function startEditEvent(ev){
   editingEvent = ev;
+  var sd = new Date(ev.start_at);
   $("eTitle").value = ev.title;
-  $("eStart").value = ymdhm(new Date(ev.start_at));
-  $("eEnd").value = ev.end_at ? ymdhm(new Date(ev.end_at)) : "";
+  $("eDate").value = ymd(sd);
+  $("eStart").value = ev.all_day ? "" : pad(sd.getHours()) + ":" + pad(sd.getMinutes());
+  if (ev.end_at){
+    var ed = new Date(ev.end_at);
+    $("eEnd").value = pad(ed.getHours()) + ":" + pad(ed.getMinutes());
+  } else {
+    $("eEnd").value = "";
+  }
   $("eNote").value = ev.note || "";
   $("eventFormTitle").textContent = "✎ 编辑日程";
   $("btnEventSave").textContent = "保存修改";
@@ -711,8 +821,8 @@ function startEditEvent(ev){
 }
 function cancelEditEvent(){
   editingEvent = null;
-  $("eTitle").value = ""; $("eEnd").value = ""; $("eNote").value = "";
-  $("eStart").value = selDay + "T09:00";
+  $("eTitle").value = ""; $("eStart").value = ""; $("eEnd").value = ""; $("eNote").value = "";
+  $("eDate").value = selDay;
   $("eventFormTitle").textContent = "➕ 添加日程";
   $("btnEventSave").textContent = "添加";
   $("btnEventCancel").classList.add("hide");
@@ -720,13 +830,27 @@ function cancelEditEvent(){
 function saveEvent(){
   var title = $("eTitle").value.trim();
   if (!title){ say("app","标题不能为空","err"); return; }
-  if (!$("eStart").value){ say("app","请填开始时间","err"); return; }
+
+  var day = parseDateInput($("eDate").value);
+  if (!day.ok || !day.value){
+    say("app", "请填日期。可以写 2026-10-15、10-15、明天、周三 或 +3", "err");
+    return;
+  }
+  var st = parseTimeInput($("eStart").value);
+  if (st === false){ say("app", "开始时间看不懂。可以写 9:00、9点半、900；留空表示全天", "err"); return; }
+  var et = parseTimeInput($("eEnd").value);
+  if (et === false){ say("app", "结束时间看不懂。可以写 10:30、10点半", "err"); return; }
+  if (et && !st){ say("app", "填了结束时间也要填开始时间（或者两个都留空表示全天）", "err"); return; }
+
   var payload = {
-    title:title,
-    start_at: new Date($("eStart").value).toISOString(),
-    end_at: $("eEnd").value ? new Date($("eEnd").value).toISOString() : null,
+    title: title,
+    start_at: buildISO(day.value, st),
+    end_at: et ? buildISO(day.value, et) : null,
+    all_day: !st,
     note: $("eNote").value.trim() || null
   };
+  if (!payload.start_at){ say("app", "时间拼不出来，检查一下日期", "err"); return; }
+
   var wasEdit = !!editingEvent;
   if (wasEdit) payload.id = editingEvent.id;
   var b = $("btnEventSave"); b.disabled = true;
