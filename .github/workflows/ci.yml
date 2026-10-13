@@ -1,0 +1,16 @@
+name: ci
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      # 测试用假 Neon 驱动（tests/stubs）覆盖 npm 装回来的真包，无需真数据库
+      - run: rm -rf node_modules/@neondatabase/serverless && cp -r tests/stubs/@neondatabase/serverless node_modules/@neondatabase/serverless
+      - run: npm test

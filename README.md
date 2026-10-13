@@ -1,336 +1,263 @@
-# Eraser 的小站 · 架构与开发手册
+# Eraser 的小站 · 使用手册与开发指南
 
-> 最后更新：2026-10-13
-> 本文档是网站的完整技术档案 + 未来开发蓝本。建议同时复制一份为仓库里的 `README.md`。
-
----
-
-## 一、架构全景
-
-```javascript
-访客浏览器
-    │  HTTPS
-    ▼
-┌─────────────────────────────────────────────┐
-│  Vercel（免费 Hobby 计划）                    │
-│  ├─ 静态文件托管：HTML/CSS/JS 直接分发         │
-│  ├─ Serverless 函数：api/*.js 自动成为接口     │
-│  ├─ HTTPS 证书：自动签发/续期（Let's Encrypt） │
-│  └─ 自动部署：监听 GitHub 仓库，Commit 即上线  │
-└──────────────────┬──────────────────────────┘
-                   │  每次 push 自动拉取构建
-                   ▼
-        GitHub 仓库（唯一代码来源）
-        github.com/EraserPlus/eraser-site
-
-域名层：
-  eraser.de5.net  ──A记录──▶  216.198.79.1（Vercel 任意Cast IP）
-  解析托管：DNSHE 免费域名平台（de5.net 子域名）
-```
-
-**核心原则：GitHub 是唯一代码来源。Vercel 只是"自动搬运工"。**
-
-### 资产清单（账号密码自己保管好）
-
-| 资产 | 位置 | 说明 |
-| --- | --- | --- |
-| 代码仓库 | GitHub / EraserPlus / **eraser-site** | Public 仓库 |
-| 托管平台 | Vercel 项目 **eraser** | Hobby 免费计划 |
-| 主域名 | **eraser.de5.net** | DNSHE 平台管理，A 记录指向 Vercel |
-| 副域名 | eraser-pi.vercel.app | Vercel 自带，永远可用 |
-| 后端函数 | 仓库 `api/` 目录 | 目前：hello.js |
-| 数据库 | （未启用） | 需要时用 Vercel Storage → Postgres |
+> 站点：<https://eraser.de5.net> ｜ 个人站 ｜ Vercel Hobby 免费档
+> 仓库：GitHub `EraserPlus/eraser-site`（Public）｜ 技术栈：纯静态 HTML/CSS/JS + Vercel Serverless Functions（Node ESM）+ Neon Postgres
+> 本文面向「未来的 Eraser 和接手的 AI」：所有内容以仓库当前真实状态为准，随改随更新。
 
 ---
 
-## 二、仓库文件结构
+## 一、一页纸架构
 
-```javascript
+### 目录树（当前真实文件清单）
+
+```text
 eraser-site/
-├── index.html            首页（导航栏 + 分区卡片）
-├── style.css             ★ 全站统一样式（改这里 = 全站换肤）
-├── trigger.txt           触发部署用，可删
+├── index.html            首页（导航栏 + 四个分区卡片）
+├── style.css             全站统一样式（改这里 = 公开页换肤）
+├── md.js                 自研 Markdown 渲染器（内置转义，见「已知取舍」）
+├── vercel.json           响应头配置：/api/ 不缓存，静态资源缓存 1 小时 + 安全头
+├── .gitattributes        锁死 LF 行尾，杜绝 Windows CRLF 污染 diff
+├── .gitignore            忽略 node_modules / .vercel / 临时文件，不进仓库
+├── package.json          只有一个运行时依赖 @neondatabase/serverless + npm test 脚本
+├── package-lock.json     锁版本，CI 用 npm ci 安装
 │
-├── tools/                工具箱
-│   ├── index.html        工具列表页
-│   └── password.html     密码生成器（新工具的复制模板）
+├── api/                  Vercel Serverless 函数目录（每个 .js 自动成为一个 /api 路由）
+│   ├── auth.js           POST 登录换令牌 / GET 配置自检
+│   ├── todos.js          待办 CRUD（全部需登录，私人数据）
+│   ├── events.js         日程 CRUD（全部需登录，私人数据）
+│   ├── content.js        全站内容 CRUD（读公开，写需登录）
+│   └── _lib/             公共库（不会成为路由）
+│       ├── db.js         数据库连接 + ensureSchema() 首次自动建表
+│       ├── token.js      HMAC 令牌签发/校验、密码校验、配置自检
+│       ├── http.js       响应封装 ok/send/fail、readJson、入参校验
+│       ├── ratelimit.js  登录限流（5 次失败锁 15 分钟，按 IP）
+│       └── content.js    五种内容类型的归一化与校验
 │
-├── files/                文件仓库（放可下载文件）
-│   ├── index.html        下载列表页
+├── admin/                管理后台（独立单文件应用，自带样式）
+│   ├── index.html        后台全部界面与逻辑（约 43KB）
+│   └── content.js        导航/博客/文件/页面 四大内容管理模块
+│
+├── tests/                七套测试 + 测试用假数据库驱动
+│   ├── api_test.mjs      令牌/密码/入参校验/api 与 admin 源文件语法（102 项）
+│   ├── content_test.mjs  内容类型归一化 + Markdown 渲染与安全（87 项）
+│   ├── api_routes_test.mjs 四个接口全流程：鉴权/CRUD/注入/限流/配置（109 项）
+│   ├── pages_audit.mjs   8 个公开页面：结构/零站外资源/静态兜底/注入防护（119 项）
+│   ├── admin_audit.mjs   管理后台：主题/隐私/接口/安全/功能点（87 项）
+│   ├── nav_test.cjs      导航页核心逻辑：数据体检/查询/视图/高亮/导入导出（91 项）
+│   ├── nav_audit.cjs     导航页静态审计：结构/零外部请求/DOM 接线/功能点（54 项）
+│   └── stubs/@neondatabase/serverless/   手写假驱动（只记录 SQL 不连库）
+│
+├── .github/workflows/ci.yml   GitHub Actions：push / PR 自动跑 npm test
+│
+├── about/index.html      关于页（内容可在后台改）
+├── nav/                  网址导航页
+│   ├── index.html        全部界面与逻辑（约 26KB）
+│   └── links.js          静态兜底数据（纯数据，无代码）
+├── blog/
+│   ├── index.html        文章列表（读 /api/content?type=post）
+│   ├── post.html         文章详情（?slug=xxx，用 md.js 渲染正文）
+│   └── posts/hello.html  旧版文章模板（留档，新文章走后台）
+├── files/
+│   ├── index.html        文件下载列表
 │   └── demo.txt          示例文件
-│
-├── blog/                 博客
-│   ├── index.html        文章列表页
-│   └── posts/
-│       └── hello.html    示例文章（新文章的复制模板）
-│
-├── nav/                  网址导航
-│   └── index.html
-│
-├── about/                关于我
-│   └── index.html
-│
-└── api/                  ★ Serverless 函数目录（每个 .js = 一个接口）
-    └── hello.js          示例接口 /api/hello
+└── tools/
+    ├── index.html        工具列表
+    └── password.html     密码生成器（新工具的复制模板）
 ```
 
-### 页面通用结构（每个页面都一样）
+### 数据流（文字版）
 
-```html
-<head>      标题 + 引用 ../style.css
-<body>
-  <div class="navbar">  顶部导航（六个分区的链接）
-  <div class="container">  正文内容
+**公开页（8 个：/、/nav/、/blog/、/blog/post.html、/files/、/about/、/tools/、/tools/password.html）**
+
+```text
+打开页面
+  → ① 先渲染写死在 HTML / links.js 里的静态内容（断网、双击本地文件都能看）
+  → ② 再 fetch 同源接口（/api/content?type=nav 等，只读同源路径）
+  → ③ 成功：用数据库返回的数据替换静态内容
+  → ④ 失败（接口挂了 / 数据库没内容）：保持静态内容，catch 兜底
+  → 结果：任何情况下不白屏
 ```
 
-子文件夹页面用 `../style.css`、`../index.html` 这样的相对路径——**保证本地双击 html 也能正常预览**。
+**管理后台（/admin/，七个标签：今天 / 待办 / 日程 / 导航 / 博客 / 文件 / 页面）**
+
+```text
+打开后台 → POST /api/auth 用密码换 HMAC 令牌（30 天有效）→ 存 localStorage
+  → 之后每个请求带 Authorization: Bearer <令牌>
+  → /api/todos、/api/events 的所有操作都要登录（401 自动退出登录）
+  → 密码连错 5 次锁 15 分钟（login_attempts 表按 IP 记录）
+```
+
+**数据库四张表（Neon Postgres，ensureSchema 首次访问自动建）**
+
+| 表 | 用途 |
+| --- | --- |
+| `todos` | 待办：标题 / 备注 / 完成 / 截止日期 / 优先级（0 低 1 中 2 高） |
+| `events` | 日程：标题 / 备注 / 开始 / 结束 / 全天 |
+| `login_attempts` | 登录限流：ip / fails / locked_until |
+| `content` | 全站内容一张表：nav_category / nav_link / post / file / page 五种 type 共用，data 为 jsonb |
 
 ---
 
-## 三、标准工作流（最重要的章节）
+## 二、快速开始
 
-### 改任何东西的通用流程
-
-```javascript
-1. 打开 github.com/EraserPlus/eraser-site
-2. 点进要改的文件
-3. 点右上角 ✏️ 铅笔（Edit this file）
-4. 改 → 点绿色 Commit changes
-5. 等 1~2 分钟（Vercel 自动部署）
-6. Ctrl+Shift+N 无痕窗口打开网站验证
+```bash
+npm test
 ```
 
-### 新增文件 / 上传文件
+一条命令按顺序跑完七套测试，共 **649 项**，全部通过即说明站点核心逻辑健康。
 
-- 仓库首页 → **Add file → Upload files** → 拖文件 → Commit
-- 网页上传单文件上限 25MB；文件夹可以整拖
-
-### 删除文件
-
-- 点进文件 → 右上角 **⋯ → Delete file** → Commit
-
-### 新建文件
-
-- **Add file → Create new file** → 文件名可以带路径（如 `api/xxx.js` 会自动建 api 目录）
-
-### 部署没触发时（万能药）
-
-在仓库里随便建一个空文件再删掉（或改任意文件），Commit 会推送 webhook，Vercel 必然收到。
+- **不需要真数据库**：`tests/stubs/` 里有一个手写的假 Neon 驱动，测试时通过全局 `__FAKE_DB__` 预设 SQL 返回值，只验证逻辑不连库。
+- CI 里也是同一套路：`npm ci` 装回真包后，用假驱动覆盖 `node_modules/@neondatabase/serverless`，再 `npm test`。
+- 本地开发同样直接 `npm test`，无需任何额外配置。
 
 ---
 
-## 四、修改指南（按场景速查）
+## 三、环境变量
 
-### 1. 改文字内容
+只在 Vercel 项目 Settings → Environment Variables 里配，**永远不要**写进仓库（仓库是 Public）。
 
-直接改对应 html 文件里的中文文字。Commit 即上线。
-
-### 2. 加一个工具页
-
-1. 复制 `tools/password.html` → 重命名（如 `tools/json.html`）
-2. 改 `<h1>` 标题、中间的 HTML 控件、`<script>` 里的逻辑
-3. 打开 `tools/index.html`，复制一行：
-
-```html
-<div class="list-item">
-  <div><div class="name">工具名</div><div class="desc">一句话说明</div></div>
-  <a href="json.html"><button class="ghost">打开</button></a>
-</div>
-```
-
-### 3. 加一个可下载文件
-
-1. 文件传进 `files/` 目录
-2. `files/index.html` 里复制一行：
-
-```html
-<div class="list-item">
-  <div><div class="name">文件名</div><div class="desc">说明</div></div>
-  <a href="文件名" download><button class="ghost">下载</button></a>
-</div>
-```
-
-### 4. 写一篇博客文章
-
-1. 进 `blog/posts/` → Add file → Create new file → `文章名.html`
-2. 把 `hello.html` 内容复制进去，改标题/日期/正文
-3. `blog/index.html` 加一条 `<div class="list-item">…`
-
-### 5. 导航站加链接
-
-`nav/index.html` 里复制一行 `<a href="https://…" target="_blank">名字</a>`。
-浏览器主页可设为 `https://eraser.de5.net/nav/`。
-
-### 6. 全站换配色
-
-`style.css` 全局替换 `#2563eb`（主题蓝）→ 想要的颜色。
-常用：#16a34a 绿 / #dc2626 红 / #7c3aed 紫 / #0f172a 暗黑系。
-
-### 7. 加一个全新分区（如 /games/）
-
-1. 仓库建 `games/index.html`，从 about/index.html 复制改导航高亮
-2. 首页 index.html 的 `.cards` 里加一个卡片
-3. （可选）其他页面的 navbar 里补一个链接
+| 变量 | 说明 |
+| --- | --- |
+| `ADMIN_PASSWORD` | 管理后台密码，**至少 8 位**。短于 8 位按「没配」处理，登录接口返回 503。令牌签名密钥由它派生，改密码 = 所有旧令牌立即失效 |
+| `DATABASE_URL` | Neon Postgres 连接串。通过 Vercel Marketplace 安装 Neon 集成后**自动注入**，不用手填 |
+| `POSTGRES_URL` | 旧名。代码里 `DATABASE_URL` 优先，回退认 `POSTGRES_URL`，两个都没配时写数据的接口返回 503 |
 
 ---
 
-## 五、Serverless 函数（api/ 目录）
+## 四、如何加一个新接口
 
-### 规则
+> `api/hello.js`（原示例接口）已删除，本节接管它的教学职能。
+> **规则：`api/` 目录下每个 `.js` 文件自动成为一个路由**——`api/notes.js` → `https://eraser.de5.net/api/notes`。
+> `api/_lib/` 子目录里的文件不会成为路由，放公共库。
 
-- 仓库根目录的 `api/` 文件夹，**每个 .js 文件 = 一个 HTTPS 接口**
-- `api/hello.js` → `https://eraser.de5.net/api/hello`
-- 支持 GET/POST，Node.js 运行环境，无需服务器
-
-### 最小模板
+完整可抄的范例（新建 `api/notes.js`）：
 
 ```js
-export default function handler(request, response) {
-  // request.query.xxx   → URL 参数 ?xxx=
-  // request.body        → POST 的 JSON/表单数据
-  // request.headers     → 请求头
-  response.status(200).json({ ok: true });
+/* ===========================================================================
+   /api/notes   读书笔记（示例：抄我改字段即可）
+   =========================================================================== */
+
+import { db, ensureSchema } from './_lib/db.js';
+import { requireAuth } from './_lib/token.js';
+import { ok, send, fail, readJson, needText, optionalText, needId } from './_lib/http.js';
+
+export default async function handler(req, res) {
+  try {
+    // 1. 需要登录的接口：先校验令牌。没过期返回 payload，失败抛 UNAUTHORIZED（→ 401）
+    requireAuth(req);
+
+    // 2. 用到数据库：ensureSchema 保证表存在（IF NOT EXISTS，重复调用安全）
+    await ensureSchema();
+    const sql = db();
+
+    if (req.method === 'GET') {
+      const rows = await sql`
+        SELECT id, title, body, created_at
+        FROM notes
+        ORDER BY id DESC`;
+      return ok(res, { ok: true, items: rows });
+    }
+
+    if (req.method === 'POST') {
+      const b = await readJson(req);
+      const rows = await sql`
+        INSERT INTO notes (title, body)
+        VALUES (${needText(b.title, '标题', 200)}, ${optionalText(b.body)})
+        RETURNING id, title, body, created_at`;
+      return ok(res, { ok: true, item: rows[0] });
+    }
+
+    if (req.method === 'DELETE') {
+      const id = needId((req.query && req.query.id) || (await readJson(req)).id);
+      const rows = await sql`DELETE FROM notes WHERE id = ${id} RETURNING id`;
+      if (!rows.length) return send(res, 404, { error: '这条笔记不存在，可能已被删除' });
+      return ok(res, { ok: true, id });
+    }
+
+    return send(res, 405, { error: '不支持的请求方法' });
+  } catch (e) {
+    // 3. 兜底：fail() 把内部异常翻译成用户看得懂的话（401/429/503/400/500）
+    return fail(res, e);
+  }
 }
 ```
 
-### 返回方式
+用到新表时，在 `api/_lib/db.js` 的 `ensureSchema()` 里补一段（同样用 IF NOT EXISTS，对已有数据库安全）：
 
 ```js
-res.status(200).json({...})      // JSON（最常用）
-res.status(200).send('文本')      // 纯文本
-res.setHeader('Content-Type','text/html'); res.send('<h1>…</h1>')
-res.redirect('https://目标网址')   // 302 跳转
-res.status(400).json({error:'…'}) // 错误
+await sql`
+  CREATE TABLE IF NOT EXISTS notes (
+    id          serial PRIMARY KEY,
+    title       text NOT NULL,
+    body        text,
+    created_at  timestamptz NOT NULL DEFAULT now()
+  )`;
 ```
 
-### 依赖第三方包
+要点速查：
 
-仓库根目录建 `package.json`：
-
-```json
-{ "dependencies": { "@vercel/postgres": "^0.10.0" } }
-```
-
-部署时 Vercel 自动 npm install（首次会慢一些）。
-
-### 环境变量（藏密钥的唯一正确方式）
-
-1. Vercel → 项目 → Settings → **Environment Variables** → 添加
-2. 函数里读取：`process.env.变量名`
-3. **永远不要**把 API Key 写进前端 html/js（仓库 Public，全世界可见）
+- **参数化 SQL 用标签模板**：`` sql`... WHERE id = ${id}` ``——值永远走参数，禁止字符串拼接 SQL（`api_routes_test.mjs` 有注入防护断言）。
+- **入参校验**：`needText`（必填）、`optionalText`（可空）、`needId`、`optionalDate`、`needTimestamp`，不合法抛 `BAD_INPUT`（→ 400）。
+- **公开读 / 登录写**：GET 不调 `requireAuth` 就是公开的；写操作放在 `requireAuth(req)` 之后。
+- **响应**：`ok(res, body)` = 200 JSON；`send(res, 404, { error })` 自定义状态码；`fail(res, e)` 兜底。
+- **自测**：在 `tests/api_routes_test.mjs` 里仿照现有用例加几条（假数据库 `fakeDb(handler)` + `mockReq`/`mockRes`），然后 `npm test`。
 
 ---
 
-## 六、域名与 DNS 备忘
+## 五、测试与 CI
 
-| 项 | 值 |
-| --- | --- |
-| 域名注册/解析平台 | DNSHE（de5.net 免费子域名） |
-| 记录类型 | **A 记录** |
-| 主机记录 | @ |
-| 记录值 | 216.198.79.1 |
-| TTL | 600（10 分钟） |
-
-- 换 Vercel IP 时：Vercel 面板 Domains 页会提示新 IP，去 DNSHE 改 A 记录即可
-- Vercel 侧无需动：证书自动、域名已绑定
-- ⚠️ 历史教训：de5.net 父域 DNSSEC 曾损坏导致 Let's Encrypt 拒签证书（2026-10-13）。
-若再次遇到 "DNSSEC: Bogus" 报错 → 找 DNSHE 平台修复，或等其自行恢复，不是你配置的问题
-
----
-
-## 七、故障排查手册
-
-| 症状 | 排查 |
-| --- | --- |
-| 网站没更新 | ① 无痕窗口 ② 确认 Commit 成功 ③ Vercel → Deployments 看最新一条状态 |
-| Deployments 没有新记录 | 再随便 Commit 一次（推 webhook） |
-| 部署显示 Error | 点进该部署 → Build Logs 看红色报错；常见：JS 语法错、package.json 写错 |
-| 页面 404 | 检查文件名大小写、路径是否一致（GitHub 区分大小写） |
-| 接口 500 | Vercel → 该部署 → Runtime Logs 看报错 |
-| 域名打不开 | dig/nslookup 查解析；DNSHE 面板看 A 记录；Vercel Domains 页看状态 |
-| 证书报错 | 多半是 DNSSEC/解析问题，等或找平台，参见第六节 |
-
----
-
-## 八、安全红线
-
-1. **仓库是 Public**：密码、Key、隐私数据一律不进仓库
-2. 密钥只放 Vercel Environment Variables
-3. 数据库表如需访问控制，函数里自行校验（如简单 token）
-4. Vercel Hobby 计划**仅限非商业用途**
-
-## 九、免费额度（Hobby 计划）
-
-| 资源 | 额度 |
-| --- | --- |
-| 静态托管带宽 | 100 GB/月 |
-| 函数调用 | 125,000 次/天 |
-| 函数执行时长 | 最长 60 秒/次 |
-| 构建时间 | 6000 分钟/月 |
-| 团队成员 | 1 人（自己） |
-| 项目数量 | 够用 |
-
-个人项目极难触顶。触顶 = 你该考虑升级或接广告回血了（笑）。
-
----
-
-## 十、升级路线图（未来蓝本）
-
-### Level 1：纯前端（当前 ✅）
-
-- 加工具：JSON 格式化、二维码、时间戳、Base64、Hash、正则测试、Markdown 编辑器
-- 加游戏：2048、贪吃蛇、数独
-- 加 PWA（手机可"安装"到桌面）
-- 浏览器本地应用：备忘录/待办（localStorage）
-
-### Level 2：+ 数据库（Vercel Postgres，免费档）
-
-启用路径：Vercel → Storage → Create Database → Postgres → Connect to Project
-（自动注入 POSTGRES_URL 环境变量）
-
-- 留言板 / 访客簿
-- Pastebin（贴文字给别人）
-- 短链接 + 点击统计
-- 匿名提问箱
-- 每日一言（自己维护语录库）
-
-### Level 3：+ 外部 API（环境变量藏 Key）
-
-- AI 聊天页（OpenAI/DeepSeek/Claude 中转，流式输出）
-- 在线跑代码（Judge0）
-- 每日壁纸 / Bing 美图 API
-- 访客信息查询
-
-### Level 4：+ Cron Jobs（Settings → Cron Jobs）
-
-- 网站监控告警（挂了就推 Telegram）
-- RSS 定时抓取，个人信息流
-- 定时签到/数据备份
-
-### Level 5：架构外扩（本站不够用时）
-
-- Cloudflare Workers + D1/KV：全球边缘、免费额度更狠、可商用
-- 廉价 VPS（~5 美元/月）：常驻进程、机器人、游戏服务器、跑本地大模型
-- 图床/大文件：Cloudflare R2（ egress 免费）
-
----
-
-## 十一、已讨论过的功能灵感池（按 wow 值排序）
-
-| 功能 | 技术点 | 难度 |
+| 套件 | 覆盖 | 项数 |
 | --- | --- | --- |
-| 阅后即焚加密分享 | 前端 AES + 一次性令牌 | ★★★ |
-| 网页版隔空投送（Snapdrop 类） | WebRTC P2P + 信令函数 | ★★★★ |
-| 个人知识库 AI 问答（RAG） | 向量库 + 嵌入 + LLM | ★★★★★ |
-| 匿名聊天室 | SSE 实时推送 + 存库 | ★★★ |
-| 在线运行代码 | Judge0 API | ★★ |
-| 匿名提问箱 | CRUD + 简单后台 | ★★ |
-| 抽奖/投票 | 聚合统计 + IP 防刷 | ★★ |
-| 网站监控告警 | Cron + TG/邮件通知 | ★★★ |
-| Webhook 中转站 | 签名验证 + 转发 | ★★ |
-| 图床 | Vercel Blob/R2 + 压缩 | ★★★ |
-| 个人 RSS 阅读器 | 定时抓取 + 解析 | ★★★ |
-| 状态页 status page | Cron + 历史存储 | ★★ |
+| `tests/api_test.mjs` | 令牌签发/校验/过期/改密码失效、密码校验、safeEqual、requireAuth、配置自检、入参校验、api/ 与 admin/ 源文件语法 | 102 |
+| `tests/content_test.mjs` | 五种内容类型归一化、Markdown 渲染 / 安全性 / 边界、plain() 摘要 | 87 |
+| `tests/api_routes_test.mjs` | 四个接口全流程：未登录 401、CRUD、入参 400、404、405、优先级、SQL 注入、登录限流、缺配置 503、409 唯一性、级联删除、响应头 | 109 |
+| `tests/pages_audit.mjs` | 8 个公开页：内联脚本语法、零站外资源、同源 fetch、导航栏统一、静态兜底、Markdown 安全、各页功能点 | 119 |
+| `tests/admin_audit.mjs` | 后台：结构、深浅色主题、隐私（noindex/零站外资源）、Bearer 令牌、XSS 防护、七个标签功能点 | 87 |
+| `tests/nav_test.cjs` | 导航核心逻辑：links.js 数据体检、hostOf/initialOf/hueOf、查询匹配、分类过滤、标签收集、高亮区间、导入导出往返、真实数据全视图 | 91 |
+| `tests/nav_audit.cjs` | 导航静态审计：结构、零外部请求、DOM 接线、localStorage 键规范、功能点、全站一致性 | 54 |
+| **合计** | | **649** |
+
+> 注：`api_test.mjs` 的项数随 `api/` 与 `admin/` 下的 `.js` 文件数浮动（每个文件一条语法断言）；`api/hello.js` 删除后为 102。
+
+**CI**：`.github/workflows/ci.yml` —— push 或 PR 自动触发，ubuntu + Node 20，`npm ci` → 假驱动覆盖真包 → `npm test`。全绿才允许合并。
+
+---
+
+## 六、部署
+
+```text
+push 到 main → GitHub → Vercel 监听到 webhook → 自动构建 → 1~2 分钟生效
+```
+
+- 站点：<https://eraser.de5.net>（DNSHE 解析，A 记录指向 Vercel；副域名 eraser-pi.vercel.app 永远可用）
+- **没有构建步骤**：HTML/CSS/JS 原样分发，`api/*.js` 即函数，部署 = 搬运文件。
+- 改完先用无痕窗口（Ctrl+Shift+N）验证，避开缓存。
+
+---
+
+## 七、已知取舍（明确不做的事）
+
+1. **单文件大页不拆**：`nav/index.html` 约 26KB、`admin/index.html` 约 43KB。「双击能开、断网能看」是刻意选择——不引构建、不打包模块，一个文件就是一个完整应用。
+2. **无评论 / 无多人 / 无 PWA / 无构建步骤**：个人单用户站，这些都不需要。评论和多用户要一张用户表和一整套会话体系，与「密码放环境变量」的极简模型冲突。
+3. **md.js 转义三铁律**（改渲染器前必读）：① 先整体转义，再生成标签；② 已转义的内容不再二次转义（query string 里的 `&` 只变 `&amp;` 一次）；③ 代码块抽出后单独转义。`tests/content_test.mjs` 的「Markdown 安全性」一节就是这三条的死锁。
+4. **PATCH 语义现状**：`todos` / `events` 是**全量更新**（不传的字段会被重置），`content` 是**合并更新**（只传的字段被改，旧字段保留）。两者不统一——统一成合并语义是后续批次的事，现在照实写、照实用。
+5. **管理后台不引 `style.css`**：后台是独立应用，自带完整样式（含深色模式、刘海屏安全区），与公开页面视觉体系刻意隔离，改公开页样式不会波及后台。
+
+---
+
+## 八、本机提交方式
+
+本机 git https 直连不通（schannel 报错），提交走 GitHub API 脚本，不走 `git push`：
+
+```bash
+# 1. 写 manifest.tsv：每行 <A|M|D><Tab><仓库内相对路径>（A 新增 / M 修改 / D 删除）
+# 2. 用脚本推分支（manifest + gh api 完成 blob/tree/commit/ref）
+COMMIT_MSG="改了什么" bash eraser-site-plan/tools/push-branch.sh <分支名> eraser-site-plan/tools/<manifest>.tsv
+# 3. 开 PR（先不合并，QA 验证后由主理人合）
+gh pr create --base main --head <分支名> --title "标题" --body-file pr-body.md
+```
+
+脚本：`eraser-site-plan/tools/push-branch.sh`。分支名建议 `tXX-简述`（如 `t01-engineering-baseline`）。
 
 ---
 

@@ -1,0 +1,2 @@
+# 锁死行尾：仓库存 LF，杜绝 Windows 端 CRLF 污染 diff
+* text=auto eol=lf

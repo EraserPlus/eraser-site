@@ -1,0 +1,170 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
+const HERE = import.meta.dirname;
+const REPO = path.join(HERE, '..');
+const html = fs.readFileSync(path.join(REPO, 'admin', 'index.html'), 'utf8');
+
+let pass = 0, fail = 0;
+const check = (name, ok, extra) => {
+  if (ok) { pass++; console.log(`PASS  ${name}`); }
+  else { fail++; console.log(`FAIL  ${name}${extra ? '  -> ' + extra : ''}`); }
+};
+
+console.log('=== 结构 ===');
+const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+check('有 2 个内联 script（主题预设 + 主逻辑）', scripts.length === 2, String(scripts.length));
+scripts.forEach((s, i) => {
+  try { new Function(s); check(`内联 script #${i + 1} 语法正确`, true); }
+  catch (e) { check(`内联 script #${i + 1} 语法正确`, false, e.message); }
+});
+check('主题预设脚本在 <head> 里、样式之前（避免闪白）',
+      html.indexOf('data-theme') < html.indexOf('<style>') && html.indexOf('<style>') < html.indexOf('</head>'));
+
+console.log('\n=== 样式与主题 ===');
+check('自带完整样式（管理页是独立应用，不依赖全站 style.css）', /<style>[\s\S]{2000,}<\/style>/.test(html));
+check('定义了浅色变量', /:root\{[\s\S]*--card:#ffffff/.test(html));
+check('定义了深色变量', /html\[data-theme="dark"\]\{/.test(html));
+check('深色变量覆盖了背景、文字、边框、卡片', (() => {
+  const m = html.match(/html\[data-theme="dark"\]\{([\s\S]*?)\}/);
+  return !!m && /--bg:/.test(m[1]) && /--ink:/.test(m[1]) && /--line:/.test(m[1]) && /--card:/.test(m[1]);
+})());
+check('有主题切换按钮', /id="btnTheme"/.test(html));
+check('主题选择会持久化', /lsSet\(THEME_KEY/.test(html));
+check('首次访问跟随系统偏好', /prefers-color-scheme: dark/.test(html));
+check('手机端适配（viewport-fit=cover）', /viewport-fit=cover/.test(html));
+check('顶栏处理刘海屏安全区', /env\(safe-area-inset-top\)/.test(html));
+
+console.log('\n=== 隐私与外部请求 ===');
+check('声明不被搜索引擎收录', /name="robots"[^>]*noindex/i.test(html));
+{
+  const ext = [...html.matchAll(/(?:src|href)\s*=\s*["']((?:https?:)?\/\/[^"']+)["']/gi)].map(m => m[1]);
+  check('没有任何站外资源引用', ext.length === 0, ext.join(', '));
+  const cdn = [...html.matchAll(/\/\/(cdn|unpkg|fonts|googleapis|jsdelivr)[^"'\s)]*/gi)];
+  check('没有 CDN / 字体域名', cdn.length === 0, cdn.map(m => m[0]).join(', '));
+}
+
+console.log('\n=== 接口调用 ===');
+{
+  ['auth', 'todos', 'events'].forEach(function (p) {
+    check(`调用了 /api/${p}`, new RegExp('api\\("' + p + '"').test(html));
+  });
+  check('带上了 Bearer 令牌', /Authorization = "Bearer "/.test(html));
+  check('收到 401 自动退出登录', /r\.status === 401/.test(html) && /logout\(\)/.test(html));
+  check('令牌存 localStorage 且键名带命名空间', /eraser\.admin\.token/.test(html));
+  check('localStorage 读写包在 try/catch 里',
+        /function lsGet[\s\S]{0,140}catch/.test(html) && /function lsSet[\s\S]{0,160}catch/.test(html));
+  check('服务器未配好时给出可读提示', /服务器还没配好/.test(html));
+}
+
+console.log('\n=== 安全 ===');
+{
+  check('密码框是 type=password', /<input type="password"/.test(html));
+  check('密码框关闭自动填充建议', /autocomplete="current-password"/.test(html));
+  check('有 escapeHtml 用于提示文案', /function escapeHtml/.test(html));
+
+  check('el() 辅助函数用 textContent 而非 innerHTML',
+        /function el\(tag, cls, text\)\{[\s\S]{0,220}textContent/.test(html));
+  check('待办标题走 el() 渲染', /el\("div", "t", t\.title\)/.test(html));
+  check('日程标题走 el() 渲染', /el\("div", "t", ev\.title\)/.test(html));
+  check('待办备注走 el() 渲染', /el\("div", "note", t\.note\)/.test(html));
+  check('日程备注走 el() 渲染', /el\("div", "note", ev\.note\)/.test(html));
+
+  const assigns = [...html.matchAll(/\.innerHTML\s*=\s*([^;]+);/g)].map(m => m[1].trim());
+  const risky = assigns.filter(v => {
+    if (v === '""') return false;
+    if (/escapeHtml/.test(v)) return false;
+    if (/^"最近 7 天完成 <b>"\s*\+\s*doneWeek/.test(v)) return false;
+    return true;
+  });
+  check('innerHTML 只用于清空 / 转义文案 / 纯数字', risky.length === 0, risky.join(' | '));
+  check('清空列表用 innerHTML = ""（不拼数据）', assigns.includes('""'));
+
+  check('删除操作有二次确认', (html.match(/confirm\(/g) || []).length >= 3,
+        String((html.match(/confirm\(/g) || []).length));
+  check('源码里没有硬编码密码', !/password\s*[:=]\s*["'][^"']{6,}["']/.test(html));
+}
+
+console.log('\n=== 功能点 ===');
+{
+  const must = [
+    ['三个标签页：今天 / 待办 / 日程', /data-tab="today"[\s\S]*data-tab="todos"[\s\S]*data-tab="events"/],
+    ['今日总览：日期与星期', /id="heroDate"/],
+    ['今日总览：三个统计数字', /id="sTodo"[\s\S]*id="sEvent"[\s\S]*id="sOver"/],
+    ['今日总览：今日日程区块', /id="todayEvents"/],
+    ['今日总览：今天该做的区块', /id="todayTodos"/],
+    ['今日总览：逾期区块（有才显示）', /id="overdueCard"/],
+    ['今日总览：最近 7 天完成统计', /weekSummary/],
+    ['月历：标题与翻月', /id="calTitle"[\s\S]*id="calPrev"[\s\S]*id="calNext"/],
+    ['月历：回到今天', /id="calToday"/],
+    ['月历：有日程的日期显示圆点', /el\("span", "dot"\)/],
+    ['月历：点日期切换选中日', /selDay = day/],
+    ['日程：按天查看', /function renderDayEvents/],
+    ['待办优先级：高 / 中 / 低', /data-p="2"[\s\S]*data-p="1"[\s\S]*data-p="0"/],
+    ['待办筛选：未完成 / 全部 / 逾期 / 已完成', /data-f="open"[\s\S]*data-f="all"[\s\S]*data-f="over"[\s\S]*data-f="done"/],
+    ['新增待办', /api\("todos",\{method:"POST"/],
+    ['编辑待办（复用顶部表单）', /function startEditTodo/],
+    ['勾选完成', /function toggleTodo/],
+    ['删除待办', /function removeTodo/],
+    ['新增日程', /api\("events",\{method:"POST"/],
+    ['编辑日程', /function startEditEvent/],
+    ['删除日程', /function removeEvent/],
+    ['截止日期友好显示', /今天到期[\s\S]*明天到期[\s\S]*逾期 /],
+    ['优先级用颜色圆点表示', /\.pri\.p2\{ background:var\(--red\)/],
+    ['加载失败不静默', /catch\(function\(e\)\{ say\("app", e\.message, "err"\)/],
+  ];
+  must.forEach(([name, re]) => check(`包含：${name}`, re.test(html)));
+}
+
+console.log('\n=== 内容管理（导航 / 博客 / 文件 / 页面）===');
+{
+  const must = [
+    ['七个标签页', /data-tab="today"[\s\S]*data-tab="todos"[\s\S]*data-tab="events"[\s\S]*data-tab="nav"[\s\S]*data-tab="post"[\s\S]*data-tab="file"[\s\S]*data-tab="page"/],
+    ['导航标签内容区', /id="tab-nav"[\s\S]*id="navHost"/],
+    ['博客标签内容区', /id="tab-post"[\s\S]*id="postHost"/],
+    ['文件标签内容区', /id="tab-file"[\s\S]*id="fileHost"/],
+    ['页面标签内容区', /id="tab-page"[\s\S]*id="pageHost"/],
+    ['加载了 Markdown 渲染器', /<script src="\.\.\/md\.js"><\/script>/],
+    ['加载了内容管理模块', /<script src="content\.js"><\/script>/],
+    ['初始化时把 api 和 say 传进去', /ContentAdmin\.init\(\{\s*api:\s*api,\s*say:\s*say\s*\}\)/],
+    ['切标签时调用内容渲染', /ContentAdmin\.render\(tab\)/],
+    ['标签栏可横向滚动（手机上有 7 个标签）', /\.tabs\{\s*overflow-x:auto/],
+    ['表单弹层样式', /\.cf-overlay\{/],
+    ['Markdown 预览样式', /\.mdprev\{/],
+  ];
+  must.forEach(([name, re]) => check(`包含：${name}`, re.test(html)));
+
+  const cjs = fs.readFileSync(path.join(REPO, 'admin', 'content.js'), 'utf8');
+  try { new Function(cjs); check('admin/content.js 语法正确', true); }
+  catch (e) { check('admin/content.js 语法正确', false, e.message); }
+
+  const cMust = [
+    ['四种内容都有字段定义', /nav_category:[\s\S]*nav_link:[\s\S]*post:[\s\S]*file:[\s\S]*page:/],
+    ['通用表单构建器', /function buildForm\(type, onSave, onCancel\)/],
+    ['表单弹层', /function openForm\(title, formNode\)/],
+    ['导航：可导入旧的 links.js', /function importFromLinksJs/],
+    ['导航：分类可增删改', /function editCategory/],
+    ['导航：链接可增删改', /function editLink/],
+    ['删除前二次确认', /if \(!confirm\(/],
+    ['失败时提示不静默', /catch\(function \(e\) \{ say\("app", e\.message, "err"\); \}\)/],
+    ['Markdown 预览用 MD.render', /md\.render\(ta\.value\)/],
+  ];
+  cMust.forEach(([name, re]) => check(`content.js 包含：${name}`, re.test(cjs)));
+
+  /* content.js 里不能把用户数据拼进 innerHTML */
+  const assigns = [...cjs.matchAll(/\.innerHTML\s*=\s*([^;]+);/g)].map(m => m[1].trim());
+  const risky = assigns.filter(v => v !== '""' && !/md\.render|MD\.render/.test(v));
+  check('content.js 的 innerHTML 只用于清空或 MD.render', risky.length === 0, risky.join(' | '));
+  check('content.js 用 textContent 渲染列表内容',
+        /el\("div", "t", opts\.title\(it\)\)/.test(cjs) && /function el\(tag, cls, text\)/.test(cjs));
+}
+
+console.log('\n=== 与全站一致性 ===');
+{
+  check('标题正确', /<title>管理后台 · Eraser 小站<\/title>/.test(html));
+  check('主色与全站一致（#2563eb）', html.includes('#2563eb'));
+  check('管理页没有加入公开导航栏（保持隐蔽）', !/class="navbar"/.test(html));
+}
+
+console.log(`\n${pass} passed, ${fail} failed`);
+process.exit(fail ? 1 : 0);
