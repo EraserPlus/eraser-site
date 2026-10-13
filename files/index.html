@@ -22,25 +22,22 @@
   <h1>📦 文件仓库</h1>
   <p class="muted">把文件传进仓库的 <code>files/</code> 目录，然后在管理后台的「文件」标签加一条记录。</p>
 
-  <!-- 静态兜底：接口不可用时显示这些 -->
-  <div id="list">
-    <div class="list-item">
-      <div><div class="name">示例文件.txt</div><div class="desc">演示用，可删除</div></div>
-      <a href="demo.txt" download><button class="ghost">下载</button></a>
-    </div>
-  </div>
+  <!-- 空状态：还没有文件、或接口不可用时显示，页面不会白屏 -->
+  <div id="list"></div>
+  <p class="muted" id="hint">还没有文件。去管理后台的「文件」标签加一条记录。</p>
 </div>
 
 <script>
 (function(){
   var list = document.getElementById("list");
+  var hint = document.getElementById("hint");
   if (!window.fetch) return;
 
   fetch("/api/content?type=file", { headers: { Accept: "application/json" } })
     .then(function(r){ return r.ok ? r.json() : null; })
     .then(function(j){
       var items = (j && j.items) || [];
-      if (!items.length) return;   // 数据库里还没内容，保留静态兜底
+      if (!items.length){ hint.style.display = ""; return; }   // 数据库里还没内容，保留静态兜底
 
       list.innerHTML = "";
       items.forEach(function(f){
@@ -73,8 +70,9 @@
 
         list.appendChild(row);
       });
+      hint.style.display = "none";
     })
-    .catch(function(){ /* 接口挂了就保留静态兜底 */ });
+    .catch(function(){ hint.style.display = ""; });   // 接口挂了就显示空状态提示
 })();
 </script>
 </body>

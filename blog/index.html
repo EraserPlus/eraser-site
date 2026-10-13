@@ -22,14 +22,9 @@
   <h1>✏️ 博客</h1>
   <p class="muted">文章在管理后台里用 Markdown 写，这里自动列出。</p>
 
-  <!-- 静态兜底：接口不可用时显示这些 -->
-  <div id="list">
-    <div class="list-item">
-      <div><div class="name">我的第一篇文章：这个站是怎么搭的</div><div class="desc">2026-10-13</div></div>
-      <a href="posts/hello.html"><button class="ghost">阅读</button></a>
-    </div>
-  </div>
-  <p class="muted" id="hint" style="display:none">还没有文章。去管理后台的「博客」标签写一篇。</p>
+  <!-- 空状态：还没有文章、或接口不可用时显示，页面不会白屏 -->
+  <div id="list"></div>
+  <p class="muted" id="hint">还没有文章。去管理后台的「博客」标签写一篇。</p>
 </div>
 
 <script>
@@ -48,7 +43,7 @@
       var items = ((j && j.items) || []).filter(function(p){
         return p.data && p.data.published !== false;
       });
-      if (!items.length) return;   // 数据库里还没内容，保留静态兜底
+      if (!items.length){ hint.style.display = ""; return; }   // 数据库里还没内容，保留静态兜底
 
       /* 新的排前面 */
       items.sort(function(a, b){
@@ -94,8 +89,9 @@
 
         list.appendChild(row);
       });
+      hint.style.display = "none";
     })
-    .catch(function(){ /* 接口挂了就保留静态兜底 */ });
+    .catch(function(){ hint.style.display = ""; });   // 接口挂了就显示空状态提示
 })();
 </script>
 </body>

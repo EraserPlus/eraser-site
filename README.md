@@ -55,11 +55,9 @@ eraser-site/
 │   └── links.js          静态兜底数据（纯数据，无代码）
 ├── blog/
 │   ├── index.html        文章列表（读 /api/content?type=post）
-│   ├── post.html         文章详情（?slug=xxx，用 md.js 渲染正文）
-│   └── posts/hello.html  旧版文章模板（留档，新文章走后台）
+│   └── post.html         文章详情（?slug=xxx，用 md.js 渲染正文）
 ├── files/
-│   ├── index.html        文件下载列表
-│   └── demo.txt          示例文件
+│   └── index.html        文件下载列表
 └── tools/
     ├── index.html        工具列表
     └── password.html     密码生成器（新工具的复制模板）
