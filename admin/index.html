@@ -5,149 +5,293 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <title>管理后台 · Eraser 小站</title>
-<link rel="stylesheet" href="../style.css">
+<script>
+/* 尽早定主题，避免闪白 */
+(function(){
+  try{
+    var t = localStorage.getItem("eraser.admin.theme");
+    if (!t) t = (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+    document.documentElement.setAttribute("data-theme", t);
+  }catch(e){ document.documentElement.setAttribute("data-theme","light"); }
+})();
+</script>
 <style>
 :root{
-  --blue:#2563eb; --ink:#24292f; --muted:#6b7280; --line:#e5e7eb;
-  --red:#dc2626; --red-l:#fef2f2; --green:#16a34a; --green-l:#f0fdf4;
-  --amber:#b45309; --amber-l:#fffbeb;
+  --blue:#2563eb; --blue-l:#eff6ff;
+  --ink:#1f2328; --ink2:#57606a; --muted:#8b949e;
+  --line:#e6e8eb; --line2:#d8dee4;
+  --bg:#f2f4f7; --card:#ffffff; --sunk:#f6f8fa;
+  --red:#d1242f; --red-l:#ffebe9;
+  --green:#1a7f37; --green-l:#dafbe1;
+  --amber:#9a6700; --amber-l:#fff8c5;
+  --shadow:0 1px 2px rgba(27,31,36,.06), 0 3px 8px rgba(27,31,36,.04);
 }
-body{ font-size:15px; -webkit-font-smoothing:antialiased; padding-bottom:env(safe-area-inset-bottom); }
-.wrap{ max-width:720px; margin:0 auto; padding:16px 14px 60px; }
+html[data-theme="dark"]{
+  --blue:#4c8dff; --blue-l:#16233a;
+  --ink:#e6edf3; --ink2:#9aa4b0; --muted:#7d8590;
+  --line:#272c33; --line2:#343b44;
+  --bg:#0d1117; --card:#161b22; --sunk:#1c2128;
+  --red:#ff7b72; --red-l:#2d1517;
+  --green:#3fb950; --green-l:#0f2417;
+  --amber:#d29922; --amber-l:#2b2210;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 3px 10px rgba(0,0,0,.3);
+}
+*{ box-sizing:border-box; }
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased;
+  padding-bottom:calc(24px + env(safe-area-inset-bottom));
+}
 .hide{ display:none !important; }
+a{ color:var(--blue); }
 
-/* 登录 */
-.login-card{ background:#fff; border:1px solid var(--line); border-radius:12px; padding:22px; margin-top:36px; }
-.login-card h1{ font-size:20px; margin:0 0 6px; }
-.login-card p{ color:var(--muted); font-size:13.5px; margin:0 0 18px; }
-input, textarea, select{ width:100%; padding:12px; border:1px solid #d0d7de; border-radius:8px; font-size:15px; font-family:inherit; }
-input:focus, textarea:focus{ outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgba(37,99,235,.12); }
-.btn{ background:var(--blue); color:#fff; border:none; border-radius:8px; padding:12px 18px; font-size:15px; cursor:pointer; }
+.wrap{ max-width:760px; margin:0 auto; padding:0 14px; }
+.login-box{ max-width:400px; margin:14vh auto 0; background:var(--card); border:1px solid var(--line);
+            border-radius:16px; padding:28px 24px; box-shadow:var(--shadow); }
+.login-box .logo{ width:44px; height:44px; border-radius:12px; background:var(--blue); color:#fff;
+                  display:flex; align-items:center; justify-content:center; font-size:22px; margin-bottom:16px; }
+.login-box h1{ font-size:20px; margin:0 0 6px; }
+.login-box p{ color:var(--ink2); font-size:13.5px; margin:0 0 20px; }
+
+input, textarea, select{
+  width:100%; padding:11px 12px; border:1px solid var(--line2); border-radius:10px;
+  font-size:15px; font-family:inherit; background:var(--card); color:var(--ink);
+}
+input:focus, textarea:focus, select:focus{ outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgba(37,99,235,.14); }
+input::placeholder, textarea::placeholder{ color:var(--muted); }
+input[type=date], input[type=datetime-local]{ min-height:44px; }
+.btn{ border:none; border-radius:10px; padding:11px 18px; font-size:15px; font-family:inherit;
+      cursor:pointer; background:var(--blue); color:#fff; font-weight:500; }
+.btn:active{ transform:translateY(1px); }
 .btn:disabled{ opacity:.5; cursor:not-allowed; }
-.btn.ghost{ background:#fff; color:var(--muted); border:1px solid var(--line); }
-.btn.danger{ background:#fff; color:var(--red); border:1px solid #fecaca; }
-.btn.sm{ padding:7px 12px; font-size:13.5px; }
+.btn.ghost{ background:var(--sunk); color:var(--ink2); border:1px solid var(--line2); }
+.btn.sm{ padding:7px 13px; font-size:13.5px; border-radius:8px; }
+.btn.icon{ background:transparent; color:var(--ink2); padding:8px 10px; font-size:17px; line-height:1; }
 
-/* 顶栏 */
-.bar{ position:sticky; top:0; z-index:10; background:#fff; border-bottom:1px solid var(--line);
-      display:flex; align-items:center; justify-content:space-between; gap:10px;
-      padding:12px 14px; padding-top:calc(12px + env(safe-area-inset-top)); }
-.bar b{ font-size:16px; }
-.tabs{ display:flex; gap:6px; background:#f1f5f9; border-radius:9px; padding:3px; margin:14px 0 16px; }
-.tabs button{ flex:1; border:none; background:transparent; padding:9px 6px; border-radius:7px;
-              font-size:14px; color:var(--muted); cursor:pointer; }
-.tabs button.on{ background:#fff; color:var(--blue); font-weight:600; box-shadow:0 1px 2px rgba(0,0,0,.06); }
+.top{ position:sticky; top:0; z-index:30; background:var(--card); border-bottom:1px solid var(--line);
+      padding:10px 14px; padding-top:calc(10px + env(safe-area-inset-top));
+      display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.top .title{ font-weight:600; font-size:16px; }
+.top .ops{ display:flex; align-items:center; gap:2px; }
 
-/* 表单 */
-.form{ background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:16px; }
-.form .row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-.form label{ display:block; font-size:12.5px; color:var(--muted); margin:10px 0 4px; }
-.form label:first-child{ margin-top:0; }
-.form .acts{ display:flex; gap:8px; margin-top:14px; }
-.form .acts .btn{ flex:1; }
-.editing{ background:var(--amber-l); border-color:#fde68a; }
+.tabs{ display:flex; gap:4px; background:var(--sunk); border:1px solid var(--line);
+       border-radius:12px; padding:4px; margin:16px 0; }
+.tabs button{ flex:1; border:none; background:transparent; padding:10px 6px; border-radius:9px;
+              font-size:14.5px; font-family:inherit; color:var(--ink2); cursor:pointer; font-weight:500; }
+.tabs button.on{ background:var(--card); color:var(--blue); box-shadow:var(--shadow); }
 
-/* 列表 */
-.list{ display:flex; flex-direction:column; gap:8px; }
-.item{ background:#fff; border:1px solid var(--line); border-radius:10px; padding:12px 13px;
-       display:flex; align-items:flex-start; gap:11px; }
-.item .box{ flex:0 0 22px; width:22px; height:22px; border:2px solid #cbd5e1; border-radius:6px;
+.card{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; box-shadow:var(--shadow); }
+.card + .card{ margin-top:12px; }
+.card h2{ font-size:14px; margin:0 0 12px; color:var(--ink2); font-weight:600;
+          display:flex; align-items:center; gap:7px; }
+.card h2 .cnt{ background:var(--sunk); color:var(--ink2); font-size:12px; font-weight:500;
+               border-radius:20px; padding:1px 9px; }
+
+.hero{ text-align:center; padding:6px 0 20px; }
+.hero .d{ font-size:26px; font-weight:600; letter-spacing:-.3px; }
+.hero .w{ color:var(--ink2); font-size:13.5px; margin-top:2px; }
+.stats{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px; }
+.stat{ background:var(--card); border:1px solid var(--line); border-radius:14px;
+       padding:14px 10px; text-align:center; box-shadow:var(--shadow); }
+.stat b{ display:block; font-size:24px; font-weight:600; line-height:1.2; }
+.stat span{ font-size:12.5px; color:var(--ink2); }
+.stat.bad b{ color:var(--red); }
+
+.item{ display:flex; align-items:flex-start; gap:11px; padding:11px 0; border-top:1px solid var(--line); }
+.item:first-of-type{ border-top:none; padding-top:2px; }
+.item .box{ flex:0 0 22px; width:22px; height:22px; border:2px solid var(--line2); border-radius:7px;
             cursor:pointer; display:flex; align-items:center; justify-content:center;
-            font-size:14px; color:#fff; margin-top:1px; }
+            font-size:13px; color:#fff; margin-top:1px; transition:background .15s, border-color .15s; }
 .item .box.on{ background:var(--green); border-color:var(--green); }
+.item .box:active{ transform:scale(.92); }
 .item .main{ flex:1; min-width:0; }
 .item .t{ font-size:15px; word-break:break-word; }
-.item.done .t{ text-decoration:line-through; color:#9ca3af; }
-.item .meta{ font-size:12.5px; color:var(--muted); margin-top:3px; display:flex; flex-wrap:wrap; gap:8px; }
-.item .note{ font-size:13px; color:#4b5563; margin-top:5px; white-space:pre-wrap; word-break:break-word; }
-.item .ops{ display:flex; gap:4px; flex:0 0 auto; }
-.item .ops button{ border:none; background:transparent; color:#9ca3af; font-size:15px;
-                   padding:4px 6px; cursor:pointer; border-radius:6px; }
-.item .ops button:hover{ background:#f1f5f9; color:var(--ink); }
-.due{ font-weight:600; }
-.due.soon{ color:var(--amber); }
-.due.over{ color:var(--red); }
+.item.done .t{ text-decoration:line-through; color:var(--muted); }
+.item .sub{ font-size:12.5px; color:var(--ink2); margin-top:2px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.item .note{ font-size:13px; color:var(--ink2); margin-top:4px; white-space:pre-wrap; word-break:break-word; }
+.item .ops{ display:flex; gap:0; flex:0 0 auto; }
+.item .ops button{ border:none; background:transparent; color:var(--muted); font-size:15px;
+                   padding:5px 7px; cursor:pointer; border-radius:7px; line-height:1; }
+.item .ops button:hover{ background:var(--sunk); color:var(--ink); }
 
-.grp{ font-size:12.5px; font-weight:600; color:var(--muted); margin:18px 0 8px; }
-.grp:first-child{ margin-top:0; }
+.pri{ display:inline-block; width:7px; height:7px; border-radius:50%; flex:0 0 7px; margin-top:9px; }
+.pri.p2{ background:var(--red); }
+.pri.p1{ background:var(--amber); }
+.pri.p0{ background:var(--muted); }
 
-.msg{ font-size:13.5px; border-radius:9px; padding:11px 13px; margin-bottom:14px; border:1px solid; }
-.msg.err{ background:var(--red-l); border-color:#fecaca; color:#7f1d1d; }
-.msg.ok{ background:var(--green-l); border-color:#bbf7d0; color:#14532d; }
-.msg.warn{ background:var(--amber-l); border-color:#fde68a; color:#78350f; }
-.empty{ text-align:center; color:var(--muted); font-size:14px; padding:40px 16px; }
-.foot{ text-align:center; color:var(--muted); font-size:12px; margin-top:28px; line-height:1.9; }
+.pill{ font-size:11.5px; padding:1px 8px; border-radius:20px; background:var(--sunk); color:var(--ink2); }
+.pill.over{ background:var(--red-l); color:var(--red); font-weight:500; }
+.pill.today{ background:var(--amber-l); color:var(--amber); font-weight:500; }
+.pill.time{ background:var(--blue-l); color:var(--blue); font-weight:500; }
+
+.filters{ display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap; }
+.filters button{ border:1px solid var(--line2); background:var(--card); color:var(--ink2);
+                 border-radius:20px; padding:6px 14px; font-size:13px; font-family:inherit; cursor:pointer; }
+.filters button.on{ background:var(--blue); border-color:var(--blue); color:#fff; font-weight:500; }
+
+.prisel{ display:flex; gap:6px; }
+.prisel button{ flex:1; border:1px solid var(--line2); background:var(--card); color:var(--ink2);
+                border-radius:9px; padding:8px 0; font-size:13.5px; font-family:inherit; cursor:pointer; }
+.prisel button.on[data-p="2"]{ background:var(--red-l); border-color:var(--red); color:var(--red); font-weight:500; }
+.prisel button.on[data-p="1"]{ background:var(--amber-l); border-color:var(--amber); color:var(--amber); font-weight:500; }
+.prisel button.on[data-p="0"]{ background:var(--sunk); border-color:var(--ink2); color:var(--ink2); font-weight:500; }
+
+.cal-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.cal-head b{ font-size:15.5px; font-weight:600; }
+.cal-head .nav{ display:flex; gap:4px; }
+.cal-head button{ border:1px solid var(--line2); background:var(--card); color:var(--ink2);
+                  width:32px; height:32px; border-radius:9px; cursor:pointer; font-size:15px; line-height:1; font-family:inherit; }
+.cal-dow{ display:grid; grid-template-columns:repeat(7,1fr); gap:3px; margin-bottom:3px; }
+.cal-dow span{ text-align:center; font-size:11.5px; color:var(--muted); padding:3px 0; }
+.cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+.cal-cell{ aspect-ratio:1/1; border-radius:9px; border:1px solid transparent; background:transparent;
+           display:flex; flex-direction:column; align-items:center; justify-content:center;
+           font-size:14px; cursor:pointer; position:relative; color:var(--ink); }
+.cal-cell.empty{ cursor:default; }
+.cal-cell:not(.empty):hover{ background:var(--sunk); }
+.cal-cell.today{ color:var(--blue); font-weight:600; }
+.cal-cell.sel{ background:var(--blue); color:#fff; font-weight:600; }
+.cal-cell.sel .dot{ background:#fff !important; }
+.cal-cell .dot{ width:5px; height:5px; border-radius:50%; background:var(--blue); position:absolute; bottom:6px; }
+
+.msg{ font-size:13.5px; border-radius:10px; padding:11px 14px; margin-bottom:14px; border:1px solid; }
+.msg.err{ background:var(--red-l); border-color:var(--red); color:var(--red); }
+.msg.ok{ background:var(--green-l); border-color:var(--green); color:var(--green); }
+.msg.warn{ background:var(--amber-l); border-color:var(--amber); color:var(--amber); }
+.empty{ text-align:center; color:var(--muted); font-size:13.5px; padding:26px 10px; }
+.foot{ text-align:center; color:var(--muted); font-size:12px; margin-top:26px; line-height:1.9; }
+.foot b{ color:var(--ink2); }
+.row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+label.fl{ display:block; font-size:12.5px; color:var(--ink2); margin:12px 0 5px; }
+label.fl.first{ margin-top:0; }
+.form-acts{ display:flex; gap:8px; margin-top:16px; }
+.form-acts .btn{ flex:1; }
 </style>
 </head>
 <body>
 
-<!-- ============ 登录 ============ -->
 <div id="login" class="wrap">
-  <div class="login-card">
+  <div class="login-box">
+    <div class="logo">🔒</div>
     <h1>管理后台</h1>
-    <p>输入管理密码。这个页面不会被搜索引擎收录。</p>
+    <p>输入管理密码。此页不会被搜索引擎收录。</p>
     <div id="loginMsg"></div>
-    <label style="display:block;font-size:12.5px;color:var(--muted);margin-bottom:5px">管理密码</label>
-    <input type="password" id="pwd" placeholder="输入密码" autocomplete="current-password" spellcheck="false">
+    <input type="password" id="pwd" placeholder="管理密码" autocomplete="current-password" spellcheck="false">
     <div style="margin-top:14px"><button class="btn" id="btnLogin" style="width:100%">登录</button></div>
   </div>
 </div>
 
-<!-- ============ 主界面 ============ -->
 <div id="app" class="hide">
-  <div class="bar">
-    <b>管理后台</b>
-    <button class="btn ghost sm" id="btnLogout">退出</button>
+  <div class="top">
+    <span class="title">管理后台</span>
+    <span class="ops">
+      <button class="btn icon" id="btnTheme" title="切换深色 / 浅色">🌙</button>
+      <button class="btn ghost sm" id="btnLogout">退出</button>
+    </span>
   </div>
 
   <div class="wrap">
     <div id="appMsg"></div>
 
     <div class="tabs">
-      <button data-tab="todos" class="on">待办事项</button>
-      <button data-tab="events">日程时间表</button>
+      <button data-tab="today" class="on">今天</button>
+      <button data-tab="todos">待办</button>
+      <button data-tab="events">日程</button>
     </div>
 
-    <!-- 待办 -->
-    <section id="tab-todos">
-      <div class="form" id="todoForm">
-        <label>标题</label>
-        <input type="text" id="tTitle" placeholder="要做什么" autocomplete="off">
-        <div class="row2">
-          <div><label>截止日期（可留空）</label><input type="date" id="tDue"></div>
-          <div><label>备注（可留空）</label><input type="text" id="tNote" placeholder="补充说明" autocomplete="off"></div>
+    <section id="tab-today">
+      <div class="hero">
+        <div class="d" id="heroDate">—</div>
+        <div class="w" id="heroWeek"></div>
+      </div>
+      <div class="stats">
+        <div class="stat"><b id="sTodo">0</b><span>待办</span></div>
+        <div class="stat"><b id="sEvent">0</b><span>今日日程</span></div>
+        <div class="stat" id="sOverBox"><b id="sOver">0</b><span>已逾期</span></div>
+      </div>
+      <div class="card">
+        <h2>📅 今日日程 <span class="cnt" id="todayEventCnt">0</span></h2>
+        <div id="todayEvents"></div>
+      </div>
+      <div class="card">
+        <h2>✅ 今天该做的 <span class="cnt" id="todayTodoCnt">0</span></h2>
+        <div id="todayTodos"></div>
+      </div>
+      <div class="card hide" id="overdueCard">
+        <h2>⚠️ 已经逾期 <span class="cnt" id="overdueCnt">0</span></h2>
+        <div id="overdueList"></div>
+      </div>
+      <p class="foot" id="weekSummary"></p>
+    </section>
+
+    <section id="tab-todos" class="hide">
+      <div class="card">
+        <h2 id="todoFormTitle">➕ 添加待办</h2>
+        <label class="fl first">要做什么</label>
+        <input type="text" id="tTitle" placeholder="比如：交房租" autocomplete="off">
+        <label class="fl">优先级</label>
+        <div class="prisel" id="tPri">
+          <button type="button" data-p="2">高</button>
+          <button type="button" data-p="1" class="on">中</button>
+          <button type="button" data-p="0">低</button>
         </div>
-        <div class="acts">
+        <div class="row2" style="margin-top:12px">
+          <div><label class="fl first">截止日期（可空）</label><input type="date" id="tDue"></div>
+          <div><label class="fl first">备注（可空）</label><input type="text" id="tNote" placeholder="补充说明" autocomplete="off"></div>
+        </div>
+        <div class="form-acts">
           <button class="btn" id="btnTodoSave">添加</button>
-          <button class="btn ghost hide" id="btnTodoCancel">取消编辑</button>
+          <button class="btn ghost hide" id="btnTodoCancel">取消</button>
         </div>
       </div>
-      <div id="todoList" class="list"></div>
+
+      <div class="filters" id="todoFilters">
+        <button type="button" data-f="open" class="on">未完成</button>
+        <button type="button" data-f="all">全部</button>
+        <button type="button" data-f="over">已逾期</button>
+        <button type="button" data-f="done">已完成</button>
+      </div>
+      <div class="card"><div id="todoList"></div></div>
     </section>
 
-    <!-- 日程 -->
     <section id="tab-events" class="hide">
-      <div class="form" id="eventForm">
-        <label>标题</label>
-        <input type="text" id="eTitle" placeholder="什么事" autocomplete="off">
-        <div class="row2">
-          <div><label>开始</label><input type="datetime-local" id="eStart"></div>
-          <div><label>结束（可留空）</label><input type="datetime-local" id="eEnd"></div>
+      <div class="card">
+        <div class="cal-head">
+          <b id="calTitle">—</b>
+          <span class="nav">
+            <button type="button" id="calPrev">‹</button>
+            <button type="button" id="calToday" style="width:auto;padding:0 10px;font-size:13px">今天</button>
+            <button type="button" id="calNext">›</button>
+          </span>
         </div>
-        <label>备注（可留空）</label>
+        <div class="cal-dow"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
+        <div class="cal-grid" id="calGrid"></div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <h2 id="dayTitle">当天安排 <span class="cnt" id="dayCnt">0</span></h2>
+        <div id="dayEvents"></div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <h2 id="eventFormTitle">➕ 添加日程</h2>
+        <label class="fl first">什么事</label>
+        <input type="text" id="eTitle" placeholder="比如：和客户开会" autocomplete="off">
+        <div class="row2" style="margin-top:12px">
+          <div><label class="fl first">开始</label><input type="datetime-local" id="eStart"></div>
+          <div><label class="fl first">结束（可空）</label><input type="datetime-local" id="eEnd"></div>
+        </div>
+        <label class="fl">备注（可空）</label>
         <input type="text" id="eNote" placeholder="补充说明" autocomplete="off">
-        <div class="acts">
+        <div class="form-acts">
           <button class="btn" id="btnEventSave">添加</button>
-          <button class="btn ghost hide" id="btnEventCancel">取消编辑</button>
+          <button class="btn ghost hide" id="btnEventCancel">取消</button>
         </div>
       </div>
-      <div id="eventList" class="list"></div>
     </section>
 
-    <p class="foot">
-      数据存在服务器上，手机和电脑看到同一份<br>
-      登录状态保留 30 天，退出后需要重新输密码
-    </p>
+    <p class="foot">数据存在服务器上，手机和电脑看到同一份<br>登录状态保留 30 天</p>
   </div>
 </div>
 
@@ -156,33 +300,32 @@ input:focus, textarea:focus{ outline:none; border-color:var(--blue); box-shadow:
 (function(){
 var $ = function(id){ return document.getElementById(id); };
 var TOKEN_KEY = "eraser.admin.token";
+var THEME_KEY = "eraser.admin.theme";
 
-/* ---------- 令牌 ---------- */
-function getToken(){ try { return localStorage.getItem(TOKEN_KEY) || ""; } catch(e){ return ""; } }
-function setToken(t){ try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch(e){} }
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function lsSet(k,v){ try{ if (v==null) localStorage.removeItem(k); else localStorage.setItem(k,v); }catch(e){} }
+function getToken(){ return lsGet(TOKEN_KEY) || ""; }
+function setToken(t){ lsSet(TOKEN_KEY, t || null); }
 
-/* ---------- 提示 ---------- */
 var msgTimers = {};
+function escapeHtml(s){
+  return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
 function say(which, text, kind){
   var el = $(which === "login" ? "loginMsg" : "appMsg");
   if (!text){ el.innerHTML = ""; return; }
-  el.innerHTML = '<div class="msg ' + (kind || "ok") + '">' + escapeHtml(text) + '</div>';
+  el.innerHTML = '<div class="msg ' + (kind||"ok") + '">' + escapeHtml(text) + '</div>';
   clearTimeout(msgTimers[which]);
-  if (kind !== "err") msgTimers[which] = setTimeout(function(){ el.innerHTML = ""; }, 4000);
-}
-function escapeHtml(s){
-  return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  if (kind !== "err") msgTimers[which] = setTimeout(function(){ el.innerHTML = ""; }, 3500);
 }
 
-/* ---------- 请求 ---------- */
 function api(path, opts){
   opts = opts || {};
-  var headers = { "Content-Type": "application/json" };
+  var headers = { "Content-Type":"application/json" };
   var t = getToken();
   if (t) headers.Authorization = "Bearer " + t;
   return fetch("/api/" + path, {
-    method: opts.method || "GET",
-    headers: headers,
+    method: opts.method || "GET", headers: headers,
     body: opts.body ? JSON.stringify(opts.body) : undefined
   }).then(function(r){
     return r.json().catch(function(){ return {}; }).then(function(j){
@@ -193,333 +336,374 @@ function api(path, opts){
   });
 }
 
-/* ---------- 登录 / 退出 ---------- */
 function showLogin(){ $("login").classList.remove("hide"); $("app").classList.add("hide"); }
 function showApp(){ $("login").classList.add("hide"); $("app").classList.remove("hide"); }
 function logout(){ setToken(""); showLogin(); }
-
 function doLogin(){
   var pwd = $("pwd").value;
-  if (!pwd){ say("login", "请输入密码", "err"); return; }
-  var b = $("btnLogin");
-  b.disabled = true; b.textContent = "登录中…";
-  api("auth", { method: "POST", body: { password: pwd } })
-    .then(function(j){
-      setToken(j.token);
-      $("pwd").value = "";
-      say("login", "");
-      enterApp();
-    })
+  if (!pwd){ say("login","请输入密码","err"); return; }
+  var b = $("btnLogin"); b.disabled = true; b.textContent = "登录中…";
+  api("auth", { method:"POST", body:{ password: pwd } })
+    .then(function(j){ setToken(j.token); $("pwd").value=""; say("login",""); enterApp(); })
     .catch(function(e){ say("login", e.message, "err"); })
-    .then(function(){ b.disabled = false; b.textContent = "登录"; });
+    .then(function(){ b.disabled=false; b.textContent="登录"; });
 }
 $("btnLogin").addEventListener("click", doLogin);
 $("pwd").addEventListener("keydown", function(e){ if (e.key === "Enter") doLogin(); });
-$("btnLogout").addEventListener("click", function(){
-  if (confirm("退出后需要重新输密码，确定吗？")) logout();
+$("btnLogout").addEventListener("click", function(){ if (confirm("退出后需要重新输密码，确定吗？")) logout(); });
+
+function applyTheme(t){
+  document.documentElement.setAttribute("data-theme", t);
+  $("btnTheme").textContent = t === "dark" ? "☀️" : "🌙";
+  lsSet(THEME_KEY, t);
+}
+$("btnTheme").addEventListener("click", function(){
+  applyTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark");
 });
+applyTheme(document.documentElement.getAttribute("data-theme") || "light");
 
-/* ---------- 日期格式化 ---------- */
-function pad(n){ return n < 10 ? "0" + n : "" + n; }
-function localDate(d){ return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()); }
-function localDateTime(d){ return localDate(d) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes()); }
-
-function dueClass(due){
-  if (!due) return "";
-  var today = localDate(new Date());
-  var d = String(due).slice(0, 10);
-  if (d < today) return "over";
-  if (d === today) return "soon";
-  return "";
+function pad(n){ return n<10 ? "0"+n : ""+n; }
+function ymd(d){ return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
+function ymdhm(d){ return ymd(d)+"T"+pad(d.getHours())+":"+pad(d.getMinutes()); }
+function todayStr(){ return ymd(new Date()); }
+var WEEK = ["周日","周一","周二","周三","周四","周五","周六"];
+function dayDiff(fromStr, toStr){
+  return Math.round((new Date(toStr+"T00:00:00") - new Date(fromStr+"T00:00:00")) / 86400000);
 }
-function dueText(due){
-  if (!due) return "";
-  var d = String(due).slice(0, 10);
-  var today = localDate(new Date());
-  if (d === today) return "今天到期";
-  var t = new Date(today + "T00:00:00");
-  var x = new Date(d + "T00:00:00");
-  var diff = Math.round((x - t) / 86400000);
-  if (diff === 1) return "明天到期";
-  if (diff > 1 && diff <= 7) return diff + " 天后到期";
-  if (diff < 0) return "已过期 " + Math.abs(diff) + " 天";
-  return d + " 到期";
+function dueLabel(due){
+  if (!due) return null;
+  var d = String(due).slice(0,10), t = todayStr();
+  var n = dayDiff(t, d);
+  if (n === 0) return { text:"今天到期", cls:"today" };
+  if (n === 1) return { text:"明天到期", cls:"" };
+  if (n > 1 && n <= 7) return { text:n+" 天后", cls:"" };
+  if (n < 0) return { text:"逾期 "+Math.abs(n)+" 天", cls:"over" };
+  return { text:d, cls:"" };
+}
+function hhmm(iso){ var d = new Date(iso); return pad(d.getHours())+":"+pad(d.getMinutes()); }
+
+var todos = [], events = [];
+var tab = "today", todoFilter = "open";
+var calYear = new Date().getFullYear(), calMonth = new Date().getMonth();
+var selDay = todayStr();
+var editingTodo = null, editingEvent = null, newPri = 1;
+
+function el(tag, cls, text){
+  var e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
 }
 
-/* ---------- 待办 ---------- */
-var todos = [], editingTodo = null;
+function todoNode(t, opts){
+  opts = opts || {};
+  var row = el("div", "item" + (t.done ? " done" : ""));
+  row.appendChild(el("span", "pri p" + (t.priority == null ? 1 : Number(t.priority))));
+
+  var box = el("div", "box" + (t.done ? " on" : ""));
+  box.textContent = t.done ? "✓" : "";
+  box.addEventListener("click", function(){ toggleTodo(t); });
+  row.appendChild(box);
+
+  var main = el("div", "main");
+  main.appendChild(el("div", "t", t.title));
+  var sub = el("div", "sub");
+  var dl = dueLabel(t.due_date);
+  if (dl) sub.appendChild(el("span", "pill " + dl.cls, dl.text));
+  if (opts.showDone && t.done && t.done_at) sub.appendChild(el("span", null, "完成于 " + String(t.done_at).slice(0,10)));
+  if (sub.childNodes.length) main.appendChild(sub);
+  if (t.note) main.appendChild(el("div", "note", t.note));
+  row.appendChild(main);
+
+  var ops = el("div", "ops");
+  var e1 = el("button", null, "✎"); e1.title = "编辑";
+  e1.addEventListener("click", function(){ startEditTodo(t); });
+  var e2 = el("button", null, "✕"); e2.title = "删除";
+  e2.addEventListener("click", function(){ removeTodo(t); });
+  ops.appendChild(e1); ops.appendChild(e2);
+  row.appendChild(ops);
+  return row;
+}
+
+function eventNode(ev, opts){
+  opts = opts || {};
+  var row = el("div", "item");
+  var main = el("div", "main");
+  main.appendChild(el("div", "t", ev.title));
+  var sub = el("div", "sub");
+  var tm = hhmm(ev.start_at);
+  if (ev.end_at) tm += " – " + hhmm(ev.end_at);
+  sub.appendChild(el("span", "pill time", tm));
+  if (opts.showDate) sub.appendChild(el("span", null, String(ev.start_at).slice(0,10)));
+  main.appendChild(sub);
+  if (ev.note) main.appendChild(el("div", "note", ev.note));
+  row.appendChild(main);
+
+  var ops = el("div", "ops");
+  var e1 = el("button", null, "✎"); e1.title = "编辑";
+  e1.addEventListener("click", function(){ startEditEvent(ev); });
+  var e2 = el("button", null, "✕"); e2.title = "删除";
+  e2.addEventListener("click", function(){ removeEvent(ev); });
+  ops.appendChild(e1); ops.appendChild(e2);
+  row.appendChild(ops);
+  return row;
+}
+
+function fillList(container, nodes, emptyText){
+  container.innerHTML = "";
+  if (!nodes.length){ container.appendChild(el("div", "empty", emptyText)); return; }
+  nodes.forEach(function(n){ container.appendChild(n); });
+}
+
+function renderToday(){
+  var now = new Date(), t = todayStr();
+  $("heroDate").textContent = (now.getMonth()+1) + " 月 " + now.getDate() + " 日";
+  $("heroWeek").textContent = WEEK[now.getDay()] + " · " + now.getFullYear() + " 年";
+
+  var todayTodos = todos.filter(function(x){ return !x.done && x.due_date && String(x.due_date).slice(0,10) === t; });
+  var undated = todos.filter(function(x){ return !x.done && !x.due_date; });
+  var todayEvents = events.filter(function(x){ return String(x.start_at).slice(0,10) === t; });
+  var overdue = todos.filter(function(x){ return !x.done && x.due_date && String(x.due_date).slice(0,10) < t; });
+
+  $("sTodo").textContent = todayTodos.length + undated.length;
+  $("sEvent").textContent = todayEvents.length;
+  $("sOver").textContent = overdue.length;
+  $("sOverBox").className = "stat" + (overdue.length ? " bad" : "");
+  $("todayEventCnt").textContent = todayEvents.length;
+  $("todayTodoCnt").textContent = todayTodos.length + undated.length;
+  $("overdueCnt").textContent = overdue.length;
+
+  fillList($("todayEvents"), todayEvents.map(function(e){ return eventNode(e); }), "今天没有安排。");
+  fillList($("todayTodos"), todayTodos.concat(undated).map(function(x){ return todoNode(x); }), "今天没有待办，轻松一下。");
+
+  $("overdueCard").classList.toggle("hide", !overdue.length);
+  fillList($("overdueList"), overdue.map(function(x){ return todoNode(x); }), "");
+
+  var weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 6);
+  var from = ymd(weekAgo);
+  var doneWeek = todos.filter(function(x){ return x.done && x.done_at && String(x.done_at).slice(0,10) >= from; }).length;
+  var openAll = todos.filter(function(x){ return !x.done; }).length;
+  $("weekSummary").innerHTML = "最近 7 天完成 <b>" + doneWeek + "</b> 项 · 还有 <b>" + openAll + "</b> 项未完成";
+}
 
 function renderTodos(){
-  var box = $("todoList");
-  box.innerHTML = "";
-  if (!todos.length){
-    box.innerHTML = '<div class="empty">还没有待办。<br>在上面输入框里加一条试试。</div>';
-    return;
+  var t = todayStr();
+  var list = todos.filter(function(x){
+    if (todoFilter === "open") return !x.done;
+    if (todoFilter === "done") return x.done;
+    if (todoFilter === "over") return !x.done && x.due_date && String(x.due_date).slice(0,10) < t;
+    return true;
+  });
+  var empty = {
+    open:"没有未完成的待办。", done:"还没有完成过任何待办。",
+    over:"没有逾期的，很好。", all:"还没有任何待办，在上面加一条试试。"
+  }[todoFilter];
+  fillList($("todoList"), list.map(function(x){ return todoNode(x, { showDone:true }); }), empty);
+}
+
+function renderCalendar(){
+  $("calTitle").textContent = calYear + " 年 " + (calMonth+1) + " 月";
+  var grid = $("calGrid");
+  grid.innerHTML = "";
+
+  var counts = {};
+  events.forEach(function(e){
+    var d = String(e.start_at).slice(0,10);
+    counts[d] = (counts[d] || 0) + 1;
+  });
+
+  var lead = new Date(calYear, calMonth, 1).getDay();
+  var days = new Date(calYear, calMonth + 1, 0).getDate();
+  var t = todayStr();
+
+  for (var i = 0; i < lead; i++) grid.appendChild(el("div", "cal-cell empty"));
+  for (var d = 1; d <= days; d++){
+    var ds = calYear + "-" + pad(calMonth+1) + "-" + pad(d);
+    var cell = el("div", "cal-cell");
+    cell.appendChild(el("span", null, String(d)));
+    if (counts[ds]) cell.appendChild(el("span", "dot"));
+    if (ds === t) cell.classList.add("today");
+    if (ds === selDay) cell.classList.add("sel");
+    (function(day){
+      cell.addEventListener("click", function(){
+        selDay = day;
+        if (!editingEvent) $("eStart").value = day + "T09:00";
+        renderCalendar();
+        renderDayEvents();
+      });
+    })(ds);
+    grid.appendChild(cell);
   }
-  todos.forEach(function(t){
-    var item = document.createElement("div");
-    item.className = "item" + (t.done ? " done" : "");
+}
 
-    var box2 = document.createElement("div");
-    box2.className = "box" + (t.done ? " on" : "");
-    box2.textContent = t.done ? "✓" : "";
-    box2.addEventListener("click", function(){ toggleTodo(t); });
-    item.appendChild(box2);
+function renderDayEvents(){
+  var dayEvents = events.filter(function(e){ return String(e.start_at).slice(0,10) === selDay; });
+  var d = new Date(selDay + "T00:00:00");
+  var isToday = selDay === todayStr();
+  $("dayTitle").childNodes[0].nodeValue =
+    (isToday ? "今天 · " : "") + (d.getMonth()+1) + " 月 " + d.getDate() + " 日 " + WEEK[d.getDay()] + " ";
+  $("dayCnt").textContent = dayEvents.length;
+  fillList($("dayEvents"), dayEvents.map(function(e){ return eventNode(e); }), "这天没有安排。");
+}
 
-    var main = document.createElement("div");
-    main.className = "main";
-    var title = document.createElement("div");
-    title.className = "t";
-    title.textContent = t.title;
-    main.appendChild(title);
+function loadTodos(){ return api("todos").then(function(j){ todos = j.items || []; }); }
+function loadEvents(){ return api("events").then(function(j){ events = j.items || []; }); }
 
-    var metaBits = [];
-    if (t.due_date){
-      var due = document.createElement("span");
-      due.className = "due " + dueClass(t.due_date);
-      due.textContent = dueText(t.due_date);
-      metaBits.push(due);
-    }
-    if (t.done && t.done_at){
-      var dn = document.createElement("span");
-      dn.textContent = "完成于 " + String(t.done_at).slice(0, 10);
-      metaBits.push(dn);
-    }
-    if (metaBits.length){
-      var meta = document.createElement("div");
-      meta.className = "meta";
-      metaBits.forEach(function(m){ meta.appendChild(m); });
-      main.appendChild(meta);
-    }
-    if (t.note){
-      var note = document.createElement("div");
-      note.className = "note";
-      note.textContent = t.note;
-      main.appendChild(note);
-    }
-    item.appendChild(main);
-
-    var ops = document.createElement("div");
-    ops.className = "ops";
-    var edit = document.createElement("button");
-    edit.textContent = "✎"; edit.title = "编辑";
-    edit.addEventListener("click", function(){ startEditTodo(t); });
-    var del = document.createElement("button");
-    del.textContent = "✕"; del.title = "删除";
-    del.addEventListener("click", function(){ removeTodo(t); });
-    ops.appendChild(edit); ops.appendChild(del);
-    item.appendChild(ops);
-
-    box.appendChild(item);
+function setPri(p){
+  newPri = p;
+  Array.prototype.forEach.call($("tPri").children, function(b){
+    b.classList.toggle("on", Number(b.dataset.p) === p);
   });
 }
-
-function loadTodos(){
-  return api("todos").then(function(j){ todos = j.items || []; renderTodos(); });
-}
+$("tPri").addEventListener("click", function(e){
+  var b = e.target.closest("button[data-p]");
+  if (b) setPri(Number(b.dataset.p));
+});
 
 function startEditTodo(t){
   editingTodo = t;
   $("tTitle").value = t.title;
   $("tDue").value = t.due_date ? String(t.due_date).slice(0,10) : "";
   $("tNote").value = t.note || "";
+  setPri(t.priority == null ? 1 : Number(t.priority));
+  $("todoFormTitle").textContent = "✎ 编辑待办";
   $("btnTodoSave").textContent = "保存修改";
   $("btnTodoCancel").classList.remove("hide");
-  $("todoForm").classList.add("editing");
+  window.scrollTo({ top:0, behavior:"smooth" });
   $("tTitle").focus();
-  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 function cancelEditTodo(){
   editingTodo = null;
   $("tTitle").value = ""; $("tDue").value = ""; $("tNote").value = "";
+  setPri(1);
+  $("todoFormTitle").textContent = "➕ 添加待办";
   $("btnTodoSave").textContent = "添加";
   $("btnTodoCancel").classList.add("hide");
-  $("todoForm").classList.remove("editing");
 }
-
 function saveTodo(){
   var title = $("tTitle").value.trim();
-  if (!title){ say("app", "标题不能为空", "err"); return; }
-  var payload = { title: title, due_date: $("tDue").value || null, note: $("tNote").value.trim() || null };
-  var b = $("btnTodoSave");
-  b.disabled = true;
-  var p;
-  if (editingTodo){
-    payload.id = editingTodo.id;
-    payload.done = editingTodo.done;
-    p = api("todos", { method: "PATCH", body: payload });
-  } else {
-    p = api("todos", { method: "POST", body: payload });
-  }
-  p.then(function(){
-    cancelEditTodo();
-    return loadTodos();
-  }).then(function(){
-    say("app", editingTodo ? "已保存" : "已添加");
-  }).catch(function(e){ say("app", e.message, "err"); })
-    .then(function(){ b.disabled = false; });
+  if (!title){ say("app","标题不能为空","err"); return; }
+  var payload = { title:title, due_date: $("tDue").value || null, note: $("tNote").value.trim() || null, priority:newPri };
+  var wasEdit = !!editingTodo;
+  if (wasEdit){ payload.id = editingTodo.id; payload.done = editingTodo.done; }
+  var b = $("btnTodoSave"); b.disabled = true;
+  var p = wasEdit ? api("todos",{method:"PATCH",body:payload}) : api("todos",{method:"POST",body:payload});
+  p.then(function(){ cancelEditTodo(); return refresh(); })
+   .then(function(){ say("app", wasEdit ? "已保存" : "已添加"); })
+   .catch(function(e){ say("app", e.message, "err"); })
+   .then(function(){ b.disabled = false; });
 }
-
 function toggleTodo(t){
-  api("todos", { method: "PATCH", body: {
-    id: t.id, title: t.title, note: t.note, due_date: t.due_date, done: !t.done
-  }}).then(loadTodos).catch(function(e){ say("app", e.message, "err"); });
+  api("todos",{ method:"PATCH", body:{ id:t.id, title:t.title, note:t.note, due_date:t.due_date, done:!t.done, priority:t.priority }})
+    .then(refresh).catch(function(e){ say("app", e.message, "err"); });
 }
-
 function removeTodo(t){
   if (!confirm("删除「" + t.title + "」？删了就找不回来了。")) return;
-  api("todos?id=" + encodeURIComponent(t.id), { method: "DELETE" })
-    .then(loadTodos)
-    .then(function(){ say("app", "已删除"); })
+  api("todos?id=" + encodeURIComponent(t.id), { method:"DELETE" })
+    .then(refresh).then(function(){ say("app","已删除"); })
     .catch(function(e){ say("app", e.message, "err"); });
 }
-
 $("btnTodoSave").addEventListener("click", saveTodo);
 $("btnTodoCancel").addEventListener("click", cancelEditTodo);
 $("tTitle").addEventListener("keydown", function(e){ if (e.key === "Enter") saveTodo(); });
-
-/* ---------- 日程 ---------- */
-var events = [], editingEvent = null;
-
-function renderEvents(){
-  var box = $("eventList");
-  box.innerHTML = "";
-  if (!events.length){
-    box.innerHTML = '<div class="empty">还没有日程。<br>在上面加一条试试。</div>';
-    return;
-  }
-  var lastDay = null;
-  events.forEach(function(ev){
-    var day = String(ev.start_at).slice(0, 10);
-    if (day !== lastDay){
-      lastDay = day;
-      var g = document.createElement("div");
-      g.className = "grp";
-      g.textContent = day + (day === localDate(new Date()) ? "（今天）" : "");
-      box.appendChild(g);
-    }
-    var item = document.createElement("div");
-    item.className = "item";
-
-    var main = document.createElement("div");
-    main.className = "main";
-    var title = document.createElement("div");
-    title.className = "t";
-    title.textContent = ev.title;
-    main.appendChild(title);
-
-    var meta = document.createElement("div");
-    meta.className = "meta";
-    var time = document.createElement("span");
-    var s = new Date(ev.start_at);
-    var txt = pad(s.getHours()) + ":" + pad(s.getMinutes());
-    if (ev.end_at){
-      var e2 = new Date(ev.end_at);
-      txt += " – " + pad(e2.getHours()) + ":" + pad(e2.getMinutes());
-    }
-    time.textContent = txt;
-    meta.appendChild(time);
-    main.appendChild(meta);
-
-    if (ev.note){
-      var note = document.createElement("div");
-      note.className = "note";
-      note.textContent = ev.note;
-      main.appendChild(note);
-    }
-    item.appendChild(main);
-
-    var ops = document.createElement("div");
-    ops.className = "ops";
-    var edit = document.createElement("button");
-    edit.textContent = "✎"; edit.title = "编辑";
-    edit.addEventListener("click", function(){ startEditEvent(ev); });
-    var del = document.createElement("button");
-    del.textContent = "✕"; del.title = "删除";
-    del.addEventListener("click", function(){ removeEvent(ev); });
-    ops.appendChild(edit); ops.appendChild(del);
-    item.appendChild(ops);
-
-    box.appendChild(item);
-  });
-}
-
-function loadEvents(){
-  return api("events").then(function(j){ events = j.items || []; renderEvents(); });
-}
+$("todoFilters").addEventListener("click", function(e){
+  var b = e.target.closest("button[data-f]");
+  if (!b) return;
+  todoFilter = b.dataset.f;
+  Array.prototype.forEach.call($("todoFilters").children, function(x){ x.classList.toggle("on", x === b); });
+  renderTodos();
+});
 
 function startEditEvent(ev){
   editingEvent = ev;
   $("eTitle").value = ev.title;
-  $("eStart").value = localDateTime(new Date(ev.start_at));
-  $("eEnd").value = ev.end_at ? localDateTime(new Date(ev.end_at)) : "";
+  $("eStart").value = ymdhm(new Date(ev.start_at));
+  $("eEnd").value = ev.end_at ? ymdhm(new Date(ev.end_at)) : "";
   $("eNote").value = ev.note || "";
+  $("eventFormTitle").textContent = "✎ 编辑日程";
   $("btnEventSave").textContent = "保存修改";
   $("btnEventCancel").classList.remove("hide");
-  $("eventForm").classList.add("editing");
+  window.scrollTo({ top:0, behavior:"smooth" });
   $("eTitle").focus();
-  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 function cancelEditEvent(){
   editingEvent = null;
-  $("eTitle").value = ""; $("eStart").value = ""; $("eEnd").value = ""; $("eNote").value = "";
+  $("eTitle").value = ""; $("eEnd").value = ""; $("eNote").value = "";
+  $("eStart").value = selDay + "T09:00";
+  $("eventFormTitle").textContent = "➕ 添加日程";
   $("btnEventSave").textContent = "添加";
   $("btnEventCancel").classList.add("hide");
-  $("eventForm").classList.remove("editing");
 }
-
 function saveEvent(){
   var title = $("eTitle").value.trim();
-  if (!title){ say("app", "标题不能为空", "err"); return; }
-  if (!$("eStart").value){ say("app", "请填开始时间", "err"); return; }
+  if (!title){ say("app","标题不能为空","err"); return; }
+  if (!$("eStart").value){ say("app","请填开始时间","err"); return; }
   var payload = {
-    title: title,
+    title:title,
     start_at: new Date($("eStart").value).toISOString(),
     end_at: $("eEnd").value ? new Date($("eEnd").value).toISOString() : null,
     note: $("eNote").value.trim() || null
   };
-  var b = $("btnEventSave");
-  b.disabled = true;
-  var p;
-  if (editingEvent){ payload.id = editingEvent.id; p = api("events", { method: "PATCH", body: payload }); }
-  else { p = api("events", { method: "POST", body: payload }); }
-  p.then(function(){ cancelEditEvent(); return loadEvents(); })
-   .then(function(){ say("app", editingEvent ? "已保存" : "已添加"); })
+  var wasEdit = !!editingEvent;
+  if (wasEdit) payload.id = editingEvent.id;
+  var b = $("btnEventSave"); b.disabled = true;
+  var p = wasEdit ? api("events",{method:"PATCH",body:payload}) : api("events",{method:"POST",body:payload});
+  p.then(function(){ cancelEditEvent(); return refresh(); })
+   .then(function(){ say("app", wasEdit ? "已保存" : "已添加"); })
    .catch(function(e){ say("app", e.message, "err"); })
    .then(function(){ b.disabled = false; });
 }
-
 function removeEvent(ev){
   if (!confirm("删除「" + ev.title + "」？删了就找不回来了。")) return;
-  api("events?id=" + encodeURIComponent(ev.id), { method: "DELETE" })
-    .then(loadEvents)
-    .then(function(){ say("app", "已删除"); })
+  api("events?id=" + encodeURIComponent(ev.id), { method:"DELETE" })
+    .then(refresh).then(function(){ say("app","已删除"); })
     .catch(function(e){ say("app", e.message, "err"); });
 }
-
 $("btnEventSave").addEventListener("click", saveEvent);
 $("btnEventCancel").addEventListener("click", cancelEditEvent);
 $("eTitle").addEventListener("keydown", function(e){ if (e.key === "Enter") saveEvent(); });
 
-/* ---------- 标签切换 ---------- */
+$("calPrev").addEventListener("click", function(){
+  calMonth--; if (calMonth < 0){ calMonth = 11; calYear--; }
+  renderCalendar();
+});
+$("calNext").addEventListener("click", function(){
+  calMonth++; if (calMonth > 11){ calMonth = 0; calYear++; }
+  renderCalendar();
+});
+$("calToday").addEventListener("click", function(){
+  var n = new Date(); calYear = n.getFullYear(); calMonth = n.getMonth();
+  selDay = todayStr(); renderCalendar(); renderDayEvents();
+});
+
 document.querySelectorAll(".tabs button").forEach(function(btn){
   btn.addEventListener("click", function(){
     document.querySelectorAll(".tabs button").forEach(function(b){ b.classList.remove("on"); });
     btn.classList.add("on");
-    var tab = btn.dataset.tab;
+    tab = btn.dataset.tab;
+    $("tab-today").classList.toggle("hide", tab !== "today");
     $("tab-todos").classList.toggle("hide", tab !== "todos");
     $("tab-events").classList.toggle("hide", tab !== "events");
-    say("app", "");
+    say("app","");
+    renderAll();
   });
 });
 
-/* ---------- 启动 ---------- */
-function enterApp(){
-  showApp();
-  loadTodos().catch(function(e){ say("app", e.message, "err"); });
-  loadEvents().catch(function(e){ say("app", e.message, "err"); });
+function renderAll(){
+  if (tab === "today") renderToday();
+  else if (tab === "todos") renderTodos();
+  else { renderCalendar(); renderDayEvents(); }
+}
+function refresh(){
+  return Promise.all([loadTodos(), loadEvents()]).then(renderAll);
 }
 
+function enterApp(){
+  showApp();
+  cancelEditTodo();
+  cancelEditEvent();
+  refresh().catch(function(e){ say("app", e.message, "err"); });
+}
 (function boot(){
   if (!getToken()){ showLogin(); return; }
   api("auth").then(function(j){
@@ -533,9 +717,7 @@ function enterApp(){
     }
     if (!j.loggedIn){ showLogin(); return; }
     enterApp();
-  }).catch(function(){
-    showLogin();
-  });
+  }).catch(function(){ showLogin(); });
 })();
 
 })();

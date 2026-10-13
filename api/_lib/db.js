@@ -54,6 +54,8 @@ export function ensureSchema() {
           fails         integer NOT NULL DEFAULT 0,
           locked_until  timestamptz
         )`;
+      /* 后续加的列，用 IF NOT EXISTS 保证对已有数据库也安全 */
+      await sql`ALTER TABLE todos ADD COLUMN IF NOT EXISTS priority smallint NOT NULL DEFAULT 1`;
       await sql`CREATE INDEX IF NOT EXISTS todos_due_idx ON todos (due_date)`;
       await sql`CREATE INDEX IF NOT EXISTS events_start_idx ON events (start_at)`;
     })().catch((e) => {
