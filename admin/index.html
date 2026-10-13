@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>管理后台 · Eraser 小站</title>
+<link rel="stylesheet" href="../style.css">
+<style>
+:root{
+  --blue:#2563eb; --ink:#24292f; --muted:#6b7280; --line:#e5e7eb;
+  --red:#dc2626; --red-l:#fef2f2; --green:#16a34a; --green-l:#f0fdf4;
+  --amber:#b45309; --amber-l:#fffbeb;
+}
+body{ font-size:15px; -webkit-font-smoothing:antialiased; padding-bottom:env(safe-area-inset-bottom); }
+.wrap{ max-width:720px; margin:0 auto; padding:16px 14px 60px; }
+.hide{ display:none !important; }
+
+/* 登录 */
+.login-card{ background:#fff; border:1px solid var(--line); border-radius:12px; padding:22px; margin-top:36px; }
+.login-card h1{ font-size:20px; margin:0 0 6px; }
+.login-card p{ color:var(--muted); font-size:13.5px; margin:0 0 18px; }
+input, textarea, select{ width:100%; padding:12px; border:1px solid #d0d7de; border-radius:8px; font-size:15px; font-family:inherit; }
+input:focus, textarea:focus{ outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgba(37,99,235,.12); }
+.btn{ background:var(--blue); color:#fff; border:none; border-radius:8px; padding:12px 18px; font-size:15px; cursor:pointer; }
+.btn:disabled{ opacity:.5; cursor:not-allowed; }
+.btn.ghost{ background:#fff; color:var(--muted); border:1px solid var(--line); }
+.btn.danger{ background:#fff; color:var(--red); border:1px solid #fecaca; }
+.btn.sm{ padding:7px 12px; font-size:13.5px; }
+
+/* 顶栏 */
+.bar{ position:sticky; top:0; z-index:10; background:#fff; border-bottom:1px solid var(--line);
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      padding:12px 14px; padding-top:calc(12px + env(safe-area-inset-top)); }
+.bar b{ font-size:16px; }
+.tabs{ display:flex; gap:6px; background:#f1f5f9; border-radius:9px; padding:3px; margin:14px 0 16px; }
+.tabs button{ flex:1; border:none; background:transparent; padding:9px 6px; border-radius:7px;
+              font-size:14px; color:var(--muted); cursor:pointer; }
+.tabs button.on{ background:#fff; color:var(--blue); font-weight:600; box-shadow:0 1px 2px rgba(0,0,0,.06); }
+
+/* 表单 */
+.form{ background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:16px; }
+.form .row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.form label{ display:block; font-size:12.5px; color:var(--muted); margin:10px 0 4px; }
+.form label:first-child{ margin-top:0; }
+.form .acts{ display:flex; gap:8px; margin-top:14px; }
+.form .acts .btn{ flex:1; }
+.editing{ background:var(--amber-l); border-color:#fde68a; }
+
+/* 列表 */
+.list{ display:flex; flex-direction:column; gap:8px; }
+.item{ background:#fff; border:1px solid var(--line); border-radius:10px; padding:12px 13px;
+       display:flex; align-items:flex-start; gap:11px; }
+.item .box{ flex:0 0 22px; width:22px; height:22px; border:2px solid #cbd5e1; border-radius:6px;
+            cursor:pointer; display:flex; align-items:center; justify-content:center;
+            font-size:14px; color:#fff; margin-top:1px; }
+.item .box.on{ background:var(--green); border-color:var(--green); }
+.item .main{ flex:1; min-width:0; }
+.item .t{ font-size:15px; word-break:break-word; }
+.item.done .t{ text-decoration:line-through; color:#9ca3af; }
+.item .meta{ font-size:12.5px; color:var(--muted); margin-top:3px; display:flex; flex-wrap:wrap; gap:8px; }
+.item .note{ font-size:13px; color:#4b5563; margin-top:5px; white-space:pre-wrap; word-break:break-word; }
+.item .ops{ display:flex; gap:4px; flex:0 0 auto; }
+.item .ops button{ border:none; background:transparent; color:#9ca3af; font-size:15px;
+                   padding:4px 6px; cursor:pointer; border-radius:6px; }
+.item .ops button:hover{ background:#f1f5f9; color:var(--ink); }
+.due{ font-weight:600; }
+.due.soon{ color:var(--amber); }
+.due.over{ color:var(--red); }
+
+.grp{ font-size:12.5px; font-weight:600; color:var(--muted); margin:18px 0 8px; }
+.grp:first-child{ margin-top:0; }
+
+.msg{ font-size:13.5px; border-radius:9px; padding:11px 13px; margin-bottom:14px; border:1px solid; }
+.msg.err{ background:var(--red-l); border-color:#fecaca; color:#7f1d1d; }
+.msg.ok{ background:var(--green-l); border-color:#bbf7d0; color:#14532d; }
+.msg.warn{ background:var(--amber-l); border-color:#fde68a; color:#78350f; }
+.empty{ text-align:center; color:var(--muted); font-size:14px; padding:40px 16px; }
+.foot{ text-align:center; color:var(--muted); font-size:12px; margin-top:28px; line-height:1.9; }
+</style>
+</head>
+<body>
+
+<!-- ============ 登录 ============ -->
+<div id="login" class="wrap">
+  <div class="login-card">
+    <h1>管理后台</h1>
+    <p>输入管理密码。这个页面不会被搜索引擎收录。</p>
+    <div id="loginMsg"></div>
+    <label style="display:block;font-size:12.5px;color:var(--muted);margin-bottom:5px">管理密码</label>
+    <input type="password" id="pwd" placeholder="输入密码" autocomplete="current-password" spellcheck="false">
+    <div style="margin-top:14px"><button class="btn" id="btnLogin" style="width:100%">登录</button></div>
+  </div>
+</div>
+
+<!-- ============ 主界面 ============ -->
+<div id="app" class="hide">
+  <div class="bar">
+    <b>管理后台</b>
+    <button class="btn ghost sm" id="btnLogout">退出</button>
+  </div>
+
+  <div class="wrap">
+    <div id="appMsg"></div>
+
+    <div class="tabs">
+      <button data-tab="todos" class="on">待办事项</button>
+      <button data-tab="events">日程时间表</button>
+    </div>
+
+    <!-- 待办 -->
+    <section id="tab-todos">
+      <div class="form" id="todoForm">
+        <label>标题</label>
+        <input type="text" id="tTitle" placeholder="要做什么" autocomplete="off">
+        <div class="row2">
+          <div><label>截止日期（可留空）</label><input type="date" id="tDue"></div>
+          <div><label>备注（可留空）</label><input type="text" id="tNote" placeholder="补充说明" autocomplete="off"></div>
+        </div>
+        <div class="acts">
+          <button class="btn" id="btnTodoSave">添加</button>
+          <button class="btn ghost hide" id="btnTodoCancel">取消编辑</button>
+        </div>
+      </div>
+      <div id="todoList" class="list"></div>
+    </section>
+
+    <!-- 日程 -->
+    <section id="tab-events" class="hide">
+      <div class="form" id="eventForm">
+        <label>标题</label>
+        <input type="text" id="eTitle" placeholder="什么事" autocomplete="off">
+        <div class="row2">
+          <div><label>开始</label><input type="datetime-local" id="eStart"></div>
+          <div><label>结束（可留空）</label><input type="datetime-local" id="eEnd"></div>
+        </div>
+        <label>备注（可留空）</label>
+        <input type="text" id="eNote" placeholder="补充说明" autocomplete="off">
+        <div class="acts">
+          <button class="btn" id="btnEventSave">添加</button>
+          <button class="btn ghost hide" id="btnEventCancel">取消编辑</button>
+        </div>
+      </div>
+      <div id="eventList" class="list"></div>
+    </section>
+
+    <p class="foot">
+      数据存在服务器上，手机和电脑看到同一份<br>
+      登录状态保留 30 天，退出后需要重新输密码
+    </p>
+  </div>
+</div>
+
+<script>
+"use strict";
+(function(){
+var $ = function(id){ return document.getElementById(id); };
+var TOKEN_KEY = "eraser.admin.token";
+
+/* ---------- 令牌 ---------- */
+function getToken(){ try { return localStorage.getItem(TOKEN_KEY) || ""; } catch(e){ return ""; } }
+function setToken(t){ try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch(e){} }
+
+/* ---------- 提示 ---------- */
+var msgTimers = {};
+function say(which, text, kind){
+  var el = $(which === "login" ? "loginMsg" : "appMsg");
+  if (!text){ el.innerHTML = ""; return; }
+  el.innerHTML = '<div class="msg ' + (kind || "ok") + '">' + escapeHtml(text) + '</div>';
+  clearTimeout(msgTimers[which]);
+  if (kind !== "err") msgTimers[which] = setTimeout(function(){ el.innerHTML = ""; }, 4000);
+}
+function escapeHtml(s){
+  return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+/* ---------- 请求 ---------- */
+function api(path, opts){
+  opts = opts || {};
+  var headers = { "Content-Type": "application/json" };
+  var t = getToken();
+  if (t) headers.Authorization = "Bearer " + t;
+  return fetch("/api/" + path, {
+    method: opts.method || "GET",
+    headers: headers,
+    body: opts.body ? JSON.stringify(opts.body) : undefined
+  }).then(function(r){
+    return r.json().catch(function(){ return {}; }).then(function(j){
+      if (r.status === 401){ logout(); throw new Error("登录已过期，请重新登录"); }
+      if (!r.ok) throw new Error(j.error || ("请求失败（" + r.status + "）"));
+      return j;
+    });
+  });
+}
+
+/* ---------- 登录 / 退出 ---------- */
+function showLogin(){ $("login").classList.remove("hide"); $("app").classList.add("hide"); }
+function showApp(){ $("login").classList.add("hide"); $("app").classList.remove("hide"); }
+function logout(){ setToken(""); showLogin(); }
+
+function doLogin(){
+  var pwd = $("pwd").value;
+  if (!pwd){ say("login", "请输入密码", "err"); return; }
+  var b = $("btnLogin");
+  b.disabled = true; b.textContent = "登录中…";
+  api("auth", { method: "POST", body: { password: pwd } })
+    .then(function(j){
+      setToken(j.token);
+      $("pwd").value = "";
+      say("login", "");
+      enterApp();
+    })
+    .catch(function(e){ say("login", e.message, "err"); })
+    .then(function(){ b.disabled = false; b.textContent = "登录"; });
+}
+$("btnLogin").addEventListener("click", doLogin);
+$("pwd").addEventListener("keydown", function(e){ if (e.key === "Enter") doLogin(); });
+$("btnLogout").addEventListener("click", function(){
+  if (confirm("退出后需要重新输密码，确定吗？")) logout();
+});
+
+/* ---------- 日期格式化 ---------- */
+function pad(n){ return n < 10 ? "0" + n : "" + n; }
+function localDate(d){ return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()); }
+function localDateTime(d){ return localDate(d) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes()); }
+
+function dueClass(due){
+  if (!due) return "";
+  var today = localDate(new Date());
+  var d = String(due).slice(0, 10);
+  if (d < today) return "over";
+  if (d === today) return "soon";
+  return "";
+}
+function dueText(due){
+  if (!due) return "";
+  var d = String(due).slice(0, 10);
+  var today = localDate(new Date());
+  if (d === today) return "今天到期";
+  var t = new Date(today + "T00:00:00");
+  var x = new Date(d + "T00:00:00");
+  var diff = Math.round((x - t) / 86400000);
+  if (diff === 1) return "明天到期";
+  if (diff > 1 && diff <= 7) return diff + " 天后到期";
+  if (diff < 0) return "已过期 " + Math.abs(diff) + " 天";
+  return d + " 到期";
+}
+
+/* ---------- 待办 ---------- */
+var todos = [], editingTodo = null;
+
+function renderTodos(){
+  var box = $("todoList");
+  box.innerHTML = "";
+  if (!todos.length){
+    box.innerHTML = '<div class="empty">还没有待办。<br>在上面输入框里加一条试试。</div>';
+    return;
+  }
+  todos.forEach(function(t){
+    var item = document.createElement("div");
+    item.className = "item" + (t.done ? " done" : "");
+
+    var box2 = document.createElement("div");
+    box2.className = "box" + (t.done ? " on" : "");
+    box2.textContent = t.done ? "✓" : "";
+    box2.addEventListener("click", function(){ toggleTodo(t); });
+    item.appendChild(box2);
+
+    var main = document.createElement("div");
+    main.className = "main";
+    var title = document.createElement("div");
+    title.className = "t";
+    title.textContent = t.title;
+    main.appendChild(title);
+
+    var metaBits = [];
+    if (t.due_date){
+      var due = document.createElement("span");
+      due.className = "due " + dueClass(t.due_date);
+      due.textContent = dueText(t.due_date);
+      metaBits.push(due);
+    }
+    if (t.done && t.done_at){
+      var dn = document.createElement("span");
+      dn.textContent = "完成于 " + String(t.done_at).slice(0, 10);
+      metaBits.push(dn);
+    }
+    if (metaBits.length){
+      var meta = document.createElement("div");
+      meta.className = "meta";
+      metaBits.forEach(function(m){ meta.appendChild(m); });
+      main.appendChild(meta);
+    }
+    if (t.note){
+      var note = document.createElement("div");
+      note.className = "note";
+      note.textContent = t.note;
+      main.appendChild(note);
+    }
+    item.appendChild(main);
+
+    var ops = document.createElement("div");
+    ops.className = "ops";
+    var edit = document.createElement("button");
+    edit.textContent = "✎"; edit.title = "编辑";
+    edit.addEventListener("click", function(){ startEditTodo(t); });
+    var del = document.createElement("button");
+    del.textContent = "✕"; del.title = "删除";
+    del.addEventListener("click", function(){ removeTodo(t); });
+    ops.appendChild(edit); ops.appendChild(del);
+    item.appendChild(ops);
+
+    box.appendChild(item);
+  });
+}
+
+function loadTodos(){
+  return api("todos").then(function(j){ todos = j.items || []; renderTodos(); });
+}
+
+function startEditTodo(t){
+  editingTodo = t;
+  $("tTitle").value = t.title;
+  $("tDue").value = t.due_date ? String(t.due_date).slice(0,10) : "";
+  $("tNote").value = t.note || "";
+  $("btnTodoSave").textContent = "保存修改";
+  $("btnTodoCancel").classList.remove("hide");
+  $("todoForm").classList.add("editing");
+  $("tTitle").focus();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+function cancelEditTodo(){
+  editingTodo = null;
+  $("tTitle").value = ""; $("tDue").value = ""; $("tNote").value = "";
+  $("btnTodoSave").textContent = "添加";
+  $("btnTodoCancel").classList.add("hide");
+  $("todoForm").classList.remove("editing");
+}
+
+function saveTodo(){
+  var title = $("tTitle").value.trim();
+  if (!title){ say("app", "标题不能为空", "err"); return; }
+  var payload = { title: title, due_date: $("tDue").value || null, note: $("tNote").value.trim() || null };
+  var b = $("btnTodoSave");
+  b.disabled = true;
+  var p;
+  if (editingTodo){
+    payload.id = editingTodo.id;
+    payload.done = editingTodo.done;
+    p = api("todos", { method: "PATCH", body: payload });
+  } else {
+    p = api("todos", { method: "POST", body: payload });
+  }
+  p.then(function(){
+    cancelEditTodo();
+    return loadTodos();
+  }).then(function(){
+    say("app", editingTodo ? "已保存" : "已添加");
+  }).catch(function(e){ say("app", e.message, "err"); })
+    .then(function(){ b.disabled = false; });
+}
+
+function toggleTodo(t){
+  api("todos", { method: "PATCH", body: {
+    id: t.id, title: t.title, note: t.note, due_date: t.due_date, done: !t.done
+  }}).then(loadTodos).catch(function(e){ say("app", e.message, "err"); });
+}
+
+function removeTodo(t){
+  if (!confirm("删除「" + t.title + "」？删了就找不回来了。")) return;
+  api("todos?id=" + encodeURIComponent(t.id), { method: "DELETE" })
+    .then(loadTodos)
+    .then(function(){ say("app", "已删除"); })
+    .catch(function(e){ say("app", e.message, "err"); });
+}
+
+$("btnTodoSave").addEventListener("click", saveTodo);
+$("btnTodoCancel").addEventListener("click", cancelEditTodo);
+$("tTitle").addEventListener("keydown", function(e){ if (e.key === "Enter") saveTodo(); });
+
+/* ---------- 日程 ---------- */
+var events = [], editingEvent = null;
+
+function renderEvents(){
+  var box = $("eventList");
+  box.innerHTML = "";
+  if (!events.length){
+    box.innerHTML = '<div class="empty">还没有日程。<br>在上面加一条试试。</div>';
+    return;
+  }
+  var lastDay = null;
+  events.forEach(function(ev){
+    var day = String(ev.start_at).slice(0, 10);
+    if (day !== lastDay){
+      lastDay = day;
+      var g = document.createElement("div");
+      g.className = "grp";
+      g.textContent = day + (day === localDate(new Date()) ? "（今天）" : "");
+      box.appendChild(g);
+    }
+    var item = document.createElement("div");
+    item.className = "item";
+
+    var main = document.createElement("div");
+    main.className = "main";
+    var title = document.createElement("div");
+    title.className = "t";
+    title.textContent = ev.title;
+    main.appendChild(title);
+
+    var meta = document.createElement("div");
+    meta.className = "meta";
+    var time = document.createElement("span");
+    var s = new Date(ev.start_at);
+    var txt = pad(s.getHours()) + ":" + pad(s.getMinutes());
+    if (ev.end_at){
+      var e2 = new Date(ev.end_at);
+      txt += " – " + pad(e2.getHours()) + ":" + pad(e2.getMinutes());
+    }
+    time.textContent = txt;
+    meta.appendChild(time);
+    main.appendChild(meta);
+
+    if (ev.note){
+      var note = document.createElement("div");
+      note.className = "note";
+      note.textContent = ev.note;
+      main.appendChild(note);
+    }
+    item.appendChild(main);
+
+    var ops = document.createElement("div");
+    ops.className = "ops";
+    var edit = document.createElement("button");
+    edit.textContent = "✎"; edit.title = "编辑";
+    edit.addEventListener("click", function(){ startEditEvent(ev); });
+    var del = document.createElement("button");
+    del.textContent = "✕"; del.title = "删除";
+    del.addEventListener("click", function(){ removeEvent(ev); });
+    ops.appendChild(edit); ops.appendChild(del);
+    item.appendChild(ops);
+
+    box.appendChild(item);
+  });
+}
+
+function loadEvents(){
+  return api("events").then(function(j){ events = j.items || []; renderEvents(); });
+}
+
+function startEditEvent(ev){
+  editingEvent = ev;
+  $("eTitle").value = ev.title;
+  $("eStart").value = localDateTime(new Date(ev.start_at));
+  $("eEnd").value = ev.end_at ? localDateTime(new Date(ev.end_at)) : "";
+  $("eNote").value = ev.note || "";
+  $("btnEventSave").textContent = "保存修改";
+  $("btnEventCancel").classList.remove("hide");
+  $("eventForm").classList.add("editing");
+  $("eTitle").focus();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+function cancelEditEvent(){
+  editingEvent = null;
+  $("eTitle").value = ""; $("eStart").value = ""; $("eEnd").value = ""; $("eNote").value = "";
+  $("btnEventSave").textContent = "添加";
+  $("btnEventCancel").classList.add("hide");
+  $("eventForm").classList.remove("editing");
+}
+
+function saveEvent(){
+  var title = $("eTitle").value.trim();
+  if (!title){ say("app", "标题不能为空", "err"); return; }
+  if (!$("eStart").value){ say("app", "请填开始时间", "err"); return; }
+  var payload = {
+    title: title,
+    start_at: new Date($("eStart").value).toISOString(),
+    end_at: $("eEnd").value ? new Date($("eEnd").value).toISOString() : null,
+    note: $("eNote").value.trim() || null
+  };
+  var b = $("btnEventSave");
+  b.disabled = true;
+  var p;
+  if (editingEvent){ payload.id = editingEvent.id; p = api("events", { method: "PATCH", body: payload }); }
+  else { p = api("events", { method: "POST", body: payload }); }
+  p.then(function(){ cancelEditEvent(); return loadEvents(); })
+   .then(function(){ say("app", editingEvent ? "已保存" : "已添加"); })
+   .catch(function(e){ say("app", e.message, "err"); })
+   .then(function(){ b.disabled = false; });
+}
+
+function removeEvent(ev){
+  if (!confirm("删除「" + ev.title + "」？删了就找不回来了。")) return;
+  api("events?id=" + encodeURIComponent(ev.id), { method: "DELETE" })
+    .then(loadEvents)
+    .then(function(){ say("app", "已删除"); })
+    .catch(function(e){ say("app", e.message, "err"); });
+}
+
+$("btnEventSave").addEventListener("click", saveEvent);
+$("btnEventCancel").addEventListener("click", cancelEditEvent);
+$("eTitle").addEventListener("keydown", function(e){ if (e.key === "Enter") saveEvent(); });
+
+/* ---------- 标签切换 ---------- */
+document.querySelectorAll(".tabs button").forEach(function(btn){
+  btn.addEventListener("click", function(){
+    document.querySelectorAll(".tabs button").forEach(function(b){ b.classList.remove("on"); });
+    btn.classList.add("on");
+    var tab = btn.dataset.tab;
+    $("tab-todos").classList.toggle("hide", tab !== "todos");
+    $("tab-events").classList.toggle("hide", tab !== "events");
+    say("app", "");
+  });
+});
+
+/* ---------- 启动 ---------- */
+function enterApp(){
+  showApp();
+  loadTodos().catch(function(e){ say("app", e.message, "err"); });
+  loadEvents().catch(function(e){ say("app", e.message, "err"); });
+}
+
+(function boot(){
+  if (!getToken()){ showLogin(); return; }
+  api("auth").then(function(j){
+    if (j.config && (!j.config.hasDatabase || !j.config.hasPassword)){
+      showLogin();
+      var miss = [];
+      if (!j.config.hasDatabase) miss.push("数据库连接（DATABASE_URL）");
+      if (!j.config.hasPassword) miss.push("管理密码（ADMIN_PASSWORD，至少 8 位）");
+      say("login", "服务器还没配好，缺少：" + miss.join("、") + "。请在 Vercel 项目的环境变量里补上。", "warn");
+      return;
+    }
+    if (!j.loggedIn){ showLogin(); return; }
+    enterApp();
+  }).catch(function(){
+    showLogin();
+  });
+})();
+
+})();
+</script>
+</body>
+</html>
