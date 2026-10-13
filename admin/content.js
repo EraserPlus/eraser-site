@@ -108,7 +108,55 @@
         inp.type = "text";
         if (f.ph) inp.placeholder = f.ph;
         if (f.t === "tags") inp.autocomplete = "off";
-        wrap.appendChild(inp);
+
+        /* 文件类型：url 输入框旁加「上传」按钮，直传 Vercel Blob，成功后回填 url */
+        if (type === "file" && f.k === "url") {
+          var upRow = el("div");
+          upRow.style.display = "flex";
+          upRow.style.gap = "8px";
+          upRow.style.alignItems = "center";
+          inp.style.flex = "1";
+          upRow.appendChild(inp);
+          var upBtn = el("button", "btn ghost sm", "上传");
+          upBtn.type = "button";
+          var filePicker = el("input");
+          filePicker.type = "file";
+          filePicker.style.display = "none";
+          upBtn.addEventListener("click", function () { filePicker.click(); });
+          filePicker.addEventListener("change", function () {
+            var file = filePicker.files && filePicker.files[0];
+            if (!file) return;
+            if (file.size > 4 * 1024 * 1024) { say("app", "文件超过 4MB，传不了", "err"); return; }
+            upBtn.disabled = true;
+            upBtn.textContent = "上传中…";
+            /* 令牌直读 localStorage——与 admin/index.html 的 TOKEN_KEY（eraser.admin.token）同一个键 */
+            var token = "";
+            try { token = localStorage.getItem("eraser.admin.token") || ""; } catch (e) {}
+            fetch("/api/upload?name=" + encodeURIComponent(file.name), {
+              method: "POST",
+              headers: token ? { Authorization: "Bearer " + token } : {},
+              body: file
+            }).then(function (r) {
+              return r.json().catch(function () { return {}; }).then(function (j) {
+                if (r.status === 401) { say("app", "登录已过期，请重新登录", "err"); return; }
+                if (!r.ok) { say("app", j.error || ("上传失败（" + r.status + "）"), "err"); return; }
+                inp.value = (j.data && j.data.url) || "";
+                say("app", "上传成功，地址已填好，点保存即可", "ok");
+              });
+            }).catch(function () {
+              say("app", "上传失败：网络错误", "err");
+            }).then(function () {
+              upBtn.disabled = false;
+              upBtn.textContent = "上传";
+              filePicker.value = "";
+            });
+          });
+          upRow.appendChild(upBtn);
+          upRow.appendChild(filePicker);
+          wrap.appendChild(upRow);
+        } else {
+          wrap.appendChild(inp);
+        }
         inputs[f.k] = inp;
       }
       box.appendChild(wrap);

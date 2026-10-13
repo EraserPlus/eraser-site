@@ -109,3 +109,19 @@ export function needTimestamp(value, name) {
   }
   return d.toISOString();
 }
+
+/* ---------- 读取原始 body（二进制安全，带大小上限，超限即抛 BAD_INPUT） ---------- */
+export async function readBody(req, maxBytes) {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (maxBytes && size > maxBytes) {
+      const e = new Error(`文件太大，上限 ${Math.floor(maxBytes / 1024 / 1024)}MB`);
+      e.code = 'BAD_INPUT';
+      throw e;
+    }
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
+}
