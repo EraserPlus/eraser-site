@@ -26,6 +26,8 @@
   .article a{ color:var(--blue); }
   .loading{ color:var(--muted); padding:40px 0; text-align:center; }
   .back{ display:inline-block; margin-top:34px; font-size:14px; }
+  .post-nav{ display:flex; justify-content:space-between; gap:12px; margin-top:34px; flex-wrap:wrap; }
+  .post-nav a{ font-size:14px; color:var(--blue); }
 </style>
 </head>
 <body>
@@ -90,6 +92,18 @@
         return;
       }
 
+      /* 与博客列表同序：先过滤草稿，再按更新时间倒序，定位当前篇的位置 */
+      var posts = items.filter(function(p){
+        return p.data && p.data.published !== false;
+      });
+      posts.sort(function(a, b){
+        return String(b.updated_at || "").localeCompare(String(a.updated_at || ""));
+      });
+      var idx = -1;
+      for (var k = 0; k < posts.length; k++){
+        if (posts[k].data && posts[k].data.slug === slug){ idx = k; break; }
+      }
+
       var d = found.data;
       document.title = d.title + " - 博客";
 
@@ -125,6 +139,22 @@
       /* MD.render 会先把内容整体转义再生成标签，所以这里赋值是安全的 */
       art.innerHTML = window.MD ? MD.render(d.content) : esc(d.content);
       box.appendChild(art);
+
+      /* 上一篇（更旧，下标 +1）/ 下一篇（更新，下标 -1）；
+         边界篇对应方向的链接不渲染。用 DOM 拼，标题走 textContent。 */
+      var nav = document.createElement("div");
+      nav.className = "post-nav";
+      function addNavLink(p, label){
+        var a = document.createElement("a");
+        a.href = "post.html?slug=" + encodeURIComponent(p.data.slug);
+        a.textContent = label + "：" + p.data.title;
+        nav.appendChild(a);
+      }
+      if (idx >= 0){
+        if (idx + 1 < posts.length) addNavLink(posts[idx + 1], "上一篇");
+        if (idx - 1 >= 0) addNavLink(posts[idx - 1], "下一篇");
+      }
+      if (nav.firstChild) box.appendChild(nav);
 
       var back = document.createElement("a");
       back.className = "back";

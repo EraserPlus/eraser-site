@@ -3,7 +3,8 @@
    ---------------------------------------------------------------------------
    安全策略：先把所有内容转义，再只插入我们自己生成的标签。
    链接只允许 http/https/mailto，挡掉 javascript: 之类的伪协议。
-   支持：标题、粗体、斜体、行内代码、代码块、链接、有序/无序列表、引用、分割线。
+   图片只允许 http/https 或站内路径（/、# 开头），其余按普通文本显示。
+   支持：标题、粗体、斜体、行内代码、代码块、链接、图片、有序/无序列表、引用、分割线。
    =========================================================================== */
 (function (global) {
   "use strict";
@@ -22,6 +23,17 @@
       return "\u0000C" + (codes.length - 1) + "\u0000";
     });
 
+    /* 图片：必须在链接正则之前处理，否则 ![alt](url) 会被链接正则吃掉前半截。
+       注意三铁律：进到这里文本已被 render() 整体 esc() 过，alt 和 src 都来自已转义文本，
+       **不能再 esc()**（再转一次 & 会变成 &amp;amp;）——与链接 label/href 同等待遇。 */
+    var imgs = [];
+    s = s.replace(/!\[([^\]\n]*)\]\(([^)\s]+)\)/g, function (_, alt, src) {
+      var safe = /^(https?:\/\/|\/|#)/i.test(src) ? src : null;
+      if (!safe) return _;              // 白名单外：原样留下（已转义，当普通文本显示，安全）
+      imgs.push({ alt: alt, src: safe });
+      return "\u0000I" + (imgs.length - 1) + "\u0000";
+    });
+
     s = s.replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, function (_, label, href) {
       var safe = /^(https?:\/\/|mailto:|\/|#)/i.test(href) ? href : "#";
       var ext = /^https?:\/\//i.test(safe) ? ' target="_blank" rel="noopener noreferrer"' : "";
@@ -35,7 +47,10 @@
     s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>");
     s = s.replace(/~~([^~\n]+)~~/g, "<del>$1</del>");
 
-    return s.replace(/\u0000C(\d+)\u0000/g, function (_, i) {
+    return s.replace(/\u0000I(\d+)\u0000/g, function (_, i) {
+      var im = imgs[Number(i)];
+      return '<img src="' + im.src + '" alt="' + im.alt + '" loading="lazy">';
+    }).replace(/\u0000C(\d+)\u0000/g, function (_, i) {
       return "<code>" + codes[Number(i)] + "</code>";
     });
   }
