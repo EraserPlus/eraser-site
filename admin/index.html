@@ -331,8 +331,14 @@ textarea:focus{ outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgb
 
     <section id="tab-nav" class="hide">
       <div class="card"><h2>🧭 网址导航</h2>
-        <p style="font-size:13px;color:var(--ink2);margin:0">
+        <p style="font-size:13px;color:var(--ink2);margin:0 0 10px">
           这里改的内容会直接显示在 <b>eraser.de5.net/nav/</b>。分类可以折叠收起，链接按你排的顺序显示。
+        </p>
+        <p style="font-size:13px;margin:0;padding:10px 12px;border-radius:9px;
+                  background:var(--amber-l);color:var(--amber);border:1px solid var(--amber)">
+          <b>第一次用请先点下面的「从现有 links.js 导入」</b><br>
+          把你仓库里现有的分类和链接搬进来。如果跳过这步直接手动加，导航页就只会显示你新加的内容，
+          原来那些不会出现。
         </p>
       </div>
       <div id="navHost"></div>
