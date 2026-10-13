@@ -19,6 +19,7 @@ const T = await load('api/_lib/token.js');
 const authRoute = (await load('api/auth.js')).default;
 const todosRoute = (await load('api/todos.js')).default;
 const eventsRoute = (await load('api/events.js')).default;
+const uploadRoute = (await load('api/upload.js')).default;
 
 /* ---------- 假数据库 ---------- */
 let executed = [];
@@ -43,7 +44,7 @@ function mockReq(method, opts = {}) {
     query: opts.query || {},
     body: opts.body,
     socket: { remoteAddress: opts.ip || '1.2.3.4' },
-    async *[Symbol.asyncIterator]() {},
+    async *[Symbol.asyncIterator]() { for (const c of (opts.chunks || [])) yield c; },
   };
 }
 function mockRes() {
@@ -502,6 +503,80 @@ console.log('\n=== 内容接口 /api/content ===');
   const all = executed.map(e => e.text).join('\n');
   check('内容接口也没有 SQL 拼接', !/DROP TABLE/i.test(all), all.slice(0, 120));
   check('恶意内容作为参数传入', executed.some(e => (e.values || []).some(v => String(v).includes('DROP TABLE'))));
+}
+
+console.log('\n=== 文件上传 /api/upload（Vercel Blob）===');
+{
+  /* 假 blob：只记录调用参数并返回预设结果，不真的连 Blob */
+  const recorded = [];
+  globalThis.__FAKE_BLOB__ = {
+    handler: (pathname, body, options) => {
+      recorded.push({ pathname, size: body.length, options });
+      return Promise.resolve({ url: 'https://fake.blob.test/' + pathname, pathname });
+    },
+  };
+  process.env.BLOB_READ_WRITE_TOKEN = 'test-token';
+
+  fakeDb(noop);
+  let res = await call(uploadRoute, 'POST', { chunks: [Buffer.from('x')] });
+  check('未登录 POST /api/upload → 401', res.statusCode === 401, String(res.statusCode));
+  check('未登录不会调用假 blob', recorded.length === 0, String(recorded.length));
+
+  res = await call(uploadRoute, 'GET', { token: TOKEN });
+  check('GET /api/upload（带令牌）→ 405', res.statusCode === 405, String(res.statusCode));
+
+  const savedBlobToken = process.env.BLOB_READ_WRITE_TOKEN;
+  delete process.env.BLOB_READ_WRITE_TOKEN;
+  res = await call(uploadRoute, 'POST', { token: TOKEN, chunks: [Buffer.from('x')] });
+  check('没配 BLOB_READ_WRITE_TOKEN → 503', res.statusCode === 503, String(res.statusCode));
+  check('错误信息说明缺 BLOB_READ_WRITE_TOKEN', /BLOB_READ_WRITE_TOKEN/.test(res.json.error || ''), res.json.error);
+  process.env.BLOB_READ_WRITE_TOKEN = savedBlobToken;
+
+  res = await call(uploadRoute, 'POST', { token: TOKEN, chunks: [Buffer.alloc(4 * 1024 * 1024 + 1)] });
+  check('body 超 4MB → 400', res.statusCode === 400, String(res.statusCode));
+  check('错误信息提示文件太大', /太大/.test(res.json.error || ''), res.json.error);
+  check('超限时不会调用假 blob', recorded.length === 0, String(recorded.length));
+
+  res = await call(uploadRoute, 'POST', { token: TOKEN, chunks: [] });
+  check('body 为空 → 400', res.statusCode === 400, String(res.statusCode));
+
+  /* 正常上传：中文名 + 空格 */
+  recorded.length = 0;
+  res = await call(uploadRoute, 'POST', {
+    token: TOKEN, query: { name: '测试 文件.txt' }, chunks: [Buffer.from('hello-blob')],
+  });
+  check('正常上传 → 200', res.statusCode === 200, String(res.statusCode));
+  check('假 blob 被调用 1 次', recorded.length === 1, String(recorded.length));
+  check('pathname 以 files/ 开头', recorded[0] && recorded[0].pathname.startsWith('files/'),
+        recorded[0] && recorded[0].pathname);
+  check('文件名清洗：只保留一层，不含路径分隔符',
+        recorded[0] && !/[\/\\]/.test(recorded[0].pathname.slice('files/'.length)),
+        recorded[0] && recorded[0].pathname);
+  check('文件内容原样传给 blob（大小正确）', recorded[0] && recorded[0].size === Buffer.byteLength('hello-blob'),
+        String(recorded[0] && recorded[0].size));
+  check('access 为 public', recorded[0] && recorded[0].options.access === 'public',
+        JSON.stringify(recorded[0] && recorded[0].options));
+  check('addRandomSuffix 为 true', recorded[0] && recorded[0].options.addRandomSuffix === true,
+        JSON.stringify(recorded[0] && recorded[0].options));
+  check('响应 data.url 是假 blob 返回的 url',
+        res.json.data && res.json.data.url === 'https://fake.blob.test/' + recorded[0].pathname,
+        JSON.stringify(res.json.data));
+
+  /* 路径穿越：../ 必须被洗掉 */
+  recorded.length = 0;
+  res = await call(uploadRoute, 'POST', { token: TOKEN, query: { name: '../evil.txt' }, chunks: [Buffer.from('evil')] });
+  check('带 ../ 的文件名也能上传 → 200', res.statusCode === 200, String(res.statusCode));
+  check('清洗后不含 .. 也不含多余 /（只有 files/ 一层）',
+        recorded[0] && recorded[0].pathname.startsWith('files/') &&
+        !recorded[0].pathname.includes('..') &&
+        !recorded[0].pathname.slice('files/'.length).includes('/'),
+        recorded[0] && recorded[0].pathname);
+
+  /* 文件名缺省 → files/file */
+  recorded.length = 0;
+  res = await call(uploadRoute, 'POST', { token: TOKEN, query: {}, chunks: [Buffer.from('x')] });
+  check('文件名缺省 → pathname 为 files/file', recorded[0] && recorded[0].pathname === 'files/file',
+        recorded[0] && recorded[0].pathname);
 }
 
 console.log('\n=== 响应头 ===');

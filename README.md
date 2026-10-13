@@ -18,7 +18,7 @@ eraser-site/
 ├── vercel.json           响应头配置：/api/ 不缓存，静态资源缓存 1 小时 + 安全头
 ├── .gitattributes        锁死 LF 行尾，杜绝 Windows CRLF 污染 diff
 ├── .gitignore            忽略 node_modules / .vercel / 临时文件，不进仓库
-├── package.json          只有一个运行时依赖 @neondatabase/serverless + npm test 脚本
+├── package.json          两个运行时依赖（@neondatabase/serverless + @vercel/blob）+ npm test 脚本
 ├── package-lock.json     锁版本，CI 用 npm ci 安装
 │
 ├── api/                  Vercel Serverless 函数目录（每个 .js 自动成为一个 /api 路由）
@@ -27,10 +27,11 @@ eraser-site/
 │   ├── events.js         日程 CRUD（全部需登录，私人数据）
 │   ├── content.js        全站内容 CRUD（读公开，写需登录）
 │   ├── rss.js            博客 RSS 订阅源（GET 公开，免登录）
+│   ├── upload.js         文件上传（需登录，裸 body 存 Vercel Blob）
 │   └── _lib/             公共库（不会成为路由）
 │       ├── db.js         数据库连接 + ensureSchema() 首次自动建表
 │       ├── token.js      HMAC 令牌签发/校验、密码校验、配置自检
-│       ├── http.js       响应封装 ok/send/fail、readJson、入参校验
+│       ├── http.js       响应封装 ok/send/fail、readJson、readBody（二进制安全、带大小上限）、入参校验
 │       ├── ratelimit.js  登录限流（5 次失败锁 15 分钟，按 IP）
 │       └── content.js    五种内容类型的归一化与校验
 │
@@ -46,7 +47,8 @@ eraser-site/
 │   ├── admin_audit.mjs   管理后台：主题/隐私/接口/安全/功能点（87 项）
 │   ├── nav_test.cjs      导航页核心逻辑：数据体检/查询/视图/高亮/导入导出（91 项）
 │   ├── nav_audit.cjs     导航页静态审计：结构/零外部请求/DOM 接线/功能点（54 项）
-│   └── stubs/@neondatabase/serverless/   手写假驱动（只记录 SQL 不连库）
+│   ├── stubs/@neondatabase/serverless/   手写假驱动（只记录 SQL 不连库）
+│   └── stubs/@vercel/blob/               手写假驱动（只记录 put 调用不连 Blob）
 │
 ├── .github/workflows/ci.yml   GitHub Actions：push / PR 自动跑 npm test
 │
@@ -104,9 +106,9 @@ eraser-site/
 npm test
 ```
 
-一条命令按顺序跑完七套测试，共 **711 项**，全部通过即说明站点核心逻辑健康。
+一条命令按顺序跑完七套测试，共 **732 项**，全部通过即说明站点核心逻辑健康。
 
-- **不需要真数据库**：`tests/stubs/` 里有一个手写的假 Neon 驱动，测试时通过全局 `__FAKE_DB__` 预设 SQL 返回值，只验证逻辑不连库。
+- **不需要真数据库 / 真 Blob**：`tests/stubs/` 里有手写的假 Neon 驱动（全局 `__FAKE_DB__` 预设 SQL 返回值）和假 @vercel/blob 驱动（全局 `__FAKE_BLOB__` 预设 put 返回值），只验证逻辑不连外部服务。
 - CI 里也是同一套路：`npm ci` 装回真包后，用假驱动覆盖 `node_modules/@neondatabase/serverless`，再 `npm test`。
 - 本地开发同样直接 `npm test`，无需任何额外配置。
 
@@ -121,6 +123,7 @@ npm test
 | `ADMIN_PASSWORD` | 管理后台密码，**至少 8 位**。短于 8 位按「没配」处理，登录接口返回 503。令牌签名密钥由它派生，改密码 = 所有旧令牌立即失效 |
 | `DATABASE_URL` | Neon Postgres 连接串。通过 Vercel Marketplace 安装 Neon 集成后**自动注入**，不用手填 |
 | `POSTGRES_URL` | 旧名。代码里 `DATABASE_URL` 优先，回退认 `POSTGRES_URL`，两个都没配时写数据的接口返回 503 |
+| `BLOB_READ_WRITE_TOKEN` | Vercel Blob 读写令牌，连接 Blob 存储后自动注入；没配时上传返回 503，可手填链接兜底 |
 
 ---
 
@@ -204,26 +207,41 @@ await sql`
 
 ---
 
-## 五、测试与 CI
+## 五、文件上传
+
+后台「文件」标签里新增/编辑文件时，「文件地址」输入框旁有一个「上传」按钮：
+
+```text
+点「上传」→ 选文件（单文件上限 4MB）→ 自动传到 Vercel Blob → url 自动回填 → 点保存
+```
+
+- 走**裸 body 上传**：前端 `fetch('/api/upload?name=文件名', { method: 'POST', body: 文件 })`，服务端直接读原始 body 存进 Blob 的 `files/` 前缀。单文件场景够用，不写 multipart 解析器。
+- **令牌只在服务端**：浏览器永远拿不到 `BLOB_READ_WRITE_TOKEN`；上传和其他写接口一样，先过 `requireAuth` 登录校验。
+- **需要在 Vercel 项目里连接 Blob 存储**：Vercel 控制台 → 项目 → Storage/Marketplace → 创建 Blob Store 并连接到项目，令牌自动注入（具体以界面为准）。
+- 没配令牌时上传返回 503，表单仍可手填链接兜底，不影响建文件条目。
+
+---
+
+## 六、测试与 CI
 
 | 套件 | 覆盖 | 项数 |
 | --- | --- | --- |
-| `tests/api_test.mjs` | 令牌签发/校验/过期/改密码失效、密码校验、safeEqual、requireAuth、配置自检、入参校验、api/ 与 admin/ 源文件语法 | 103 |
+| `tests/api_test.mjs` | 令牌签发/校验/过期/改密码失效、密码校验、safeEqual、requireAuth、配置自检、入参校验、api/ 与 admin/ 源文件语法 | 104 |
 | `tests/content_test.mjs` | 五种内容类型归一化、Markdown 渲染 / 图片 / 安全性 / 边界、plain() 摘要 | 107 |
-| `tests/api_routes_test.mjs` | 四个接口全流程：未登录 401、CRUD、入参 400、404、405、优先级、SQL 注入、登录限流、缺配置 503、409 唯一性、级联删除、响应头、PATCH 合并语义（只更新出现的字段，done_at 三态）、RSS 订阅源（公开/草稿过滤/XML 转义/空库合法） | 150 |
+| `tests/api_routes_test.mjs` | 四个接口全流程：未登录 401、CRUD、入参 400、404、405、优先级、SQL 注入、登录限流、缺配置 503、409 唯一性、级联删除、响应头、PATCH 合并语义（只更新出现的字段，done_at 三态）、RSS 订阅源（公开/草稿过滤/XML 转义/空库合法）、文件上传（401/405/503/超 4MB/空 body/文件名清洗/路径穿越） | 170 |
 | `tests/pages_audit.mjs` | 8 个公开页：内联脚本语法、零站外资源、同源 fetch、导航栏统一、静态兜底、Markdown 安全、各页功能点 | 119 |
 | `tests/admin_audit.mjs` | 后台：结构、深浅色主题、隐私（noindex/零站外资源）、Bearer 令牌、XSS 防护、七个标签功能点 | 87 |
 | `tests/nav_test.cjs` | 导航核心逻辑：links.js 数据体检、hostOf/initialOf/hueOf、查询匹配、分类过滤、标签收集、高亮区间、导入导出往返、真实数据全视图 | 91 |
 | `tests/nav_audit.cjs` | 导航静态审计：结构、零外部请求、DOM 接线、localStorage 键规范、功能点、全站一致性 | 54 |
-| **合计** | | **711** |
+| **合计** | | **732** |
 
-> 注：`api_test.mjs` 的项数随 `api/` 与 `admin/` 下的 `.js` 文件数浮动（每个文件一条语法断言）；`api/hello.js` 删除后为 102，`api/rss.js` 加入后为 103。
+> 注：`api_test.mjs` 的项数随 `api/` 与 `admin/` 下的 `.js` 文件数浮动（每个文件一条语法断言）；`api/hello.js` 删除后为 102，`api/rss.js` 加入后为 103，`api/upload.js` 加入后为 104。
 
-**CI**：`.github/workflows/ci.yml` —— push 或 PR 自动触发，ubuntu + Node 20，`npm ci` → 假驱动覆盖真包 → `npm test`。全绿才允许合并。
+**CI**：`.github/workflows/ci.yml` —— push 或 PR 自动触发，ubuntu + Node 20，`npm ci` → 假驱动（neon + vercel/blob）覆盖真包 → `npm test`。全绿才允许合并。
 
 ---
 
-## 六、部署
+## 七、部署
 
 ```text
 push 到 main → GitHub → Vercel 监听到 webhook → 自动构建 → 1~2 分钟生效
@@ -235,7 +253,7 @@ push 到 main → GitHub → Vercel 监听到 webhook → 自动构建 → 1~2 �
 
 ---
 
-## 七、已知取舍（明确不做的事）
+## 八、已知取舍（明确不做的事）
 
 1. **单文件大页不拆**：`nav/index.html` 约 26KB、`admin/index.html` 约 43KB。「双击能开、断网能看」是刻意选择——不引构建、不打包模块，一个文件就是一个完整应用。
 2. **无评论 / 无多人 / 无 PWA / 无构建步骤**：个人单用户站，这些都不需要。评论和多用户要一张用户表和一整套会话体系，与「密码放环境变量」的极简模型冲突。
@@ -245,7 +263,7 @@ push 到 main → GitHub → Vercel 监听到 webhook → 自动构建 → 1~2 �
 
 ---
 
-## 八、本机提交方式
+## 九、本机提交方式
 
 本机 git https 直连不通（schannel 报错），提交走 GitHub API 脚本，不走 `git push`：
 
