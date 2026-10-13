@@ -40,7 +40,7 @@ eraser-site/
 ├── tests/                七套测试 + 测试用假数据库驱动
 │   ├── api_test.mjs      令牌/密码/入参校验/api 与 admin 源文件语法（102 项）
 │   ├── content_test.mjs  内容类型归一化 + Markdown 渲染与安全（87 项）
-│   ├── api_routes_test.mjs 四个接口全流程：鉴权/CRUD/注入/限流/配置（109 项）
+│   ├── api_routes_test.mjs 四个接口全流程：鉴权/CRUD/注入/限流/配置/PATCH 合并语义（128 项）
 │   ├── pages_audit.mjs   8 个公开页面：结构/零站外资源/静态兜底/注入防护（119 项）
 │   ├── admin_audit.mjs   管理后台：主题/隐私/接口/安全/功能点（87 项）
 │   ├── nav_test.cjs      导航页核心逻辑：数据体检/查询/视图/高亮/导入导出（91 项）
@@ -102,7 +102,7 @@ eraser-site/
 npm test
 ```
 
-一条命令按顺序跑完七套测试，共 **649 项**，全部通过即说明站点核心逻辑健康。
+一条命令按顺序跑完七套测试，共 **668 项**，全部通过即说明站点核心逻辑健康。
 
 - **不需要真数据库**：`tests/stubs/` 里有一个手写的假 Neon 驱动，测试时通过全局 `__FAKE_DB__` 预设 SQL 返回值，只验证逻辑不连库。
 - CI 里也是同一套路：`npm ci` 装回真包后，用假驱动覆盖 `node_modules/@neondatabase/serverless`，再 `npm test`。
@@ -208,12 +208,12 @@ await sql`
 | --- | --- | --- |
 | `tests/api_test.mjs` | 令牌签发/校验/过期/改密码失效、密码校验、safeEqual、requireAuth、配置自检、入参校验、api/ 与 admin/ 源文件语法 | 102 |
 | `tests/content_test.mjs` | 五种内容类型归一化、Markdown 渲染 / 安全性 / 边界、plain() 摘要 | 87 |
-| `tests/api_routes_test.mjs` | 四个接口全流程：未登录 401、CRUD、入参 400、404、405、优先级、SQL 注入、登录限流、缺配置 503、409 唯一性、级联删除、响应头 | 109 |
+| `tests/api_routes_test.mjs` | 四个接口全流程：未登录 401、CRUD、入参 400、404、405、优先级、SQL 注入、登录限流、缺配置 503、409 唯一性、级联删除、响应头、PATCH 合并语义（只更新出现的字段，done_at 三态） | 128 |
 | `tests/pages_audit.mjs` | 8 个公开页：内联脚本语法、零站外资源、同源 fetch、导航栏统一、静态兜底、Markdown 安全、各页功能点 | 119 |
 | `tests/admin_audit.mjs` | 后台：结构、深浅色主题、隐私（noindex/零站外资源）、Bearer 令牌、XSS 防护、七个标签功能点 | 87 |
 | `tests/nav_test.cjs` | 导航核心逻辑：links.js 数据体检、hostOf/initialOf/hueOf、查询匹配、分类过滤、标签收集、高亮区间、导入导出往返、真实数据全视图 | 91 |
 | `tests/nav_audit.cjs` | 导航静态审计：结构、零外部请求、DOM 接线、localStorage 键规范、功能点、全站一致性 | 54 |
-| **合计** | | **649** |
+| **合计** | | **668** |
 
 > 注：`api_test.mjs` 的项数随 `api/` 与 `admin/` 下的 `.js` 文件数浮动（每个文件一条语法断言）；`api/hello.js` 删除后为 102。
 
