@@ -37,15 +37,32 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'PATCH') {
+      /* 合并语义：只更新请求体里出现的键，未出现的保持原值（与 /api/content 一致）。
+         旧前端传全量字段时行为不变（全传 = 全量更新）。
+         注意：假数据库驱动只支持静态 SQL，不能用 sql.join 动态拼 SET 子句，
+         所以用一条静态 SQL + CASE 实现按需更新。 */
       const b = await readJson(req);
       const id = needId(b.id);
+      const has = (k) => Object.prototype.hasOwnProperty.call(b, k);
+      const hasTitle = has('title'), hasNote = has('note'), hasStart = has('start_at'),
+            hasEnd = has('end_at'), hasAllDay = has('all_day');
+      if (!hasTitle && !hasNote && !hasStart && !hasEnd && !hasAllDay) {
+        const e = new Error('至少传一个要修改的字段（title / note / start_at / end_at / all_day）');
+        e.code = 'BAD_INPUT';
+        throw e;
+      }
+      const title  = hasTitle  ? needText(b.title, '标题', 200) : null;
+      const note   = hasNote   ? optionalText(b.note) : null;
+      const start  = hasStart  ? needTimestamp(b.start_at, '开始时间') : null;
+      const end    = hasEnd    ? (b.end_at ? needTimestamp(b.end_at, '结束时间') : null) : null;
+      const allDay = hasAllDay ? !!b.all_day : null;
       const rows = await sql`
         UPDATE events SET
-          title    = ${needText(b.title, '标题', 200)},
-          note     = ${optionalText(b.note)},
-          start_at = ${needTimestamp(b.start_at, '开始时间')}::timestamptz,
-          end_at   = ${b.end_at ? needTimestamp(b.end_at, '结束时间') : null}::timestamptz,
-          all_day  = ${!!b.all_day}
+          title    = CASE WHEN ${hasTitle} THEN ${title}::text ELSE title END,
+          note     = CASE WHEN ${hasNote}  THEN ${note}::text ELSE note END,
+          start_at = CASE WHEN ${hasStart} THEN ${start}::timestamptz ELSE start_at END,
+          end_at   = CASE WHEN ${hasEnd}   THEN ${end}::timestamptz ELSE end_at END,
+          all_day  = CASE WHEN ${hasAllDay} THEN ${allDay}::boolean ELSE all_day END
         WHERE id = ${id}
         RETURNING id, title, note, start_at, end_at, all_day, created_at`;
       if (!rows.length) return send(res, 404, { error: '这条日程不存在，可能已被删除' });

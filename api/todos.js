@@ -50,16 +50,40 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'PATCH') {
+      /* 合并语义：只更新请求体里出现的键，未出现的保持原值（与 /api/content 一致）。
+         旧前端传全量字段时行为不变（全传 = 全量更新）。
+         注意：假数据库驱动只支持静态 SQL，不能用 sql.join 动态拼 SET 子句，
+         所以用一条静态 SQL + CASE 实现按需更新。 */
       const b = await readJson(req);
       const id = needId(b.id);
+      const has = (k) => Object.prototype.hasOwnProperty.call(b, k);
+      const hasTitle = has('title'), hasNote = has('note'), hasDue = has('due_date'),
+            hasPri = has('priority'), hasDone = has('done');
+      if (!hasTitle && !hasNote && !hasDue && !hasPri && !hasDone) {
+        const e = new Error('至少传一个要修改的字段（title / note / due_date / priority / done）');
+        e.code = 'BAD_INPUT';
+        throw e;
+      }
+      /* 只校验出现的字段；未出现的不校验、不发送 */
+      const title = hasTitle ? needText(b.title, '标题', 200) : null;
+      const note  = hasNote  ? optionalText(b.note) : null;
+      const due   = hasDue   ? optionalDate(b.due_date, '截止日期') : null;
+      const pri   = hasPri   ? needPriority(b.priority) : null;
+      const done  = hasDone  ? !!b.done : null;
+      /* done_at 三态：传 done=true → 已打过时间戳的不动；传 done=false → 清空；不传 → 原值。
+         done_at 永不接受前端传入（SQL 里没有它的入参，天然防御）。 */
       const rows = await sql`
         UPDATE todos SET
-          title    = ${needText(b.title, '标题', 200)},
-          note     = ${optionalText(b.note)},
-          due_date = ${optionalDate(b.due_date, '截止日期')},
-          priority = ${needPriority(b.priority)},
-          done     = ${!!b.done},
-          done_at  = CASE WHEN ${!!b.done} THEN COALESCE(done_at, now()) ELSE NULL END
+          title    = CASE WHEN ${hasTitle} THEN ${title}::text ELSE title END,
+          note     = CASE WHEN ${hasNote}  THEN ${note}::text  ELSE note END,
+          due_date = CASE WHEN ${hasDue}   THEN ${due}::date   ELSE due_date END,
+          priority = CASE WHEN ${hasPri}   THEN ${pri}::smallint ELSE priority END,
+          done     = CASE WHEN ${hasDone}  THEN ${done}::boolean ELSE done END,
+          done_at  = CASE
+                       WHEN ${hasDone} AND NOT ${done} THEN NULL
+                       WHEN ${hasDone} AND ${done} THEN COALESCE(done_at, now())
+                       ELSE done_at
+                     END
         WHERE id = ${id}
         RETURNING id, title, note, done, due_date, priority, created_at, done_at`;
       if (!rows.length) return send(res, 404, { error: '这条待办不存在，可能已被删除' });
