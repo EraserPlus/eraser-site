@@ -4,5 +4,8 @@
   "type": "module",
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0"
+  },
+  "scripts": {
+    "test": "node tests/api_test.mjs && node tests/content_test.mjs && node tests/api_routes_test.mjs && node tests/pages_audit.mjs && node tests/admin_audit.mjs && node tests/nav_test.cjs && node tests/nav_audit.cjs"
   }
 }
