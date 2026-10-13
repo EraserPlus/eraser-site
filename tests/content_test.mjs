@@ -166,12 +166,57 @@ console.log('\n=== Markdown 边界 ===');
   check('连续多个代码块', (R('```\na\n```\n\n```\nb\n```').match(/<pre>/g) || []).length === 2);
 }
 
+console.log('\n=== Markdown 图片 ===');
+{
+  const cat = R('![猫](https://example.com/cat.png)');
+  check('基本图片渲染成 <img>',
+        cat.includes('<img src="https://example.com/cat.png" alt="猫" loading="lazy">'), cat);
+  check('图片包在段落里', /^<p><img .*><\/p>$/.test(cat), cat);
+
+  const js = R('![x](javascript:alert(1))');
+  check('javascript: 伪协议图片不渲染', !/<img/i.test(js), js);
+  check('伪协议图片不生成标签，! 作为字面文本留下', js.startsWith('<p>!'), js);
+
+  const amp = R('![a&b](https://x.com/i.png)');
+  check('alt 里的 & 只转义一次（已转义文本不二次转义）', amp.includes('alt="a&amp;b"'), amp);
+  check('不会出现 &amp;amp; 双重转义', !amp.includes('&amp;amp;'), amp);
+
+  check('空 alt 也渲染', R('![](https://x.com/i.png)').includes('alt=""'), R('![](https://x.com/i.png)'));
+  check('站内相对路径图片正常渲染', R('![x](/files/a.png)').includes('<img src="/files/a.png"'), R('![x](/files/a.png)'));
+  check('锚点路径图片正常渲染', R('![x](#fig)').includes('<img src="#fig"'), R('![x](#fig)'));
+
+  const mix = R('看图 ![猫](https://x/c.png) 完毕');
+  check('混排：图片前面的文字在', mix.includes('看图'), mix);
+  check('混排：图片后面的文字在', mix.includes('完毕'), mix);
+  check('混排：图片本身在', mix.includes('<img'), mix);
+  check('混排时图片前后空格保留', /图 <img/.test(mix) && /> 完毕/.test(mix), mix);
+
+  const li = R('- ![猫](https://x/c.png)');
+  check('列表项里的图片也能渲染', /<ul><li><img/.test(li), li);
+
+  const two = R('![a](https://x/a.png) 和 ![b](https://x/b.png)');
+  check('一篇里多张图片都渲染', (two.match(/<img/g) || []).length === 2, two);
+  check('多张图片各自参数正确',
+        two.includes('src="https://x/a.png"') && two.includes('src="https://x/b.png"'), two);
+
+  /* 图片分支在链接正则之前：![alt](url) 整体是图片，不会被链接正则吃掉前半截 */
+  const inLink = R('[![封面](https://x/c.png)](https://x/post)');
+  check('图片在链接里也先按图片处理', inLink.includes('<img') && inLink.includes('href="https://x/post"'), inLink);
+
+  /* 代码里的图片记号不渲染 */
+  const inCode = R('`![x](https://x/c.png)`');
+  check('行内代码里的图片记号不渲染', !/<img/i.test(inCode) && inCode.includes('<code>'), inCode);
+}
+
 console.log('\n=== 摘要提取 plain() ===');
 {
   check('去掉标题记号', MD.plain('# 标题\n正文') === '标题 正文', MD.plain('# 标题\n正文'));
   check('去掉粗体记号', MD.plain('**粗**') === '粗');
   check('去掉代码块', MD.plain('前\n```\ncode\n```\n后') === '前 后', MD.plain('前\n```\ncode\n```\n后'));
   check('链接只留文字', MD.plain('[名](https://a.com)') === '名');
+  check('图片只留 alt 文字', MD.plain('![猫](https://x/c.png)') === '猫', MD.plain('![猫](https://x/c.png)'));
+  check('图片和链接混排只留文字', MD.plain('看 ![猫](https://x/c.png) 和 [名](https://a.com)') === '看 猫 和 名',
+        MD.plain('看 ![猫](https://x/c.png) 和 [名](https://a.com)'));
   check('超长截断并加省略号', MD.plain('x'.repeat(50), 10) === 'x'.repeat(10) + '…');
   check('不超长不加省略号', MD.plain('abc', 10) === 'abc');
 }

@@ -51,8 +51,14 @@ function mockRes() {
     statusCode: 200,
     headers: {},
     json: null,
+    body: null,
     setHeader(k, v) { this.headers[k] = v; },
-    end(s) { this.json = s ? JSON.parse(s) : null; },
+    end(s) {
+      /* XML（RSS）这类非 JSON 响应只留 body；JSON 响应仍然解析进 json */
+      this.body = s == null ? null : String(s);
+      this.json = null;
+      if (s) { try { this.json = JSON.parse(s); } catch (e) { /* 非 JSON，只用 body */ } }
+    },
   };
 }
 async function call(handler, method, opts = {}) {
@@ -504,6 +510,89 @@ console.log('\n=== 响应头 ===');
   const res = await call(todosRoute, 'GET', { token: TOKEN });
   check('接口响应禁止缓存（no-store）', /no-store/.test(res.headers['Cache-Control'] || ''), res.headers['Cache-Control']);
   check('响应是 UTF-8 JSON', /application\/json/.test(res.headers['Content-Type'] || ''));
+}
+
+console.log('\n=== RSS 订阅源 /api/rss（公开免登录） ===');
+{
+  const rssRoute = (await load('api/rss.js')).default;
+  const HOST = 'eraser.example.com';
+  const postRow = (o) => Object.assign({ id: 1, updated_at: '2026-10-13T10:00:00.000Z', data: {} }, o);
+
+  /* 假驱动不会执行 WHERE，这里按真实 SQL 的条件手动模拟一遍，
+     保证「草稿被过滤」的断言反映线上行为（另外还会单独检查 SQL 文本） */
+  const posts = [
+    postRow({ id: 3, updated_at: '2026-10-13T10:00:00.000Z',
+              data: { slug: 'hello', title: '第一篇文章', summary: '这是摘要', content: '正文一', tags: ['测试'], published: true } }),
+    postRow({ id: 2, updated_at: '2026-10-12T10:00:00.000Z',
+              data: { slug: 'secret-draft', title: '不该出现的草稿', content: '草稿正文', published: false } }),
+    postRow({ id: 1, updated_at: '2026-10-11T10:00:00.000Z',
+              data: { slug: 'older', title: '更老的一篇', summary: '', content: '第二篇正文', tags: [], published: true } }),
+  ];
+
+  fakeDb((text) => {
+    if (/SELECT .* FROM content/.test(text)) {
+      return posts.filter(r => r.data.published !== false);
+    }
+    return [];
+  });
+  let res = await call(rssRoute, 'GET', { headers: { host: HOST } });
+  check('未登录也能读 RSS（订阅器不带令牌）→ 200', res.statusCode === 200, String(res.statusCode));
+  check('Content-Type 是 application/rss+xml', /application\/rss\+xml/.test(res.headers['Content-Type'] || ''),
+        res.headers['Content-Type']);
+  check('响应体是 XML（以 <?xml 开头）', /^<\?xml/.test(res.body || ''), String(res.body).slice(0, 40));
+  check('包含 <rss version="2.0">', (res.body || '').includes('<rss version="2.0">'));
+  check('包含 <channel>', (res.body || '').includes('<channel>'));
+  check('草稿被过滤，只剩 2 个 <item>', (res.body.match(/<item>/g) || []).length === 2,
+        String((res.body.match(/<item>/g) || []).length));
+  check('草稿标题不出现在订阅源里', !(res.body || '').includes('不该出现的草稿'));
+  check('文章标题正确', (res.body || '').includes('<title>第一篇文章</title>'));
+  check('链接用 Host 头拼绝对地址', (res.body || '').includes('https://' + HOST + '/blog/post.html?slug=hello'));
+  check('slug 做了 URL 编码', (res.body || '').includes('slug=older'));
+  check('没有 summary 时用正文截断兜底', (res.body || '').includes('第二篇正文'));
+  check('guid 与链接一致', (res.body || '').includes('<guid>https://' + HOST + '/blog/post.html?slug=hello</guid>'));
+
+  const sel = executed.find(e => /SELECT .* FROM content/.test(e.text));
+  check('SQL 里带 published 过滤（缺省视为公开）',
+        sel && /COALESCE\(data->>'published', 'true'\) <> 'false'/.test(sel.text), sel ? sel.text : 'none');
+  check('SQL 按更新时间倒序取 20 条',
+        sel && /ORDER BY updated_at DESC, id DESC/.test(sel.text) && /LIMIT 20/.test(sel.text),
+        sel ? sel.text : 'none');
+
+  /* --- pubDate --- */
+  check('pubDate 存在且是 UTC 字符串格式',
+        /<pubDate>[A-Z][a-z]{2}, \d{2} [A-Z][a-z]{2} \d{4} \d{2}:\d{2}:\d{2} GMT<\/pubDate>/.test(res.body || ''),
+        (/pubDate>([^<]*)</.exec(res.body || '') || [])[1] || 'none');
+
+  /* --- XML 转义 --- */
+  fakeDb((text) => {
+    if (/SELECT .* FROM content/.test(text)) {
+      return [postRow({ id: 9, data: { slug: 'x', title: '标题<b>&"引号"', content: '正文' } })];
+    }
+    return [];
+  });
+  res = await call(rssRoute, 'GET', { headers: { host: HOST } });
+  check('XML 特殊字符被转义（<>&"）',
+        (res.body || '').includes('标题&lt;b&gt;&amp;&quot;引号&quot;'),
+        (/<title>([^<]*)<\/title>/.exec(res.body || '') || [])[1] || 'none');
+  check('转义后的标题仍是合法 XML（没有裸 < 落在标签外）', !/<title>[^<]*<b>/.test(res.body || ''));
+
+  /* --- 空库 --- */
+  fakeDb(() => []);
+  res = await call(rssRoute, 'GET', { headers: { host: HOST } });
+  check('空库也返回 200', res.statusCode === 200, String(res.statusCode));
+  check('空库返回合法空 channel', (res.body || '').includes('<channel>') && !(res.body || '').includes('<item>'));
+  check('空库也是完整 XML', /^<\?xml[\s\S]*<\/rss>\s*$/.test(res.body || ''));
+
+  /* --- 方法限制 --- */
+  fakeDb(noop);
+  res = await call(rssRoute, 'POST', { body: {} });
+  check('POST /api/rss → 405', res.statusCode === 405, String(res.statusCode));
+
+  /* --- Host 头缺省时的兜底域名（空库时校验 channel 级链接） --- */
+  fakeDb(() => []);
+  res = await call(rssRoute, 'GET', {});
+  check('没有 Host 头时用兜底域名', (res.body || '').includes('<link>https://eraser.de5.net</link>'),
+        (/<link>([^<]*)<\/link>/.exec(res.body || '') || [])[1] || 'none');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
