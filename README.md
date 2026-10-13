@@ -17,6 +17,7 @@ eraser-site/
 ├── md.js                 自研 Markdown 渲染器（内置转义，见「已知取舍」）
 ├── vercel.json           响应头配置：/api/ 不缓存，静态资源缓存 1 小时 + 安全头
 ├── .gitattributes        锁死 LF 行尾，杜绝 Windows CRLF 污染 diff
+├── .gitignore            忽略 node_modules / .vercel / 临时文件，不进仓库
 ├── package.json          只有一个运行时依赖 @neondatabase/serverless + npm test 脚本
 ├── package-lock.json     锁版本，CI 用 npm ci 安装
 │
