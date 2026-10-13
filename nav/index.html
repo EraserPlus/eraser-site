@@ -122,6 +122,44 @@ mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
 .note.hide{display:none}
 .footnote{color:var(--muted);font-size:12.5px;text-align:center;margin-top:34px;line-height:1.9}
 .footnote code{background:#f1f5f9;border-radius:4px;padding:1px 5px;font-size:12px}
+
+/* ===== 暗色：跟随系统（纯 CSS，无 JS 无切换按钮） ===== */
+/* 覆盖上面 :root 的变量为暗色值（参照 admin 后台暗色方案，品牌蓝提亮保证对比度），
+   并把本页硬编码的浅色表面/描边/文字逐一改成暗色，与变量配套。
+   说明：375px 宽度下 .grid 有 600px 断点、toolbar/tagbar/views 均已 flex-wrap，
+   顶栏换行由 style.css 的 768px 断点负责（本页引了 style.css），实测无破损。
+   图标底色/文字是 JS 里按名称生成的 hsl() 动态色（禁动逻辑），暗色下保持原样。 */
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0d1117; --card:#161b22; --sunk:#1c2128;
+    --ink:#e6edf3; --muted:#7d8590; --line:#272c33;
+    --blue:#60a5fa; --blue-d:#3b82f6; --blue-l:#16233a;
+    --red:#ff7b72; --red-l:#2d1517;
+    --green:#3fb950; --green-l:#0f2417;
+    --amber:#d29922; --amber-l:#2b2210;
+    --mark:#713f12;
+  }
+  #q{ background:var(--card); }
+  .views{ background:var(--card); }
+  .views button:hover{ background:var(--sunk); }
+  .views button.active{ color:#0d1117; }
+  .right button{ background:var(--card); }
+  .right button:hover{ background:var(--sunk); }
+  .chip{ background:var(--card); }
+  .chip:hover{ border-color:#3d444d; }
+  .chip.active{ color:#0d1117; }
+  .tagbar .clear{ border-color:#3d444d; }
+  .cath .n{ background:var(--sunk); }
+  a.card:hover{ border-color:#1e3a5f; }
+  a.card .url{ color:var(--muted); }
+  a.card .tg i{ background:var(--sunk); color:var(--muted); }
+  .star{ color:#4b5563; }
+  .footnote code{ background:var(--sunk); }
+  .searchwrap kbd{ background:var(--sunk); }
+  .note.ok{ border-color:#1f4429; color:var(--green); }
+  .note.warn{ border-color:#4a3a12; color:var(--amber); }
+  .note.err{ border-color:#4a1f1f; color:var(--red); }
+}
 </style>
 </head>
 <body>
