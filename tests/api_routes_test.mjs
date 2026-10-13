@@ -198,6 +198,92 @@ console.log('\n=== 待办优先级 ===');
         sel && /ORDER BY done ASC, priority DESC/.test(sel.text), sel ? sel.text : 'none');
 }
 
+console.log('\n=== PATCH 合并语义：只更新请求体里出现的字段 ===');
+{
+  /* 参数顺序：[hasTitle, title, hasNote, note, hasDue, due, hasPri, pri,
+     hasDone, done, hasDone, done, hasDone, done, id]
+     （done_at 的 CASE 里 hasDone / done 各出现两次，共 15 个参数；
+       所以「done 键是否出现」看 values[8]，「传入的 done 值」看 values[9]） */
+  const grabTodos = () => executed.find(e => /UPDATE todos/.test(e.text));
+
+  fakeDb(() => [{ id: 1, title: 'x', note: null, done: true, due_date: null, created_at: 'x', done_at: 'y' }]);
+  let r = await call(todosRoute, 'PATCH', { token: TOKEN, body: { id: 1, done: true } });
+  check('PATCH 只传 done:true → 200', r.statusCode === 200, String(r.statusCode));
+  let up = grabTodos();
+  check('SQL 用静态 CASE 且维护 done_at', up && /CASE/.test(up.text) && /done_at/.test(up.text),
+        up ? up.text.slice(0, 160) : 'none');
+  check('title/note/due/priority 四个标志位为 false、done 标志位为 true',
+        up && up.values[0] === false && up.values[2] === false && up.values[4] === false &&
+        up.values[6] === false && up.values[8] === true,
+        up ? JSON.stringify(up.values) : 'none');
+
+  fakeDb(() => [{ id: 1, title: 'x', note: null, done: false, due_date: null, created_at: 'x', done_at: null }]);
+  r = await call(todosRoute, 'PATCH', { token: TOKEN, body: { id: 1, done: false } });
+  check('PATCH 只传 done:false → 200', r.statusCode === 200, String(r.statusCode));
+  up = grabTodos();
+  /* done 键出现了（values[8]=hasDone 为 true），但值为 false（values[9]） */
+  check('done 标志位为 true 且传入的 done 值为 false',
+        up && up.values[8] === true && up.values[9] === false, up ? JSON.stringify(up.values) : 'none');
+
+  fakeDb(() => [{ id: 1, title: '新标题', note: null, done: false, due_date: null, created_at: 'x', done_at: null }]);
+  r = await call(todosRoute, 'PATCH', { token: TOKEN, body: { id: 1, title: '新标题' } });
+  check('PATCH 只传 title → 200', r.statusCode === 200, String(r.statusCode));
+  up = grabTodos();
+  check('title 标志位为 true，其余四个标志位为 false',
+        up && up.values[0] === true && up.values[2] === false && up.values[4] === false &&
+        up.values[6] === false && up.values[8] === false,
+        up ? JSON.stringify(up.values) : 'none');
+
+  /* done_at 由服务端维护，夹带传入也必须被忽略 */
+  fakeDb(() => [{ id: 1, title: 'x', note: null, done: true, due_date: null, created_at: 'x', done_at: 'server-side' }]);
+  r = await call(todosRoute, 'PATCH', { token: TOKEN, body: { id: 1, done: true, done_at: 'HACKED' } });
+  check('PATCH 夹带 done_at → 200（字段被忽略）', r.statusCode === 200, String(r.statusCode));
+  up = grabTodos();
+  check('done_at 没有作为参数传入（永不接受前端传入）',
+        up && !up.values.some(v => v === 'HACKED'), up ? JSON.stringify(up.values) : 'none');
+
+  fakeDb(noop);
+  r = await call(todosRoute, 'PATCH', { token: TOKEN, body: { id: 1 } });
+  check('PATCH 只有 id → 400', r.statusCode === 400, String(r.statusCode));
+  check('错误信息提示至少传一个字段', /至少传一个/.test(r.json.error || ''), r.json.error);
+
+  /* 回归：旧前端全量传参仍然 200（全传 = 全量更新） */
+  fakeDb(() => [{ id: 1, title: '全量', note: 'n', done: true, due_date: '2026-10-20', priority: 2, created_at: 'x', done_at: 'y' }]);
+  r = await call(todosRoute, 'PATCH', { token: TOKEN, body: { id: 1, title: '全量', note: 'n', due_date: '2026-10-20', priority: 2, done: true } });
+  check('PATCH 全量传参（兼容旧行为）→ 200', r.statusCode === 200, String(r.statusCode));
+  up = grabTodos();
+  check('全量时五个标志位全为 true',
+        up && up.values[0] === true && up.values[2] === true && up.values[4] === true &&
+        up.values[6] === true && up.values[8] === true,
+        up ? JSON.stringify(up.values) : 'none');
+
+  /* 日程：参数顺序 [hasTitle, title, hasNote, note, hasStart, start, hasEnd, end, hasAllDay, allDay, id] */
+  const grabEvents = () => executed.find(e => /UPDATE events/.test(e.text));
+
+  fakeDb(() => [{ id: 1, title: 'x', note: null, start_at: 's', end_at: null, all_day: false, created_at: 'x' }]);
+  r = await call(eventsRoute, 'PATCH', { token: TOKEN, body: { id: 1, start_at: '2026-10-20T09:00:00.000Z' } });
+  check('日程 PATCH 只传 start_at → 200', r.statusCode === 200, String(r.statusCode));
+  up = grabEvents();
+  check('start 标志位为 true，title/note/end/all_day 标志位为 false',
+        up && up.values[0] === false && up.values[2] === false && up.values[4] === true &&
+        up.values[6] === false && up.values[8] === false,
+        up ? JSON.stringify(up.values) : 'none');
+
+  fakeDb(() => [{ id: 1, title: '改标题', note: null, start_at: 's', end_at: null, all_day: false, created_at: 'x' }]);
+  r = await call(eventsRoute, 'PATCH', { token: TOKEN, body: { id: 1, title: '改标题' } });
+  check('日程 PATCH 只传 title → 200', r.statusCode === 200, String(r.statusCode));
+  up = grabEvents();
+  check('title 标志位为 true，其余标志位为 false',
+        up && up.values[0] === true && up.values[2] === false && up.values[4] === false &&
+        up.values[6] === false && up.values[8] === false,
+        up ? JSON.stringify(up.values) : 'none');
+
+  fakeDb(noop);
+  r = await call(eventsRoute, 'PATCH', { token: TOKEN, body: { id: 1 } });
+  check('日程 PATCH 只有 id → 400', r.statusCode === 400, String(r.statusCode));
+  check('错误信息提示至少传一个字段', /至少传一个/.test(r.json.error || ''), r.json.error);
+}
+
 console.log('\n=== SQL 注入防护 ===');
 {
   const evil = "'; DROP TABLE todos; --";
