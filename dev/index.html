@@ -80,8 +80,8 @@ html[data-theme="dark"] .steps li::before { color: #0d1117; }
     <tr><th>托管</th><td>Vercel Hobby 免费档。push main → 自动部署，1~2 分钟生效</td></tr>
     <tr><th>数据库</th><td>Neon Postgres，三张表：content（六种内容共用）/ todos / events。闲置约 5 分钟休眠，首次访问慢几秒属正常</td></tr>
     <tr><th>后台</th><td><code>/admin/</code> 密码登录（站长持有），7 个标签：今天 / 待办 / 日程 / 导航 / 博客 / 追更 / 页面</td></tr>
-    <tr><th>测试</th><td>七套 1001 项，一条命令：<code>npm test</code>。提交前必须全绿</td></tr>
-    <tr><th>当前版本</th><td>main @ <code>ccb99c8</code> · 最近批次 M5 首页并入全站搜索（2026-10-14）</td></tr>
+    <tr><th>测试</th><td>七套 1008 项，一条命令：<code>npm test</code>。提交前必须全绿</td></tr>
+    <tr><th>当前版本</th><td>main @ <code>20fc693</code> · 最近批次 M6 体验基座（手动主题切换 + Ctrl+K 命令面板，2026-10-14）</td></tr>
   </table>
 
   <h2>2. 工作流程（六步，别跳步）</h2>
@@ -133,13 +133,14 @@ done < /tmp/main_tree.tsv</code></pre>
     <li><b>PATCH 全是合并语义</b>：只更新请求体里出现的字段；清空要显式传 null。</li>
     <li><b>行尾 LF、UTF-8 无 BOM</b>；新文件写完顺手检查。</li>
     <li><b>敏感信息绝不进仓库</b>：密码、令牌只在 Vercel 环境变量里。仓库是公开的。</li>
+    <li><b>主题机制</b>：每页 <code>&lt;head&gt;</code> 有一段防闪内联脚本，首帧前把 <code>eraser.theme</code>（没存过就跟随系统偏好）写到 <code>html[data-theme]</code>；暗色样式一律写成 <code>html[data-theme="dark"] 选择器</code>，不要再写 <code>@media (prefers-color-scheme: dark)</code>。顶栏按钮与 <code>Ctrl+K</code> 面板由 <code>shell.js</code> 提供（后台另有自己的 <code>eraser.admin.theme</code>，互不影响）。</li>
     <li><b>每批独立提交、独立可回滚</b>（git revert 即可）；测试全绿才合并。</li>
   </ul>
 
   <h2>5. 站点地图（改哪里的速查）</h2>
   <table>
     <tr><th>前台页面</th><td><code>index.html</code> 首页（= 全站搜索：搜索框 + 分组结果，<code>/?q=</code> 可直接带词进搜索） / <code>tools/</code> 工具箱（数据驱动，加工具改 TOOLS 数组）/ <code>blog/</code> 博客（列表 + post.html 文章页）/ <code>collect/</code> 追更（追番 + 漫画留档）/ <code>nav/</code> 网址导航（links.js 静态兜底 + 后台数据）/ <code>about/</code> 关于</td></tr>
-    <tr><th>前台公共</th><td><code>style.css</code> 全站样式（CSS 变量 + 系统暗色 + 768px 断点）/ <code>md.js</code> Markdown 渲染（转义三铁律）</td></tr>
+    <tr><th>前台公共</th><td><code>style.css</code> 全站样式（CSS 变量 + <code>html[data-theme="dark"]</code> 暗色 + 768px 断点）/ <code>md.js</code> Markdown 渲染（转义三铁律）/ <code>shell.js</code> 全站公共交互层（顶栏主题切换按钮 + <code>Ctrl/⌘+K</code> 命令面板 + 复制当前链接）</td></tr>
     <tr><th>后台</th><td><code>admin/index.html</code>（单文件：登录 + 7 标签 + 导出备份）+ <code>admin/content.js</code>（内容表单与列表，SCHEMA 驱动）</td></tr>
     <tr><th>接口 api/</th><td><code>auth.js</code> 登录 / <code>todos.js</code> 待办 / <code>events.js</code> 日程 / <code>content.js</code> 内容（六种类型 CRUD）/ <code>search.js</code> 搜索 / <code>rss.js</code> 博客订阅源 / <code>upload.js</code> 上传（Vercel Blob）/ <code>favicon.js</code> 图标代理；公共层在 <code>api/_lib/</code></td></tr>
     <tr><th>内容类型</th><td>content 表六种：nav_category / nav_link / post / file（已下架，数据保留）/ page / <b>media（追更，M1 新增）</b>。类型定义与校验在 <code>api/_lib/content.js</code></td></tr>
@@ -150,7 +151,7 @@ done < /tmp/main_tree.tsv</code></pre>
   <ol>
     <li><code>api/_lib/content.js</code>：TYPES 加条目 + normalize 加校验分支（字段白名单、枚举、长度）；</li>
     <li><code>admin/content.js</code>：SCHEMA 加字段定义 + RENDERERS 加列表渲染；<code>admin/index.html</code>：加 tab 按钮、section、TABS 数组；导出备份记得带上新类型；</li>
-    <li>前台新页面：复制 <code>collect/index.html</code> 的模式（静态兜底 → fetch → 渲染）；</li>
+    <li>前台新页面：复制 <code>collect/index.html</code> 的模式（静态兜底 → fetch → 渲染），<b>并照抄 <code>&lt;head&gt;</code> 里的防闪主题脚本与页尾的 <code>&lt;script src="../shell.js"&gt;&lt;/script&gt;</code></b>（否则新页没有主题按钮和 <code>Ctrl+K</code>）；</li>
     <li>全站导航栏同步加链接；<code>tests/pages_audit.mjs</code> 的 PAGES 数组加新页面；</li>
     <li>补测试（normalize 用例、接口用例、页面专项），<code>npm test</code> 全绿，走六步流程上线。</li>
   </ol>
@@ -176,6 +177,7 @@ done < /tmp/main_tree.tsv</code></pre>
     <div class="row latest"><span class="no">M3</span><span class="what">收尾：域名记录归档进仓库、README 同步、关闭历史 PR #11</span><span class="when">10-14</span></div>
     <div class="row latest"><span class="no">M4</span><span class="what"><b>追更接入全站搜索</b>（media 按名称 / 备注 / 链接检索，没填链接回落追更页）；<b>上传按钮可达化</b>：由不可达的 file 类型改挂到追更的「链接 / 封面图」（PR #24）</span><span class="when">10-14</span></div>
     <div class="row latest"><span class="no">M5</span><span class="what"><b>首页并入全站搜索</b>：删掉独立 <code>search/</code>，根路径 <code>/</code> 整页改成搜索（原首页欢迎语 / 五卡片丢弃）；全站导航去掉重复的「首页」，「搜索」指向 <code>/</code>；后台页面标识只留 about（PR #26）</span><span class="when">10-14</span></div>
+    <div class="row latest"><span class="no">M6</span><span class="what"><b>体验基座</b>：新增全站公共交互层 <code>shell.js</code>——顶栏手动主题切换（存 <code>eraser.theme</code>，各页 head 加防闪脚本）、<code>Ctrl/⌘+K</code> 命令面板（跳分区 / 搜关键词 / 切主题 / 复制链接 / 回顶部）、复制当前链接；暗色由 <code>@media</code> 统一改为 <code>html[data-theme="dark"]</code>；导航页的 Ctrl+K 收归 shell.js，避免重复绑定（PR #28）</span><span class="when">10-14</span></div>
   </div>
 
   <h2>7. 当前待办 / 已知事项</h2>
