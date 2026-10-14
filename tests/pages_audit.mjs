@@ -181,5 +181,31 @@ console.log('\n=== 追更页 ===');
   check('封面图加载失败自动隐藏', /img\.addEventListener\("error"/.test(html));
 }
 
+console.log('\n=== 开发交接页（dev/，给接手的 AI）===');
+{
+  const html = read('dev/index.html');
+  check('不进搜索引擎收录（noindex）', /name="robots"[^>]*noindex/i.test(html));
+  check('引用了全站 style.css', /<link[^>]*href="[^"]*style\.css"/.test(html));
+  check('品牌名与全站一致', /🧩 Eraser 的小站/.test(html));
+  check('有回首页的出口', /href="\.\.\/index\.html"/.test(html));
+  check('六步工作流程在', /工作流程/.test(html) && /六步/.test(html));
+  check('红线约定在', /不换框架/.test(html) && /永不白屏/.test(html));
+  check('本机特殊性在（推送脚本 / 禁 npm install）', /push-branch\.sh/.test(html) && /npm install/.test(html));
+  check('批次记录在（T 批 + M 批）', /T15/.test(html) && /M1/.test(html) && /M2/.test(html));
+  check('站点地图含核心路径', /collect\//.test(html) && /admin\//.test(html) && /api\/_lib/.test(html));
+  check('给下一个 AI 的复制指令在', /eraser\.de5\.net\/dev\//.test(html));
+  check('有当前版本一栏', /当前版本/.test(html) && /main @/.test(html));
+  const anchors = [...html.matchAll(/<a[^>]*href\s*=\s*["'](https?:\/\/[^"']+)["'][^>]*>/gi)];
+  const unsafe = anchors.filter(a => !/rel\s*=\s*["'][^"']*noopener/i.test(a[0]));
+  check(`站外链接都带 noopener（${anchors.length} 个）`, unsafe.length === 0,
+        unsafe.map(a => a[1]).join(', '));
+  const ext = [
+    ...html.matchAll(/<script[^>]*\ssrc\s*=\s*["']((?:https?:)?\/\/[^"']+)["']/gi),
+    ...html.matchAll(/<link[^>]*\shref\s*=\s*["']((?:https?:)?\/\/[^"']+)["']/gi),
+    ...html.matchAll(/<img[^>]*\ssrc\s*=\s*["']((?:https?:)?\/\/[^"']+)["']/gi),
+  ].map(m => m[1]);
+  check('没有站外资源（脚本/样式/图片）', ext.length === 0, ext.join(', '));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
