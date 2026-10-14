@@ -116,11 +116,11 @@ mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
 
 <div class="container">
   <h1>全站搜索</h1>
-  <p class="sub">一次搜遍导航链接、博客文章和页面文字</p>
+  <p class="sub">一次搜遍导航链接、博客文章、页面文字和追更</p>
 
   <div class="searchwrap">
     <span class="ico">⌕</span>
-    <input id="q" type="text" placeholder="搜链接、文章、页面……" autocomplete="off" spellcheck="false" autocapitalize="off">
+    <input id="q" type="text" placeholder="搜链接、文章、页面、追更……" autocomplete="off" spellcheck="false" autocapitalize="off">
     <kbd>Enter</kbd>
   </div>
 
@@ -202,13 +202,14 @@ function showIdle(){
   countEl.innerHTML = "";
   listEl.textContent = "";
   var empty = el("div", "empty");
-  empty.innerHTML = "输入关键词，回车开始搜索。<br>能搜：<b>导航链接</b>（名称/网址/说明/标签/关键词）、<b>博客文章</b>（标题/摘要/标签）、<b>页面文字</b>（关于页等）。";
+  empty.innerHTML = "输入关键词，回车开始搜索。<br>能搜：<b>导航链接</b>（名称/网址/说明/标签/关键词）、<b>博客文章</b>（标题/摘要/标签）、<b>页面文字</b>（关于页等）、<b>追更</b>（名称/备注/链接）。";
   listEl.appendChild(empty);
 }
 
 var GROUPS = [
   { type: "nav_link", icon: "🔗", name: "导航链接" },
   { type: "post",     icon: "✏️", name: "博客文章" },
+  { type: "media",    icon: "📺", name: "追更" },
   { type: "page",     icon: "📄", name: "页面" }
 ];
 

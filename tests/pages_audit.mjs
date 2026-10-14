@@ -137,6 +137,7 @@ console.log('\n=== 搜索页 ===');
   check('命中词高亮用 DOM 节点', /el\("mark"/.test(html));
   check('站外结果新窗口打开且带 noopener', /rel = "noopener noreferrer"/.test(html));
   check('结果标题/描述用 textContent 拼（防注入）', /el\("div", "t"\)/.test(html) && /el\("div", "d"\)/.test(html));
+  check('结果分组含追更栏目', /type: "media"/.test(html) && /name: "追更"/.test(html));
 }
 
 console.log('\n=== 首页 ===');

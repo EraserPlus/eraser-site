@@ -1,7 +1,7 @@
 /* ===========================================================================
    /api/search   全站搜索（GET 公开，免登录）
    范围：导航链接（名称/网址/说明/标签/关键词）、博客文章（标题/摘要/标签，草稿除外）、
-        页面文字（标题/正文，如关于页）。
+        页面文字（标题/正文，如关于页）、追更（名称/备注/链接）。
    用法：/api/search?q=关键词
    =========================================================================== */
 
@@ -17,6 +17,7 @@ function urlOf(row) {
   const d = (row && row.data) || {};
   if (row.type === 'post') return '/blog/post.html?slug=' + encodeURIComponent(d.slug || '');
   if (row.type === 'page') return d.key === 'home' ? '/' : '/' + encodeURIComponent(d.key || '') + '/';
+  if (row.type === 'media') return d.url || '/collect/';   // 追更：填了链接走链接，没填就回落到追更页
   return d.url || '#';   // nav_link，站外地址
 }
 
@@ -34,7 +35,7 @@ export default async function handler(req, res) {
 
     const rows = await sql`
       SELECT id, type, data FROM content
-      WHERE type IN ('nav_link', 'post', 'page')
+      WHERE type IN ('nav_link', 'post', 'page', 'media')
         AND (
           (type = 'nav_link' AND (
              data->>'name' ILIKE ${p} OR data->>'url' ILIKE ${p}
@@ -45,6 +46,9 @@ export default async function handler(req, res) {
              OR data->>'tags' ILIKE ${p}))
           OR (type = 'page' AND (
              data->>'title' ILIKE ${p} OR data->>'content' ILIKE ${p}))
+          OR (type = 'media' AND (
+             data->>'name' ILIKE ${p} OR data->>'note' ILIKE ${p}
+             OR data->>'url' ILIKE ${p}))
         )
       ORDER BY updated_at DESC
       LIMIT 50`;
@@ -54,7 +58,7 @@ export default async function handler(req, res) {
       return {
         type: r.type,
         title: d.name || d.title || '',
-        desc: d.desc || d.summary || '',
+        desc: d.desc || d.summary || d.note || '',
         url: urlOf({ type: r.type, data: d }),
       };
     });

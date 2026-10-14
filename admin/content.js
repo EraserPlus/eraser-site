@@ -91,6 +91,10 @@
   }
   var draftTimers = [];
 
+  /* 哪些字段旁挂「上传」按钮：直传 Vercel Blob，成功后回填地址。
+     文件仓库（type=file）下架后，改挂在追更的链接 / 封面图上，让上传仍然可达。 */
+  var UPLOAD_FIELDS = { file: ["url"], media: ["url", "cover"] };
+
   /* ---------------- 通用表单 ---------------- */
   /* 返回一个 <div>，调用 form.read() 取数据、form.fill(item) 回填 */
   function buildForm(type, onSave, onCancel) {
@@ -168,8 +172,8 @@
         if (f.ph) inp.placeholder = f.ph;
         if (f.t === "tags") inp.autocomplete = "off";
 
-        /* 文件类型：url 输入框旁加「上传」按钮，直传 Vercel Blob，成功后回填 url */
-        if (type === "file" && f.k === "url") {
+        /* 可上传字段（文件仓库的 url、追更的链接 / 封面）旁加「上传」按钮，成功后回填地址 */
+        if (UPLOAD_FIELDS[type] && UPLOAD_FIELDS[type].indexOf(f.k) !== -1) {
           var upRow = el("div");
           upRow.style.display = "flex";
           upRow.style.gap = "8px";
