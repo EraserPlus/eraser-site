@@ -670,5 +670,108 @@ console.log('\n=== RSS 订阅源 /api/rss（公开免登录） ===');
         (/<link>([^<]*)<\/link>/.exec(res.body || '') || [])[1] || 'none');
 }
 
+
+console.log('\n=== /api/favicon 图标代理 ===');
+{
+  const faviconRoute = (await load('api/favicon.js')).default;
+  const realFetch = globalThis.fetch;
+  let fetchCalls = [];
+  function stubFetch(fn){
+    globalThis.fetch = (u, o) => { fetchCalls.push(String(u)); return fn(u, o); };
+  }
+  const pngBytes = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+  function imgRes(type){
+    return {
+      ok: true, status: 200,
+      headers: { get: (k) => (k.toLowerCase() === 'content-type' ? type : null) },
+      arrayBuffer: async () => pngBytes,
+    };
+  }
+  const notFound = { ok: false, status: 404, headers: { get: () => null } };
+  try {
+    let r = await call(faviconRoute, 'POST', { query: { url: 'https://example.com/' } });
+    check('POST /api/favicon → 405', r.statusCode === 405, String(r.statusCode));
+
+    fetchCalls = [];
+    stubFetch(() => { throw new Error('不该发出请求'); });
+    r = await call(faviconRoute, 'GET', { query: { url: 'http://169.254.169.254/latest/meta-data/' } });
+    check('云元数据地址 → 400', r.statusCode === 400, String(r.statusCode));
+    check('内网地址根本不发请求', fetchCalls.length === 0, fetchCalls.join(','));
+
+    r = await call(faviconRoute, 'GET', { query: { url: 'javascript:alert(1)' } });
+    check('javascript: → 400', r.statusCode === 400, String(r.statusCode));
+    r = await call(faviconRoute, 'GET', { query: {} });
+    check('缺 url → 400', r.statusCode === 400, String(r.statusCode));
+    r = await call(faviconRoute, 'GET', { query: { url: 'http://intranet/' } });
+    check('无点主机名 → 400', r.statusCode === 400, String(r.statusCode));
+
+    /* favicon.ico 直接命中 */
+    fetchCalls = [];
+    stubFetch((u) => u.indexOf('/favicon.ico') !== -1 ? imgRes('image/x-icon') : notFound);
+    r = await call(faviconRoute, 'GET', { query: { url: 'https://favicon-ok.test/' } });
+    check('抓到图标 → 200', r.statusCode === 200, String(r.statusCode));
+    check('Content-Type 是 image/*', /^image\//.test(r.headers['Content-Type'] || ''), r.headers['Content-Type']);
+    check('带 7 天浏览器缓存头', r.headers['Cache-Control'] === 'public, max-age=604800', r.headers['Cache-Control']);
+
+    /* favicon.ico 是 octet-stream 但字节是 PNG → 魔数认出 */
+    fetchCalls = [];
+    stubFetch((u) => u.indexOf('/favicon.ico') !== -1 ? imgRes('application/octet-stream') : notFound);
+    r = await call(faviconRoute, 'GET', { query: { url: 'https://favicon-sniff.test/' } });
+    check('octet-stream + PNG 魔数 → 200 且识别成 image/png',
+          r.statusCode === 200 && r.headers['Content-Type'] === 'image/png', r.headers['Content-Type']);
+
+    /* 缓存命中：同一 url 第二次不再 fetch */
+    const before = fetchCalls.length;
+    r = await call(faviconRoute, 'GET', { query: { url: 'https://favicon-ok.test/' } });
+    check('缓存命中不再发请求', fetchCalls.length === before && r.statusCode === 200,
+          `${before} -> ${fetchCalls.length}`);
+
+    /* 302 跳内网 → 挡掉（400，且不再继续） */
+    fetchCalls = [];
+    stubFetch(() => ({ status: 302, ok: false, headers: { get: (k) => (k.toLowerCase() === 'location' ? 'http://127.0.0.1/x' : null) } }));
+    r = await call(faviconRoute, 'GET', { query: { url: 'https://redirect-evil.test/' } });
+    check('302 跳内网 → 400', r.statusCode === 400, String(r.statusCode));
+
+    /* favicon.ico 404，但首页 HTML 里声明了图标 → 扒出来 */
+    fetchCalls = [];
+    const htmlRes = {
+      ok: true, status: 200,
+      headers: { get: (k) => (k.toLowerCase() === 'content-type' ? 'text/html' : null) },
+      text: async () => '<html><head><link rel="shortcut icon" href="/static/logo.png"></head><body></body></html>',
+    };
+    stubFetch((u) => {
+      if (u.indexOf('/favicon.ico') !== -1) return notFound;
+      if (u === 'https://html-ok.test/') return Promise.resolve(htmlRes);
+      if (u === 'https://html-ok.test/static/logo.png') return Promise.resolve(imgRes('image/png'));
+      return Promise.resolve(notFound);
+    });
+    r = await call(faviconRoute, 'GET', { query: { url: 'https://html-ok.test/' } });
+    check('favicon.ico 没有 → 扒首页声明的图标',
+          r.statusCode === 200 && fetchCalls.indexOf('https://html-ok.test/static/logo.png') !== -1,
+          fetchCalls.join(','));
+
+    /* 首页里的图标指向内网 → 跳过，最终 404 */
+    fetchCalls = [];
+    stubFetch((u) => {
+      if (u.indexOf('/favicon.ico') !== -1) return notFound;
+      if (u === 'https://html-evil.test/') return Promise.resolve({
+        ok: true, status: 200,
+        headers: { get: (k) => (k.toLowerCase() === 'content-type' ? 'text/html' : null) },
+        text: async () => '<link rel="icon" href="http://192.168.1.1/steal.png">',
+      });
+      return Promise.resolve(notFound);
+    });
+    r = await call(faviconRoute, 'GET', { query: { url: 'https://html-evil.test/' } });
+    check('首页图标指向内网 → 不当真，最终 404', r.statusCode === 404, String(r.statusCode));
+
+    /* 什么都抓不到 → 404 */
+    fetchCalls = [];
+    stubFetch(() => notFound);
+    r = await call(faviconRoute, 'GET', { query: { url: 'https://nothing.test/' } });
+    check('抓不到 → 404', r.statusCode === 404, String(r.statusCode));
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+}
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

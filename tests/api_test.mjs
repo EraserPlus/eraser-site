@@ -248,5 +248,79 @@ console.log('\n=== 全部源文件语法检查 ===');
   }
 }
 
+
+console.log('\n=== favicon SSRF 防护（纯函数） ===');
+{
+  const F = await load('api/_lib/favicon.js');
+  const allows = (u) => { try { F.assertPublicHttpUrl(u); return true; } catch (e) { return false; } };
+
+  const good = [
+    'https://example.com', 'http://example.com', 'https://example.com/a?b=1',
+    'http://example.com:80/', 'https://example.com:443/',
+    'https://chat.deepseek.com/x#y', 'HTTPS://EXAMPLE.COM',
+    'http://172.32.0.9/',      // 172.32 不在 172.16/12 里，是公网
+    'http://8.8.8.8/',
+  ];
+  good.forEach(u => check(`放行 ${u}`, allows(u)));
+
+  const bad = [
+    ['空值', ''],
+    ['null', null],
+    ['javascript: 协议', 'javascript:alert(1)'],
+    ['data: 协议', 'data:image/png;base64,AAAA'],
+    ['file: 协议', 'file:///etc/passwd'],
+    ['ftp: 协议', 'ftp://example.com'],
+    ['协议相对', '//example.com'],
+    ['垃圾文本', 'not a url'],
+    ['localhost', 'http://localhost'],
+    ['localhost 子域', 'http://app.localhost'],
+    ['.local 内网名', 'http://printer.local'],
+    ['.internal 内网名', 'http://db.internal'],
+    ['127.0.0.1', 'http://127.0.0.1'],
+    ['127.1 简写回环', 'http://127.1/'],
+    ['十进制 IP 2130706433', 'http://2130706433/'],
+    ['十六进制 IP 0x7f000001', 'http://0x7f000001/'],
+    ['10 段', 'http://10.1.2.3/'],
+    ['192.168 段', 'http://192.168.1.1/'],
+    ['172.16 段', 'http://172.16.0.9/'],
+    ['172.31 段', 'http://172.31.255.255/'],
+    ['169.254 云元数据', 'http://169.254.169.254/latest/meta-data/'],
+    ['100.64 CGNAT', 'http://100.100.100.100/'],
+    ['0.0.0.0', 'http://0.0.0.0/'],
+    ['组播 224', 'http://224.0.0.1/'],
+    ['IPv6 回环', 'http://[::1]/'],
+    ['IPv6 链路本地', 'http://[fe80::1]/'],
+    ['IPv6 ULA', 'http://[fc00::1]/'],
+    ['IPv4 映射 IPv6', 'http://[::ffff:127.0.0.1]/'],
+    ['带账号密码', 'http://user:pass@example.com/'],
+    ['非标端口', 'http://example.com:8080/'],
+    ['缺主机名', 'http:///path'],
+  ];
+  bad.forEach(([name, u]) => check(`挡掉 ${name}`, !allows(u)));
+
+  check('规范化后协议主机小写', (() => {
+    try { return F.assertPublicHttpUrl('HTTPS://EXAMPLE.COM/A').indexOf('https://example.com/A') === 0; }
+    catch (e) { return false; }
+  })());
+}
+
+console.log('\n=== 图片类型识别（魔数兜底） ===');
+{
+  const F = await load('api/_lib/favicon.js');
+  const png = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+  const ico = Buffer.from([0x00, 0x00, 0x01, 0x00, 1, 2, 3, 4]);
+  const gif = Buffer.from([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 1, 2]);
+  const jpg = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3, 4]);
+  const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>');
+
+  check('服务端 image/* 直接采信', F.guessImageType(png, 'image/png; charset=binary') === 'image/png');
+  check('octet-stream + PNG 魔数 → image/png', F.guessImageType(png, 'application/octet-stream') === 'image/png');
+  check('空 type + ico 魔数 → image/x-icon', F.guessImageType(ico, '') === 'image/x-icon');
+  check('GIF 魔数', F.guessImageType(gif, '') === 'image/gif');
+  check('JPEG 魔数', F.guessImageType(jpg, '') === 'image/jpeg');
+  check('SVG 文本头', F.guessImageType(svg, '') === 'image/svg+xml');
+  check('text/html 且不是图片字节 → null', F.guessImageType(Buffer.from('<html><body>x</body></html>'), 'text/html') === null);
+  check('空 buffer → null', F.guessImageType(Buffer.alloc(0), '') === null);
+}
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

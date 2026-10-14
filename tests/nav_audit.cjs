@@ -126,6 +126,14 @@ console.log('\n=== 功能点 ===');
     ['剪贴板 API + execCommand 兜底', /execCommand\("copy"\)/],
     ['回到顶部按钮', /id="btnTop"/],
     ['桌面/移动双端断点', /min-width:1024px/],
+    ['favicon 服务端同源代理', /\/api\/favicon\?url=/],
+    ['favicon 抓不到回落首字母图标', /addEventListener\("error", function\(\)\{ fv\.style\.display = "none"/],
+    ['favicon 地址做了 URL 编码', /encodeURIComponent\(link\.url\)/],
+    ['导出 Markdown 链接表', /id="btnExportMd"/],
+    ['Markdown 导出是纯函数', /function toMarkdown/],
+    ['搜索词在网址行也高亮', /highlighted\(C\.hostOf/],
+    ['最近访问显示相对时间', /function relTime/],
+    ['卡片悬停显示完整网址', /a\.title = link\.url/],
   ];
   must.forEach(([name, re]) => check(`包含：${name}`, re.test(html)));
 

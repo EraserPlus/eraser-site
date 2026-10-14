@@ -379,5 +379,42 @@ console.log('\n=== 最近访问 ===');
   })());
 }
 
+console.log('\n=== 相对时间 ===');
+{
+  const now = 1700000000000;   // 2023-11-14 22:13:20 UTC
+  check('一分钟内是刚刚', C.relTime(now - 30000, now) === '刚刚');
+  check('N 分钟前', C.relTime(now - 5 * 60000, now) === '5 分钟前');
+  check('59 分钟还是分钟前', C.relTime(now - 59 * 60000, now) === '59 分钟前');
+  check('N 小时前', C.relTime(now - 3 * 3600000, now) === '3 小时前');
+  check('N 天前', C.relTime(now - 2 * 86400000, now) === '2 天前');
+  check('超过一周给 MM-DD', /^\d{1,2}-\d{2}$/.test(C.relTime(now - 30 * 86400000, now)));
+  check('未来时间不回负', C.relTime(now + 999999, now) === '刚刚');
+  check('空值不炸（按很早以前处理）', typeof C.relTime(null, now) === 'string');
+  check('0 不炸', typeof C.relTime(0, now) === 'string');
+}
+
+console.log('\n=== 导出 Markdown ===');
+{
+  const data = { categories: [
+    { id: 'a', name: '甲', links: [
+      { name: 'One', url: 'https://one.com', desc: '第一个' },
+      { name: 'Two', url: 'https://two.com' }
+    ]}
+  ]};
+  const md = C.toMarkdown(data);
+  check('以 # 网址导航 开头', md.indexOf('# 网址导航') === 0);
+  check('分类是二级标题', md.indexOf('## 甲') !== -1);
+  check('链接是 [name](url) 格式', md.indexOf('- [One](https://one.com)') !== -1);
+  check('有描述的带上描述', md.indexOf('- [One](https://one.com) — 第一个') !== -1);
+  check('没描述的不带破折号',
+        md.indexOf('- [Two](https://two.com)') !== -1 && md.indexOf('- [Two](https://two.com) —') === -1);
+  check('空数据也生成标题', C.toMarkdown({ categories: [] }).indexOf('# 网址导航') === 0);
+  check('null 不炸', C.toMarkdown(null).indexOf('# 网址导航') === 0);
+  check('真实数据的每条链接都在', (() => {
+    const mdAll = C.toMarkdown(DATA);
+    return C.allLinks(DATA).every(l => mdAll.indexOf('](' + l.url + ')') !== -1);
+  })());
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
