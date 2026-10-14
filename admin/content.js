@@ -21,6 +21,7 @@
         { k: "name", l: "名称", t: "text", ph: "比如：GitHub", req: true },
         { k: "url", l: "网址", t: "text", ph: "https://…", req: true },
         { k: "desc", l: "说明（可空）", t: "text", ph: "一句话说明" },
+        { k: "tip", l: "提示词（可空）", t: "text", ph: "给自己的小提示，前台卡片显示" },
         { k: "tags", l: "标签（逗号分隔）", t: "tags", ph: "代码, 英文" },
         { k: "keywords", l: "搜索关键词（逗号分隔）", t: "tags", ph: "别名、拼音、缩写，搜这些词也能找到" }
       ]
@@ -442,7 +443,7 @@
                   return api("content", {
                     method: "POST",
                     body: { type: "nav_link", parent_id: id,
-                            data: { name: l.name, url: l.url, desc: l.desc, tags: l.tags || [], keywords: l.keywords || [] } }
+                            data: { name: l.name, url: l.url, desc: l.desc, tip: l.tip, tags: l.tags || [], keywords: l.keywords || [] } }
                   });
                 });
               });
@@ -499,6 +500,8 @@
         remove(it.id, SCHEMA[type].name, function () { return reload(type).then(function () { renderList(type, hostId, opts); }); });
       });
       o.appendChild(e1); o.appendChild(e2);
+      /* 各内容类型自己的快捷操作（如博客的一键发布/转草稿） */
+      if (opts.ops) opts.ops(it).forEach(function (b) { o.appendChild(b); });
       row.appendChild(o);
       card.appendChild(row);
     });
@@ -528,7 +531,7 @@
     nav: function () { return loadNav().then(renderNav); },
     post: function () {
       return reload("post").then(function () {
-        renderList("post", "postHost", {
+        var postOpts = {
           title: function (i) { return i.data.title; },
           meta: function (i) {
             var m = ["/" + i.data.slug];
@@ -538,8 +541,30 @@
           },
           note: function (i) {
             return i.data.summary || (md ? md.plain(i.data.content, 80) : "");
+          },
+          /* 一键发布 / 转草稿：不用打开表单改复选框 */
+          ops: function (i) {
+            var out = [];
+            var pub = i.data.published !== false;
+            var b = el("button", null, pub ? "转草稿" : "发布");
+            b.title = pub ? "转成草稿，前台立刻不显示" : "公开发布，前台立即可见";
+            b.addEventListener("click", function () {
+              if (!confirm(pub ? "把《" + i.data.title + "》转成草稿？前台会立刻不显示。"
+                               : "发布《" + i.data.title + "》？前台立刻可见。")) return;
+              b.disabled = true;
+              api("content", { method: "PATCH", body: { id: i.id, data: { published: !pub } } })
+                .then(function () { return reload("post"); })
+                .then(function () {
+                  renderList("post", "postHost", postOpts);
+                  say("app", pub ? "已转为草稿" : "已发布");
+                })
+                .catch(function (e) { say("app", e.message, "err"); b.disabled = false; });
+            });
+            out.push(b);
+            return out;
           }
-        });
+        };
+        renderList("post", "postHost", postOpts);
       });
     },
     page: function () {

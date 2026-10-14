@@ -65,6 +65,11 @@ console.log('\n=== nav_link ===');
   const k2 = C.normalize('nav_link', { name: 'a', url: 'https://a.com', keywords: 'git, 代码托管，hub' });
   check('关键词支持逗号分隔字符串（中英文逗号都行）', JSON.stringify(k2.keywords) === '["git","代码托管","hub"]', JSON.stringify(k2.keywords));
   check('不传关键词给空数组', JSON.stringify(C.normalize('nav_link', { name: 'a', url: 'https://a.com' }).keywords) === '[]');
+
+  check('不传提示词给 null', C.normalize('nav_link', { name: 'a', url: 'https://a.com' }).tip === null);
+  check('提示词原样保留', C.normalize('nav_link', { name: 'a', url: 'https://a.com', tip: '备用入口' }).tip === '备用入口');
+  check('提示词去首尾空格', C.normalize('nav_link', { name: 'a', url: 'https://a.com', tip: '  备用  ' }).tip === '备用');
+  check('提示词超长报错', code(() => C.normalize('nav_link', { name: 'a', url: 'https://a.com', tip: 'x'.repeat(201) })) === 'BAD_INPUT');
   const k3 = C.normalize('nav_link', { name: 'a', url: 'https://a.com', keywords: Array(30).fill(0).map((_, i) => 'k' + i) });
   check('关键词最多 20 个', k3.keywords.length === 20, String(k3.keywords.length));
   const k4 = C.normalize('nav_link', { name: 'a', url: 'https://a.com', keywords: ['  x  ', '', '  '] });
