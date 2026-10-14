@@ -12,7 +12,7 @@
 
 ```text
 eraser-site/
-├── index.html            首页（导航栏 + 四个分区卡片）
+├── index.html            首页（导航栏 + 五个分区卡片）
 ├── style.css             全站统一样式（改这里 = 公开页换肤）
 ├── md.js                 自研 Markdown 渲染器（内置转义，见「已知取舍」）
 ├── vercel.json           响应头配置：/api/ 不缓存，静态资源缓存 1 小时 + 安全头
@@ -36,18 +36,18 @@ eraser-site/
 │       ├── http.js       响应封装 ok/send/fail、readJson、readBody（二进制安全、带大小上限）、入参校验
 │       ├── ratelimit.js  登录限流（5 次失败锁 15 分钟，按 IP）
 │       ├── favicon.js    favicon 的 SSRF 防护与图片魔数识别（纯函数，可单测）
-│       └── content.js    五种内容类型的归一化与校验
+│       └── content.js    六种内容类型（含追更 media）的归一化与校验
 │
 ├── admin/                管理后台（独立单文件应用，自带样式）
 │   ├── index.html        后台全部界面与逻辑（约 43KB）
-│   └── content.js        导航/博客/文件/页面 四大内容管理模块
+│   └── content.js        导航/博客/页面/追更 内容管理模块（SCHEMA 驱动）
 │
 ├── tests/                七套测试 + 测试用假数据库驱动
 │   ├── api_test.mjs      令牌/密码/入参校验/favicon SSRF 与魔数识别/api 与 admin 源文件语法（156 项）
-│   ├── content_test.mjs  内容类型归一化 + Markdown 渲染/图片/安全（116 项）
-│   ├── api_routes_test.mjs 四个接口全流程：鉴权/CRUD/注入/限流/配置/PATCH 合并语义/RSS 订阅源/favicon 代理（203 项）
-│   ├── pages_audit.mjs   7 个公开页面：结构/零站外资源/静态兜底/注入防护（121 项）
-│   ├── admin_audit.mjs   管理后台：主题/隐私/接口/安全/功能点（118 项）
+│   ├── content_test.mjs  六种内容类型归一化（含追更）/ Markdown 渲染与安全（136 项）
+│   ├── api_routes_test.mjs 接口全流程：鉴权/CRUD/注入/限流/PATCH 合并语义/RSS/上传/favicon/追更（206 项）
+│   ├── pages_audit.mjs   8 个公开页面（含追更/交接页）：结构/零站外资源/静态兜底/注入防护（154 项）
+│   ├── admin_audit.mjs   管理后台：主题/隐私/接口/安全/功能点（123 项）
 │   ├── nav_test.cjs      导航页核心逻辑：数据体检/查询/视图/最近访问/高亮/导入导出（145 项）
 │   ├── nav_audit.cjs     导航页静态审计：结构/零外部请求/DOM 接线/功能点（79 项）
 │   ├── stubs/@neondatabase/serverless/   手写假驱动（只记录 SQL 不连库）
@@ -64,6 +64,11 @@ eraser-site/
 │   └── post.html         文章详情（?slug=xxx，用 md.js 渲染正文）
 ├── search/
 │   └── index.html        全站搜索页（读 /api/search，静态兜底）
+├── collect/
+│   └── index.html        追更页（追番/漫画留档，读 /api/content?type=media）
+├── dev/
+│   ├── index.html        开发交接页（给接手的 AI：现状 / 六步流程 / 红线 / 批次记录）
+│   └── push-branch.sh    推送脚本（git push 直连不通时走 gh API；从自身位置推断仓库目录）
 └── tools/
     ├── index.html        工具列表
 ```
@@ -82,7 +87,7 @@ eraser-site/
   → 结果：任何情况下不白屏
 ```
 
-**管理后台（/admin/，六个标签：今天 / 待办 / 日程 / 导航 / 博客 / 页面）**
+**管理后台（/admin/，七个标签：今天 / 待办 / 日程 / 导航 / 博客 / 追更 / 页面）**
 
 ```text
 打开后台 → POST /api/auth 用密码换 HMAC 令牌（30 天有效）→ 存 localStorage
@@ -109,7 +114,7 @@ eraser-site/
 npm test
 ```
 
-一条命令按顺序跑完七套测试，共 **732 项**，全部通过即说明站点核心逻辑健康。
+一条命令按顺序跑完七套测试，共 **999 项**，全部通过即说明站点核心逻辑健康。
 
 - **不需要真数据库 / 真 Blob**：`tests/stubs/` 里有手写的假 Neon 驱动（全局 `__FAKE_DB__` 预设 SQL 返回值）和假 @vercel/blob 驱动（全局 `__FAKE_BLOB__` 预设 put 返回值），只验证逻辑不连外部服务。
 - CI 里也是同一套路：`npm ci` 装回真包后，用假驱动覆盖 `node_modules/@neondatabase/serverless`，再 `npm test`。
@@ -248,15 +253,15 @@ T12 起密码生成器已下架（主人预留位置回头补内容），数组�
 | 套件 | 覆盖 | 项数 |
 | --- | --- | --- |
 | `tests/api_test.mjs` | 令牌签发/校验/过期/改密码失效、密码校验、safeEqual、requireAuth、配置自检、入参校验、favicon SSRF 防护与图片魔数识别、api/ 与 admin/ 源文件语法 | 156 |
-| `tests/content_test.mjs` | 五种内容类型归一化、Markdown 渲染 / 图片 / 安全性 / 边界、plain() 摘要 | 116 |
-| `tests/api_routes_test.mjs` | 四个接口全流程：未登录 401、CRUD、入参 400、404、405、优先级、SQL 注入、登录限流、缺配置 503、409 唯一性、级联删除、响应头、PATCH 合并语义（只更新出现的字段，done_at 三态）、RSS 订阅源（公开/草稿过滤/XML 转义/空库合法）、文件上传（401/405/503/超 4MB/空 body/文件名清洗/路径穿越）、favicon 代理（405/400 与 SSRF 挡在发请求前/魔数兜底/缓存/302 跳内网/首页声明图标/404） | 203 |
-| `tests/pages_audit.mjs` | 7 个公开页：内联脚本语法、零站外资源、同源 fetch、导航栏统一、静态兜底、Markdown 安全、各页功能点 | 121 |
-| `tests/admin_audit.mjs` | 后台：结构、深浅色主题、隐私（noindex/零站外资源）、Bearer 令牌、XSS 防护、六个标签功能点、链接关键词、Markdown 实时预览与草稿自动保存 | 118 |
+| `tests/content_test.mjs` | 六种内容类型归一化（含追更 media：栏目/状态枚举、评分 0-10、可空字段）、Markdown 渲染 / 图片 / 安全性 / 边界、plain() 摘要 | 136 |
+| `tests/api_routes_test.mjs` | 接口全流程：未登录 401、CRUD、入参 400、404、405、优先级、SQL 注入、登录限流、缺配置 503、409 唯一性、级联删除、响应头、PATCH 合并语义、RSS 订阅源、文件上传、favicon 代理、追更（公开读 / 非法栏目 400） | 206 |
+| `tests/pages_audit.mjs` | 8 个公开页面（含追更/开发交接页）：内联脚本语法、零站外资源、同源 fetch、导航栏统一、静态兜底、Markdown 安全、各页功能点 | 154 |
+| `tests/admin_audit.mjs` | 后台：结构、深浅色主题、隐私（noindex/零站外资源）、Bearer 令牌、XSS 防护、七个标签功能点（含追更表单与列表）、Markdown 实时预览与草稿自动保存 | 123 |
 | `tests/nav_test.cjs` | 导航核心逻辑：links.js 数据体检、hostOf/initialOf/hueOf、查询匹配、分类过滤（含侧栏 cat）、最近访问、标签收集、高亮区间、导入导出往返、真实数据全视图 | 145 |
 | `tests/nav_audit.cjs` | 导航静态审计：结构、零外部请求、DOM 接线、localStorage 键规范、功能点（含最近视图/密度切换/复制/回到顶部）、全站一致性 | 79 |
-| **合计** | | **938** |
+| **合计** | | **999** |
 
-> 注：`api_test.mjs` 的项数随 `api/` 与 `admin/` 下的 `.js` 文件数浮动（每个文件一条语法断言）；`api/hello.js` 删除后为 102，`api/rss.js` 加入后为 103，`api/upload.js` 加入后为 104，T08 加入 favicon 两个文件与 SSRF/魔数纯函数用例后为 155。
+> 注：`api_test.mjs` 的项数随 `api/` 与 `admin/` 下的 `.js` 文件数浮动（每个文件一条语法断言），当前为 156。
 
 **CI**：`.github/workflows/ci.yml` —— push 或 PR 自动触发，ubuntu + Node 20，`npm ci` → 假驱动（neon + vercel/blob）覆盖真包 → `npm test`。全绿才允许合并。
 
@@ -268,7 +273,7 @@ T12 起密码生成器已下架（主人预留位置回头补内容），数组�
 push 到 main → GitHub → Vercel 监听到 webhook → 自动构建 → 1~2 分钟生效
 ```
 
-- 站点：<https://eraser.de5.net>（DNSHE 解析，A 记录指向 Vercel；副域名 eraser-pi.vercel.app 永远可用）
+- 站点：<https://eraser.de5.net>（DNS 解析与备用域名 eraser.888.moe 的配置记录见仓库 `domains.config.yaml`；Vercel 默认域名 eraser-pi.vercel.app 永远可用）
 - **没有构建步骤**：HTML/CSS/JS 原样分发，`api/*.js` 即函数，部署 = 搬运文件。
 - 改完先用无痕窗口（Ctrl+Shift+N）验证，避开缓存。
 
@@ -291,12 +296,14 @@ push 到 main → GitHub → Vercel 监听到 webhook → 自动构建 → 1~2 �
 ```bash
 # 1. 写 manifest.tsv：每行 <A|M|D><Tab><仓库内相对路径>（A 新增 / M 修改 / D 删除）
 # 2. 用脚本推分支（manifest + gh api 完成 blob/tree/commit/ref）
-COMMIT_MSG="改了什么" bash eraser-site-plan/tools/push-branch.sh <分支名> eraser-site-plan/tools/<manifest>.tsv
-# 3. 开 PR（先不合并，QA 验证后由主理人合）
-gh pr create --base main --head <分支名> --title "标题" --body-file pr-body.md
+COMMIT_MSG="改了什么" bash dev/push-branch.sh <分支名> <manifest.tsv> main
+# 3. 开 PR（先不合并，CI 与验收通过后合并）
+gh pr create -R EraserPlus/eraser-site --base main --head <分支名> --title "标题" --body-file pr-body.md
 ```
 
-脚本：`eraser-site-plan/tools/push-branch.sh`。分支名建议 `tXX-简述`（如 `t01-engineering-baseline`）。
+脚本：`dev/push-branch.sh`（已收进仓库，自动从自身位置推断仓库目录；也可用环境变量 `REPO_DIR`/`REPO` 覆盖）。分支名建议 `tXX-简述`（如 `t01-engineering-baseline`）。
+
+> 完整的接手说明（工作流程六步、环境特殊性、红线、批次记录）见仓库 `dev/index.html`，线上地址：<https://eraser.de5.net/dev/>
 
 ---
 
