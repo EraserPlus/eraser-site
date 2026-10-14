@@ -88,8 +88,7 @@ console.log('\n=== 安全 ===');
 console.log('\n=== 功能点 ===');
 {
   const must = [
-    ['三个标签页：今天 / 待办 / 日程', /data-tab="today"[\s\S]*data-tab="todos"[\s\S]*data-tab="events"/],
-    ['今日总览：日期与星期', /id="heroDate"/],
+    ['三个标签页：今天 / 待办 / 日程', /data-tab="today"[\s\S]*data-tab="todos"[\s\S]*data-tab="events"/],    ['今日总览：日期与星期', /id="heroDate"/],
     ['今日总览：三个统计数字', /id="sTodo"[\s\S]*id="sEvent"[\s\S]*id="sOver"/],
     ['今日总览：今日日程区块', /id="todayEvents"/],
     ['今日总览：今天该做的区块', /id="todayTodos"/],
@@ -116,19 +115,18 @@ console.log('\n=== 功能点 ===');
   must.forEach(([name, re]) => check(`包含：${name}`, re.test(html)));
 }
 
-console.log('\n=== 内容管理（导航 / 博客 / 文件 / 页面）===');
+console.log('\n=== 内容管理（导航 / 博客 / 页面）===');
 {
   const must = [
-    ['七个标签页', /data-tab="today"[\s\S]*data-tab="todos"[\s\S]*data-tab="events"[\s\S]*data-tab="nav"[\s\S]*data-tab="post"[\s\S]*data-tab="file"[\s\S]*data-tab="page"/],
+    ['六个标签页', /data-tab="today"[\s\S]*data-tab="todos"[\s\S]*data-tab="events"[\s\S]*data-tab="nav"[\s\S]*data-tab="post"[\s\S]*data-tab="page"/],
     ['导航标签内容区', /id="tab-nav"[\s\S]*id="navHost"/],
     ['博客标签内容区', /id="tab-post"[\s\S]*id="postHost"/],
-    ['文件标签内容区', /id="tab-file"[\s\S]*id="fileHost"/],
     ['页面标签内容区', /id="tab-page"[\s\S]*id="pageHost"/],
     ['加载了 Markdown 渲染器', /<script src="\.\.\/md\.js"><\/script>/],
     ['加载了内容管理模块', /<script src="content\.js"><\/script>/],
     ['初始化时把 api 和 say 传进去', /ContentAdmin\.init\(\{\s*api:\s*api,\s*say:\s*say\s*\}\)/],
     ['切标签时调用内容渲染', /ContentAdmin\.render\(tab\)/],
-    ['标签栏可横向滚动（手机上有 7 个标签）', /\.tabs\{\s*overflow-x:auto/],
+    ['标签栏可横向滚动（手机上有 6 个标签）', /\.tabs\{\s*overflow-x:auto/],
     ['表单弹层样式', /\.cf-overlay\{/],
     ['Markdown 预览样式', /\.mdprev\{/],
   ];
