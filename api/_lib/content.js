@@ -14,7 +14,7 @@ const TYPES = {
   nav_link: {
     public: true,
     needsParent: true,          // 必须属于某个分类
-    fields: ['name', 'url', 'desc', 'tags'],
+    fields: ['name', 'url', 'desc', 'tags', 'keywords'],
   },
   post: {
     public: true,
@@ -100,6 +100,7 @@ export function normalize(type, raw) {
     out.url = url(d.url, '网址');
     out.desc = str(d.desc, '说明', { max: 200, required: false });
     out.tags = tags(d.tags);
+    out.keywords = tags(d.keywords);   // 搜索关键词：数组/逗号串都吃，同一套归一化
   } else if (type === 'post') {
     out.slug = slug(d.slug);
     out.title = str(d.title, '标题', { max: 200 });
