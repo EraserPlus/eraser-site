@@ -46,7 +46,7 @@ eraser-site/
 │   ├── api_test.mjs      令牌/密码/入参校验/favicon SSRF 与魔数识别/api 与 admin 源文件语法（156 项）
 │   ├── content_test.mjs  内容类型归一化 + Markdown 渲染/图片/安全（112 项）
 │   ├── api_routes_test.mjs 四个接口全流程：鉴权/CRUD/注入/限流/配置/PATCH 合并语义/RSS 订阅源/favicon 代理（202 项）
-│   ├── pages_audit.mjs   8 个公开页面：结构/零站外资源/静态兜底/注入防护（122 项）
+│   ├── pages_audit.mjs   7 个公开页面：结构/零站外资源/静态兜底/注入防护（118 项）
 │   ├── admin_audit.mjs   管理后台：主题/隐私/接口/安全/功能点（114 项）
 │   ├── nav_test.cjs      导航页核心逻辑：数据体检/查询/视图/最近访问/高亮/导入导出（135 项）
 │   ├── nav_audit.cjs     导航页静态审计：结构/零外部请求/DOM 接线/功能点（74 项）
@@ -66,12 +66,11 @@ eraser-site/
 │   └── index.html        全站搜索页（读 /api/search，静态兜底）
 └── tools/
     ├── index.html        工具列表
-    └── password.html     密码生成器（新工具的复制模板）
 ```
 
 ### 数据流（文字版）
 
-**公开页（8 个：/、/nav/、/blog/、/blog/post.html、/search/、/about/、/tools/、/tools/password.html）**
+**公开页（7 个：/、/nav/、/blog/、/blog/post.html、/search/、/about/、/tools/）**
 
 ```text
 打开页面
@@ -226,6 +225,24 @@ POST /api/upload?name=文件名（需登录，body 传原始文件，单文件�
 
 ---
 
+## 五之一、加一个新工具（工具箱预留接口）
+
+工具箱页面（`tools/index.html`）是**数据驱动**的：页面里的 `TOOLS` 数组就是唯一清单。上架一个新工具只要两步：
+
+1. 在 `tools/` 目录放一个纯前端页面 `xxx.html`（复制现有结构：导航栏 + `<div class="container">` + 自己的 JS；**不引任何站外资源**）；
+2. 在 `tools/index.html` 里给 `TOOLS` 加一行：
+
+```js
+var TOOLS = [
+  { name: "工具名", desc: "一句话说明", href: "xxx.html" },
+];
+```
+
+刷新 `/tools/` 即上架；删工具删行即可。空清单时页面显示筹备中提示，不会白屏。
+T12 起密码生成器已下架（主人预留位置回头补内容），数组清空。
+
+---
+
 ## 六、测试与 CI
 
 | 套件 | 覆盖 | 项数 |
@@ -233,11 +250,11 @@ POST /api/upload?name=文件名（需登录，body 传原始文件，单文件�
 | `tests/api_test.mjs` | 令牌签发/校验/过期/改密码失效、密码校验、safeEqual、requireAuth、配置自检、入参校验、favicon SSRF 防护与图片魔数识别、api/ 与 admin/ 源文件语法 | 156 |
 | `tests/content_test.mjs` | 五种内容类型归一化、Markdown 渲染 / 图片 / 安全性 / 边界、plain() 摘要 | 112 |
 | `tests/api_routes_test.mjs` | 四个接口全流程：未登录 401、CRUD、入参 400、404、405、优先级、SQL 注入、登录限流、缺配置 503、409 唯一性、级联删除、响应头、PATCH 合并语义（只更新出现的字段，done_at 三态）、RSS 订阅源（公开/草稿过滤/XML 转义/空库合法）、文件上传（401/405/503/超 4MB/空 body/文件名清洗/路径穿越）、favicon 代理（405/400 与 SSRF 挡在发请求前/魔数兜底/缓存/302 跳内网/首页声明图标/404） | 202 |
-| `tests/pages_audit.mjs` | 8 个公开页：内联脚本语法、零站外资源、同源 fetch、导航栏统一、静态兜底、Markdown 安全、各页功能点 | 122 |
+| `tests/pages_audit.mjs` | 7 个公开页：内联脚本语法、零站外资源、同源 fetch、导航栏统一、静态兜底、Markdown 安全、各页功能点 | 118 |
 | `tests/admin_audit.mjs` | 后台：结构、深浅色主题、隐私（noindex/零站外资源）、Bearer 令牌、XSS 防护、六个标签功能点、链接关键词、Markdown 实时预览与草稿自动保存 | 114 |
 | `tests/nav_test.cjs` | 导航核心逻辑：links.js 数据体检、hostOf/initialOf/hueOf、查询匹配、分类过滤（含侧栏 cat）、最近访问、标签收集、高亮区间、导入导出往返、真实数据全视图 | 114 |
 | `tests/nav_audit.cjs` | 导航静态审计：结构、零外部请求、DOM 接线、localStorage 键规范、功能点（含最近视图/密度切换/复制/回到顶部）、全站一致性 | 74 |
-| **合计** | | **915** |
+| **合计** | | **911** |
 
 > 注：`api_test.mjs` 的项数随 `api/` 与 `admin/` 下的 `.js` 文件数浮动（每个文件一条语法断言）；`api/hello.js` 删除后为 102，`api/rss.js` 加入后为 103，`api/upload.js` 加入后为 104，T08 加入 favicon 两个文件与 SSRF/魔数纯函数用例后为 155。
 
