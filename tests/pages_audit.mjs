@@ -137,6 +137,14 @@ console.log('\n=== 全站搜索页（现为首页 /）===');
   check('站外结果新窗口打开且带 noopener', /rel = "noopener noreferrer"/.test(html));
   check('结果标题/描述用 textContent 拼（防注入）', /el\("div", "t"\)/.test(html) && /el\("div", "d"\)/.test(html));
   check('结果分组含追更栏目', /type: "media"/.test(html) && /name: "追更"/.test(html));
+  /* M7 搜索增强 */
+  check('↑↓ 键选结果、循环移动并高亮', /e\.key === "ArrowDown"/.test(html) && /e\.key === "ArrowUp"/.test(html)
+        && /classList\.add\("active"\)/.test(html));
+  check('Enter 打开当前选中项', /hitEls\[activeIdx\]\.click\(\)/.test(html));
+  check('搜索历史存本地且能清空', /eraser\.search\.history/.test(html) && /localStorage\.removeItem\(HKEY\)/.test(html));
+  check('按内容类型分区过滤（全部/各分区）', /state\.tab === "all"/.test(html) && /r\.type === state\.tab/.test(html));
+  check('结果分批展示 + 剩余条数', /state\.shown/.test(html) && /加载更多（还剩/.test(html));
+  check('模糊命中带「模糊」标记', /el\("span", "fz", "模糊"\)/.test(html));
 }
 
 console.log('\n=== 旧首页已下线（首页与搜索合并）===');

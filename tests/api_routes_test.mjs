@@ -862,6 +862,45 @@ console.log('\n=== 全站搜索 /api/search ===');
   fakeDb(() => []);
   r = await call(searchRoute, 'GET', { query: { q: 'x'.repeat(120) } });
   check('超长搜索词截断处理 → 200', r.statusCode === 200, String(r.statusCode));
+
+  /* ---------- 子序列模糊匹配（M7）：精确命中不足时补一层 ---------- */
+  const navRow = (id, name, url) => row({ id, type: 'nav_link', data: { name, url } });
+  /* 第一次查询（ILIKE，精确）返回空，候选池查询返回两条，用来验证「模糊兜底」 */
+  fakeDb((text) => /ILIKE/.test(text)
+    ? []
+    : [navRow(11, 'GitHub', 'https://github.com'), navRow(12, 'Vercel', 'https://vercel.com')]);
+
+  r = await call(searchRoute, 'GET', { query: { q: 'gth' } });
+  check('模糊搜索 gth → 命中 GitHub', r.json.results.length === 1 && r.json.results[0].title === 'GitHub',
+        JSON.stringify(r.json.results));
+  check('模糊命中项带 fuzzy 标记', r.json.results[0].fuzzy === true, JSON.stringify(r.json.results[0]));
+  check('模糊命中仍映射出正确链接', r.json.results[0].url === 'https://github.com', r.json.results[0].url);
+  /* 这一次搜索发了 2 条 SQL：精确查询 + 候选池查询，且池里排除了草稿 */
+  check('模糊兜底会追加候选池查询，且池里排除了草稿文章',
+        executed.length === 2 && executed.some(e => /type <> 'post'/.test(e.text) && /IS DISTINCT FROM 'false'/.test(e.text)),
+        executed.map(e => e.text).join(' | ').slice(0, 300));
+
+  r = await call(searchRoute, 'GET', { query: { q: 'vrc' } });
+  check('模糊搜索 vrc → 命中 Vercel', r.json.results.length === 1 && r.json.results[0].title === 'Vercel',
+        JSON.stringify(r.json.results));
+
+  /* 精确查询和候选池查到同一条时只出现一次（按 id 去重） */
+  fakeDb((text) => /ILIKE/.test(text)
+    ? [navRow(11, 'GitHub', 'https://github.com')]
+    : [navRow(11, 'GitHub', 'https://github.com'), navRow(12, 'Vercel', 'https://vercel.com')]);
+  r = await call(searchRoute, 'GET', { query: { q: 'git' } });
+  check('精确与模糊同一条不重复', r.json.results.length === 1, JSON.stringify(r.json.results));
+  check('精确命中不带 fuzzy 标记', r.json.results[0].fuzzy === undefined, JSON.stringify(r.json.results[0]));
+
+  /* 精确命中已达上限（50）时不再查候选池，省一次查询 */
+  fakeDb(() => Array.from({ length: 50 }, (_, i) => row({ id: i + 1, type: 'page', data: { key: 'p' + i, title: '页面' + i } })));
+  r = await call(searchRoute, 'GET', { query: { q: '页面' } });
+  check('命中已满 50 条时不查候选池', executed.length === 1, String(executed.length));
+
+  /* 关键词太短（< 3 字）不做模糊，避免噪音 */
+  fakeDb(() => []);
+  r = await call(searchRoute, 'GET', { query: { q: 'gi' } });
+  check('关键词不足 3 字不触发模糊查询', r.statusCode === 200 && executed.length === 1, String(executed.length));
 }
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
