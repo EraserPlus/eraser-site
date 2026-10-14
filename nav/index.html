@@ -91,6 +91,9 @@ h1{font-size:26px;margin:0 0 4px;letter-spacing:-.2px}
 
 /* 分类 */
 .cat{margin-bottom:26px}
+.cath[draggable="true"]{ cursor:move; }
+.cat.dragging{ opacity:.5; }
+.cat.dragover .cath{ box-shadow:inset 0 3px 0 var(--blue); border-radius:4px; }
 .cath{display:flex;align-items:center;gap:8px;margin:0 0 10px}
 .cath button{
   font-family:inherit;font-size:16px;font-weight:600;color:var(--ink);
@@ -293,11 +296,12 @@ body.dense a.card .tm{display:none}
 
       <div id="content"></div>
 
-      <p class="footnote">
-        链接可在「后台 → 导航」标签里管理；<code>nav/links.js</code> 是断网兜底数据<br>
-        快捷键：<code>/</code> 搜索 · <code>↑</code><code>↓</code> 选择 · <code>Enter</code> 打开 · <code>Esc</code> 清空<br>
-        星标、常用和最近访问存在浏览器本地，换设备不会同步
-      </p>
+  <p class="footnote">
+    链接可在「后台 → 导航」标签里管理；<code>nav/links.js</code> 是断网兜底数据<br>
+    快捷键：<code>/</code> 搜索 · <code>↑</code><code>↓</code> 选择 · <code>Enter</code> 打开 · <code>Esc</code> 清空<br>
+    桌面端拖拽分类标题可调整顺序（只保存在本机浏览器）<br>
+    星标、常用、最近访问和分类顺序存在浏览器本地，换设备不会同步
+  </p>
     </div>
   </div>
 </div>
@@ -527,11 +531,27 @@ function toMarkdown(data){
   return lines.join("\n");
 }
 
+/* 按用户拖拽出的顺序重排分类：order 是分类 id 数组。
+   没提到的分类按原相对顺序跟在后面；order 里不存在的 id 忽略。 */
+function applyOrder(data, order){
+  var cats = categoriesOf(data);
+  var list = Array.isArray(order) ? order : [];
+  var seen = {}, head = [];
+  list.forEach(function(id){
+    if (seen[id]) return;
+    for (var i = 0; i < cats.length; i++){
+      if (cats[i].id === id){ seen[id] = 1; head.push(cats[i]); break; }
+    }
+  });
+  var tail = cats.filter(function(c){ return !seen[c.id]; });
+  return { categories: head.concat(tail) };
+}
+
 return {
   norm: norm, hostOf: hostOf, initialOf: initialOf, hueOf: hueOf,
   categoriesOf: categoriesOf, allLinks: allLinks, countLinks: countLinks,
   parseQuery: parseQuery, matchesQuery: matchesQuery, matchesTags: matchesTags, haystack: haystack,
-  recentLinks: recentLinks, relTime: relTime, toMarkdown: toMarkdown,
+  recentLinks: recentLinks, relTime: relTime, toMarkdown: toMarkdown, applyOrder: applyOrder,
   filterCategories: filterCategories, collectTags: collectTags,
   matchRanges: matchRanges, serialize: serialize, parseImport: parseImport
 };
@@ -580,6 +600,7 @@ var state = {
   view: "all",
   cat: "",
   density: load("density", "comfy"),
+  order: load("order", []),
   stars: load("stars", []),
   clicks: load("clicks", {}),
   recent: load("recent", []),
@@ -804,6 +825,18 @@ function toggleStar(url){
   render();
 }
 
+/* 把 fromId 分类拖到 toId 前面，顺序存本地（官方顺序仍在后台/links.js） */
+function moveCategory(fromId, toId){
+  var ids = C.categoriesOf(state.data).map(function(c){ return c.id; });
+  var from = ids.indexOf(fromId), to = ids.indexOf(toId);
+  if (from === -1 || to === -1) return;
+  ids.splice(to, 0, ids.splice(from, 1)[0]);
+  state.order = ids;
+  save("order", ids);
+  state.data = C.applyOrder(state.data, ids);
+  render();
+}
+
 /* ---------- 密度 ---------- */
 function applyDensity(){
   document.body.classList.toggle("dense", state.density === "compact");
@@ -869,6 +902,27 @@ function render(){
       if (state.folded[cat.id]) sec.classList.add("folded");
 
       var h = el("h2", "cath");
+      /* 桌面端拖拽分类标题调整顺序（触屏用侧栏/横滑条点选） */
+      h.draggable = true;
+      h.title = "拖拽调整分类顺序";
+      h.addEventListener("dragstart", function(ev){
+        ev.dataTransfer.setData("text/plain", cat.id);
+        ev.dataTransfer.effectAllowed = "move";
+        sec.classList.add("dragging");
+      });
+      h.addEventListener("dragend", function(){ sec.classList.remove("dragging"); });
+      h.addEventListener("dragover", function(ev){
+        ev.preventDefault();
+        ev.dataTransfer.dropEffect = "move";
+        sec.classList.add("dragover");
+      });
+      h.addEventListener("dragleave", function(){ sec.classList.remove("dragover"); });
+      h.addEventListener("drop", function(ev){
+        ev.preventDefault();
+        sec.classList.remove("dragover");
+        var from = ev.dataTransfer.getData("text/plain");
+        if (from && from !== cat.id) moveCategory(from, cat.id);
+      });
       var btn = el("button");
       btn.type = "button";
       btn.appendChild(document.createTextNode(cat.name));
@@ -1017,7 +1071,7 @@ document.addEventListener("keydown", function(e){
    接口不可用或还没数据时，回落到 links.js 里的静态数据。
    这样即使接口挂了、或者本地双击打开，页面照样能看。 */
 function applyData(data){
-  state.data = data;
+  state.data = C.applyOrder(data, state.order);
   $("total").textContent = C.countLinks(state.data);
   $("totalCat").textContent = C.categoriesOf(state.data).length;
   render();

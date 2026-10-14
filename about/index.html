@@ -18,6 +18,12 @@
   .article pre code{ background:none; padding:0; }
   .article blockquote{ border-left:3px solid var(--line); margin:16px 0; padding:2px 0 2px 14px; color:var(--ink4); }
   .article a{ color:var(--blue); }
+  .runbadge{ margin-top:26px; text-align:center; font-size:12.5px; color:var(--muted); }
+  .runbadge b{ color:var(--ink); }
+  .runbadge .dot{ color:var(--green); }
+  @media (prefers-color-scheme: dark){
+    .runbadge b{ color:var(--ink); }
+  }
 </style>
 </head>
 <body>
@@ -40,9 +46,23 @@
     <h2>联系方式</h2>
     <p>GitHub：<a href="https://github.com/EraserPlus" target="_blank" rel="noopener noreferrer">EraserPlus</a></p>
   </div>
+  <!-- 运行徽章放在 article 外：后台用 Markdown 替换正文时不动它 -->
+  <p class="runbadge"><span class="dot">●</span> 本站已稳定运行 <b id="runDays">—</b> 天 · 自 2026 年 10 月起</p>
 </div>
 
 <script src="../md.js"></script>
+<script>
+/* 站点运行徽章：按首次上线日期算天数，改 SITE_LAUNCH 即可 */
+var SITE_LAUNCH = "2026-10-13";
+(function(){
+  var b = document.getElementById("runDays");
+  if (!b) return;
+  var t = new Date(SITE_LAUNCH + "T00:00:00").getTime();
+  if (isNaN(t)) return;
+  var d = Math.floor((Date.now() - t) / 86400000);
+  b.textContent = d < 0 ? 0 : d;
+})();
+</script>
 <script>
 (function(){
   var art = document.getElementById("article");

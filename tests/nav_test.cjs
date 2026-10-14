@@ -426,5 +426,29 @@ console.log('\n=== 导出 Markdown ===');
   })());
 }
 
+console.log('\n=== 分类拖拽排序 ===');
+{
+  const data = { categories: [
+    { id: 'a', name: '甲', links: [{ name: '1', url: 'https://a.com' }] },
+    { id: 'b', name: '乙', links: [{ name: '2', url: 'https://b.com' }] },
+    { id: 'c', name: '丙', links: [{ name: '3', url: 'https://c.com' }] }
+  ]};
+  let r = C.applyOrder(data, ['c', 'a']);
+  check('指定顺序的排在前面', r.categories.map(c => c.id).join() === 'c,a,b', r.categories.map(c => c.id).join());
+  r = C.applyOrder(data, ['b', 'c', 'a']);
+  check('完整顺序即完全重排', r.categories.map(c => c.id).join() === 'b,c,a');
+  r = C.applyOrder(data, []);
+  check('空顺序 = 原顺序', r.categories.map(c => c.id).join() === 'a,b,c');
+  r = C.applyOrder(data, ['zzz', 'a']);
+  check('不存在的 id 被忽略', r.categories.map(c => c.id).join() === 'a,b,c');
+  r = C.applyOrder(data, ['c', 'c', 'a']);
+  check('重复 id 去重', r.categories.map(c => c.id).join() === 'c,a,b');
+  r = C.applyOrder(null, ['a']);
+  check('null 数据不炸', r.categories.length === 0);
+  r = C.applyOrder(data, null);
+  check('null 顺序不炸', r.categories.map(c => c.id).join() === 'a,b,c');
+  check('链接内容不被重排动', C.applyOrder(data, ['b', 'a']).categories[0].links[0].url === 'https://b.com');
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
