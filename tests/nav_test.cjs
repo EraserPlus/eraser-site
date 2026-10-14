@@ -228,6 +228,33 @@ console.log('\n=== 导出 / 导入往返 ===');
   check('中文标签往返不乱码', C.parseImport(C.serialize(DATA)).categories[0].links[0].tags.length > 0);
 }
 
+/* 回归：links.js 原文是手写的 JS 对象 literal（键名不带引号），不是合法 JSON。
+   历史上后台「从现有 links.js 导入」用 JSON.parse 直接解析它，必挂
+   （Expected property name or '}'）——这里锁定 parseImport 必须能吃原始格式。 */
+console.log('\n=== parseImport 兼容 links.js 原始格式 ===');
+{
+  const raw = fs.readFileSync(path.join(ROOT, 'nav', 'links.js'), 'utf8');
+
+  let rawData = null, rawErr = null;
+  try { rawData = C.parseImport(raw); } catch (e) { rawErr = e.message; }
+  check('parseImport 能解析 links.js 原文（无引号键名）', !!rawData, String(rawErr));
+  check('解析 links.js 原文得 11 个分类',
+        !!rawData && rawData.categories.length === DATA.categories.length,
+        rawData ? String(rawData.categories.length) : String(rawErr));
+  check('解析 links.js 原文得 34 条链接',
+        !!rawData && C.countLinks(rawData) === C.countLinks(DATA),
+        rawData ? String(C.countLinks(rawData)) : String(rawErr));
+  check('解析 links.js 原文的内容与 <script> 加载一致',
+        !!rawData && JSON.stringify(rawData) === JSON.stringify(DATA));
+
+  check('内联无引号键名文本也能导入',
+        C.parseImport('window.NAV_DATA = {categories:[{id:"a",name:"A",links:[]}]};').categories.length === 1);
+
+  let err4 = null;
+  try { C.parseImport('not a links file'); } catch (e) { err4 = e.message; }
+  check('非 links 文件文本报错', !!err4, String(err4));
+}
+
 console.log('\n=== 真实数据跑一遍所有视图 ===');
 {
   const total = C.countLinks(DATA);
