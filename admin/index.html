@@ -242,7 +242,6 @@ textarea:focus{ outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgb
       <button data-tab="events">日程</button>
       <button data-tab="nav">导航</button>
       <button data-tab="post">博客</button>
-      <button data-tab="file">文件</button>
       <button data-tab="page">页面</button>
     </div>
 
@@ -367,15 +366,6 @@ textarea:focus{ outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgb
         </p>
       </div>
       <div id="postHost"></div>
-    </section>
-
-    <section id="tab-file" class="hide">
-      <div class="card"><h2>📦 文件仓库</h2>
-        <p style="font-size:13px;color:var(--ink2);margin:0">
-          这里只管「列表」。文件本身要先传到仓库的 <b>files/</b> 目录，再在这里加一条指向它。
-        </p>
-      </div>
-      <div id="fileHost"></div>
     </section>
 
     <section id="tab-page" class="hide">
@@ -890,7 +880,7 @@ $("calToday").addEventListener("click", function(){
   selDay = todayStr(); renderCalendar(); renderDayEvents();
 });
 
-var TABS = ["today", "todos", "events", "nav", "post", "file", "page"];
+var TABS = ["today", "todos", "events", "nav", "post", "page"];
 
 document.querySelectorAll(".tabs button").forEach(function(btn){
   btn.addEventListener("click", function(){

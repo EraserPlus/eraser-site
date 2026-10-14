@@ -36,14 +36,6 @@
         { k: "content", l: "正文（Markdown）", t: "md", req: true }
       ]
     },
-    file: {
-      name: "文件",
-      fields: [
-        { k: "name", l: "文件名", t: "text", ph: "比如：demo.zip", req: true },
-        { k: "url", l: "文件地址", t: "text", ph: "files/demo.zip 或完整网址", req: true },
-        { k: "desc", l: "说明（可空）", t: "text", ph: "一句话说明" }
-      ]
-    },
     page: {
       name: "页面",
       fields: [
@@ -527,7 +519,7 @@
     openForm(item ? "编辑" + SCHEMA[type].name : "新增" + SCHEMA[type].name, form);
   }
 
-  var cache = { post: [], file: [], page: [] };
+  var cache = { post: [], page: [] };
   function reload(type) {
     return api("content?type=" + type).then(function (j) { cache[type] = j.items || []; });
   }
@@ -547,15 +539,6 @@
           note: function (i) {
             return i.data.summary || (md ? md.plain(i.data.content, 80) : "");
           }
-        });
-      });
-    },
-    file: function () {
-      return reload("file").then(function () {
-        renderList("file", "fileHost", {
-          title: function (i) { return i.data.name; },
-          meta: function (i) { return [i.data.url]; },
-          note: function (i) { return i.data.desc; }
         });
       });
     },

@@ -154,10 +154,10 @@ console.log('\n=== 与站点其它页的一致性 ===');
   check('品牌名与其他页一致（.logo + 🧩 Eraser 的小站）',
         /<span class="logo">🧩 Eraser 的小站<\/span>/.test(html));
   check('菜单包在 <nav> 里（与其他页一致）', /<nav>[\s\S]*<\/nav>/.test(html));
-  check('菜单文字与其他页一致（文件仓库 而非 文件）', /文件仓库<\/a>/.test(html));
+  check('菜单文字与其他页一致（搜索）', /搜索<\/a>/.test(html));
   check('本页导航项标记为 active', /<a href="index\.html" class="active">导航<\/a>/.test(html));
 
-  const expected = ['../index.html', '../tools/index.html', '../files/index.html',
+  const expected = ['../index.html', '../search/index.html', '../tools/index.html',
                     '../blog/index.html', 'index.html', '../about/index.html'];
   check('六个分区链接齐全', expected.every(h => html.includes(`href="${h}"`)));
 

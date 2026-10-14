@@ -12,7 +12,7 @@ const check = (name, ok, extra) => {
 const read = (f) => fs.readFileSync(path.join(REPO, f), 'utf8');
 
 const PAGES = ['index.html', 'nav/index.html', 'blog/index.html', 'blog/post.html',
-               'files/index.html', 'about/index.html', 'tools/index.html', 'tools/password.html'];
+               'search/index.html', 'about/index.html', 'tools/index.html', 'tools/password.html'];
 
 console.log('=== 所有页面：结构与语法 ===');
 for (const f of PAGES) {
@@ -60,7 +60,7 @@ console.log('\n=== 所有页面：导航栏统一 ===');
 for (const f of PAGES) {
   const html = read(f);
   check(`${f} 品牌名统一`, /<span class="logo">🧩 Eraser 的小站<\/span>/.test(html));
-  check(`${f} 菜单含「文件仓库」`, /文件仓库<\/a>/.test(html));
+  check(`${f} 菜单含「搜索」`, /搜索<\/a>/.test(html));
   check(`${f} 引用全站 style.css`, /<link[^>]*href="[^"]*style\.css"/.test(html));
   check(`${f} 标了当前页 active`, /class="active"/.test(html));
 }
@@ -70,9 +70,9 @@ console.log('\n=== 静态兜底：接口挂了也不能白屏 ===');
   const cases = [
     ['nav/index.html', /applyData\(window\.NAV_DATA\)/, '先渲染 links.js'],
     ['blog/index.html', /id="list"/, '列表有静态内容'],
-    ['files/index.html', /id="list"/, '列表有静态内容'],
     ['about/index.html', /id="article"/, '正文有静态内容'],
     ['index.html', /id="welcomeTitle"/, '欢迎语有静态内容'],
+    ['search/index.html', /id="q"/, '搜索框'],
   ];
   for (const [f, re, what] of cases) {
     check(`${f} 保留${what}`, re.test(read(f)));
@@ -126,13 +126,16 @@ console.log('\n=== 博客列表页 ===');
   check('标题用 textContent 设置', /name\.textContent = d\.title/.test(html));
 }
 
-console.log('\n=== 文件列表页 ===');
+console.log('\n=== 搜索页 ===');
 {
-  const html = read('files/index.html');
-  check('站内文件走下载', /setAttribute\("download"/.test(html));
-  check('站外链接新窗口打开', /target = "_blank"/.test(html));
-  check('站外链接带 noopener', /noopener noreferrer/.test(html));
-  check('文件名用 textContent 设置', /name\.textContent = d\.name/.test(html));
+  const html = read('search/index.html');
+  check('从网址读 q 参数', /decodeURIComponent/.test(html));
+  check('搜索请求走同源 /api/search', /fetch\("\/api\/search\?q="/.test(html));
+  check('没搜词时显示静态引导（不白屏）', /showIdle/.test(html) && /输入关键词，回车开始搜索/.test(html));
+  check('接口失败给可读提示且保留页面', /搜索服务开小差了/.test(html));
+  check('命中词高亮用 DOM 节点', /el\("mark"/.test(html));
+  check('站外结果新窗口打开且带 noopener', /rel = "noopener noreferrer"/.test(html));
+  check('结果标题/描述用 textContent 拼（防注入）', /el\("div", "t"\)/.test(html) && /el\("div", "d"\)/.test(html));
 }
 
 console.log('\n=== 首页 ===');

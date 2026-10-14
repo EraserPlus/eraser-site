@@ -791,5 +791,49 @@ console.log('\n=== /api/favicon 图标代理 ===');
     globalThis.fetch = realFetch;
   }
 }
+
+console.log('\n=== 全站搜索 /api/search ===');
+{
+  const searchRoute = (await load('api/search.js')).default;
+  const row = (o) => Object.assign({ id: 1, type: 'nav_category', parent_id: null, sort_order: 0, updated_at: 'x', data: {} }, o);
+
+  let r = await call(searchRoute, 'POST', { query: { q: 'x' } });
+  check('POST /api/search → 405', r.statusCode === 405, String(r.statusCode));
+
+  r = await call(searchRoute, 'GET', {});
+  check('没带 q → 200 且空结果', r.statusCode === 200 && r.json.results.length === 0,
+        JSON.stringify(r.json));
+
+  fakeDb(() => [
+    row({ id: 1, type: 'nav_link', data: { name: 'GitHub', url: 'https://github.com', desc: '代码仓库' } }),
+    row({ id: 2, type: 'post', data: { slug: 'hello', title: '你好世界', summary: '第一篇文章' } }),
+    row({ id: 3, type: 'page', data: { key: 'about', title: '关于', content: '关于页正文' } }),
+  ]);
+  r = await call(searchRoute, 'GET', { query: { q: 'git' } });
+  check('搜索 → 200', r.statusCode === 200, String(r.statusCode));
+  check('返回 3 条结果', r.json.results.length === 3, String(r.json.results.length));
+  check('导航链接指向站外原地址', r.json.results[0].url === 'https://github.com', r.json.results[0].url);
+  check('文章指向 /blog/post.html?slug=', r.json.results[1].url === '/blog/post.html?slug=hello', r.json.results[1].url);
+  check('页面指向 /about/', r.json.results[2].url === '/about/', r.json.results[2].url);
+  check('标题与摘要映射正确', r.json.results[1].title === '你好世界' && r.json.results[1].desc === '第一篇文章',
+        JSON.stringify(r.json.results[1]));
+  check('SQL 里过滤了草稿文章', executed.some(e => /IS DISTINCT FROM 'false'/.test(e.text)),
+        executed.map(e => e.text).join(' | ').slice(0, 200));
+  check('SQL 覆盖了链接的关键词字段', executed.some(e => /keywords/.test(e.text)),
+        executed.map(e => e.text).join(' | ').slice(0, 200));
+
+  /* 注入防护：恶意字符串只作为参数，不拼进 SQL */
+  const evil = "'; DROP TABLE content; --";
+  executed = [];
+  await call(searchRoute, 'GET', { query: { q: evil } });
+  const allSql = executed.map(e => e.text).join('\n');
+  check('搜索接口没有 SQL 拼接', !/DROP TABLE/i.test(allSql), allSql.slice(0, 200));
+  check('恶意字符串作为参数传入', executed.some(e => (e.values || []).some(v => String(v).includes('DROP TABLE'))));
+
+  /* 超长关键词截断到 50，不报错 */
+  fakeDb(() => []);
+  r = await call(searchRoute, 'GET', { query: { q: 'x'.repeat(120) } });
+  check('超长搜索词截断处理 → 200', r.statusCode === 200, String(r.statusCode));
+}
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
