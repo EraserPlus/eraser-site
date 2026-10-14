@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>
+/* 尽早定主题，避免闪白；没存过就跟随系统偏好（切换按钮与命令面板见 shell.js） */
+(function(){try{var t=localStorage.getItem("eraser.theme");if(t!=="light"&&t!=="dark"){t=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";}document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();
+</script>
 <title>追更 · Eraser 的小站</title>
 <link rel="stylesheet" href="../style.css">
 <style>
@@ -29,13 +33,11 @@
 .badge-watching { background: rgba(37,99,235,.12); color: #2563eb; }
 .badge-finished { background: rgba(26,127,55,.12); color: #1a7f37; }
 .badge-paused { background: rgba(154,103,0,.14); color: #9a6700; }
-@media (prefers-color-scheme: dark) {
-  .badge-wish { background: rgba(139,148,158,.16); color: #8b949e; }
-  .badge-watching { background: rgba(96,165,250,.16); color: #60a5fa; }
-  .badge-finished { background: rgba(63,185,80,.16); color: #3fb950; }
-  .badge-paused { background: rgba(210,153,34,.16); color: #d29922; }
-  .mg-score { color: #d29922; }
-}
+html[data-theme="dark"] .badge-wish { background: rgba(139,148,158,.16); color: #8b949e; }
+html[data-theme="dark"] .badge-watching { background: rgba(96,165,250,.16); color: #60a5fa; }
+html[data-theme="dark"] .badge-finished { background: rgba(63,185,80,.16); color: #3fb950; }
+html[data-theme="dark"] .badge-paused { background: rgba(210,153,34,.16); color: #d29922; }
+html[data-theme="dark"] .mg-score { color: #d29922; }
 .mg-fold {
   display: flex; align-items: center; justify-content: space-between;
   color: var(--muted); font-size: 13px; cursor: pointer;
@@ -211,5 +213,6 @@
     .catch(function () { /* 接口挂了：保持静态空状态，不白屏 */ });
 })();
 </script>
+<script src="../shell.js"></script>
 </body>
 </html>

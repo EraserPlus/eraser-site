@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>
+/* 尽早定主题，避免闪白；没存过就跟随系统偏好（切换按钮与命令面板见 shell.js） */
+(function(){try{var t=localStorage.getItem("eraser.theme");if(t!=="light"&&t!=="dark"){t=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";}document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();
+</script>
 <title>工具箱 - Eraser 的小站</title>
 <link rel="stylesheet" href="../style.css">
 <style>
@@ -10,9 +14,7 @@
   .hintline{font-size:12.5px;color:var(--muted);margin:22px auto 0;max-width:640px;line-height:1.9;
             border:1px dashed var(--line);border-radius:10px;padding:10px 14px}
   .hintline code{background:var(--sunk);border-radius:4px;padding:1px 5px;font-size:12px}
-  @media (prefers-color-scheme: dark){
-    .hintline code{background:var(--sunk)}
-  }
+  html[data-theme="dark"] .hintline code{background:var(--sunk)}
 </style>
 </head>
 <body>
@@ -75,5 +77,6 @@ var TOOLS = [];
   });
 })();
 </script>
+<script src="../shell.js"></script>
 </body>
 </html>

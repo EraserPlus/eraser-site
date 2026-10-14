@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>全站搜索 · Eraser 小站</title>
+<script>
+/* 尽早定主题，避免闪白；没存过就跟随系统偏好（切换按钮与命令面板见 shell.js） */
+(function(){try{var t=localStorage.getItem("eraser.theme");if(t!=="light"&&t!=="dark"){t=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";}document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();
+</script>
 <link rel="stylesheet" href="style.css">
 <style>
 /* 本页只写 style.css 里没有的样式；导航栏、容器基础一律交给 style.css */
@@ -77,26 +81,24 @@ mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
   .container{padding:20px 14px 64px}
 }
 
-/* ===== 暗色：跟随系统（纯 CSS） ===== */
-@media (prefers-color-scheme: dark){
-  :root{
-    --bg:#0d1117; --card:#161b22; --sunk:#1c2128;
-    --ink:#e6edf3; --muted:#7d8590; --line:#272c33;
-    --blue:#60a5fa; --blue-d:#3b82f6; --blue-l:#16233a;
-    --red:#ff7b72; --red-l:#2d1517;
-    --green:#3fb950; --green-l:#0f2417;
-    --amber:#d29922; --amber-l:#2b2210;
-    --mark:#713f12;
-  }
-  #q{ background:var(--card); }
-  .chip{ background:var(--card); }
-  .grp-h .n{ background:var(--sunk); }
-  a.hit:hover{ border-color:#1e3a5f; }
-  a.hit .u{ color:var(--muted); }
-  .footnote code{ background:var(--sunk); }
-  .searchwrap kbd{ background:var(--sunk); }
-  .note.err{ border-color:#4a1f1f; color:var(--red); }
+/* ===== 暗色：手动切换（html[data-theme="dark"]）===== */
+html[data-theme="dark"]{
+  --bg:#0d1117; --card:#161b22; --sunk:#1c2128;
+  --ink:#e6edf3; --muted:#7d8590; --line:#272c33;
+  --blue:#60a5fa; --blue-d:#3b82f6; --blue-l:#16233a;
+  --red:#ff7b72; --red-l:#2d1517;
+  --green:#3fb950; --green-l:#0f2417;
+  --amber:#d29922; --amber-l:#2b2210;
+  --mark:#713f12;
 }
+html[data-theme="dark"] #q{ background:var(--card); }
+html[data-theme="dark"] .chip{ background:var(--card); }
+html[data-theme="dark"] .grp-h .n{ background:var(--sunk); }
+html[data-theme="dark"] a.hit:hover{ border-color:#1e3a5f; }
+html[data-theme="dark"] a.hit .u{ color:var(--muted); }
+html[data-theme="dark"] .footnote code{ background:var(--sunk); }
+html[data-theme="dark"] .searchwrap kbd{ background:var(--sunk); }
+html[data-theme="dark"] .note.err{ border-color:#4a1f1f; color:var(--red); }
 </style>
 </head>
 <body>
@@ -297,5 +299,6 @@ qEl.focus();
 
 })();
 </script>
+<script src="shell.js"></script>
 </body>
 </html>

@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>
+/* 尽早定主题，避免闪白；没存过就跟随系统偏好（切换按钮与命令面板见 shell.js） */
+(function(){try{var t=localStorage.getItem("eraser.theme");if(t!=="light"&&t!=="dark"){t=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";}document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();
+</script>
 <title>关于 - Eraser 的小站</title>
 <link rel="stylesheet" href="../style.css">
 <style>
@@ -21,9 +25,7 @@
   .runbadge{ margin-top:26px; text-align:center; font-size:12.5px; color:var(--muted); }
   .runbadge b{ color:var(--ink); }
   .runbadge .dot{ color:var(--green); }
-  @media (prefers-color-scheme: dark){
-    .runbadge b{ color:var(--ink); }
-  }
+  html[data-theme="dark"] .runbadge b{ color:var(--ink); }
 </style>
 </head>
 <body>
@@ -86,5 +88,6 @@ var SITE_LAUNCH = "2026-10-13";
     .catch(function(){ /* 接口挂了就保留静态兜底 */ });
 })();
 </script>
+<script src="../shell.js"></script>
 </body>
 </html>

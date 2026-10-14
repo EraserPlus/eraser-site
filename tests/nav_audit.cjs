@@ -4,6 +4,7 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const html = fs.readFileSync(path.join(ROOT, 'nav', 'index.html'), 'utf8');
 const links = fs.readFileSync(path.join(ROOT, 'nav', 'links.js'), 'utf8');
+const shell = fs.readFileSync(path.join(ROOT, 'shell.js'), 'utf8');
 
 let pass = 0, fail = 0;
 const check = (name, ok, extra) => {
@@ -14,8 +15,11 @@ const check = (name, ok, extra) => {
 console.log('=== 结构 ===');
 const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
 const external = [...html.matchAll(/<script[^>]*\ssrc\s*=\s*["']([^"']+)["']/gi)].map(m => m[1]);
-check('有 2 个内联 script（核心 + 界面）', inline.length === 2, `实际 ${inline.length}`);
-check('有 1 个外部 script', external.length === 1, external.join(', '));
+check('有 3 个内联 script（防闪主题 + 核心 + 界面）', inline.length === 3, `实际 ${inline.length}`);
+check('首个内联 script 是防闪主题脚本（读 eraser.theme）', /eraser\.theme/.test(inline[0] || ''));
+check('有 2 个外部 script（links.js + 全站 shell.js）', external.length === 2, external.join(', '));
+check('外部 script 指向 links.js 与 ../shell.js',
+      external[0] === 'links.js' && external[1] === '../shell.js', external.join(', '));
 check('外部 script 指向 links.js', external[0] === 'links.js', external[0]);
 check('links.js 是相对路径（本地双击也能用）', external[0] && !/^[/.]/.test(external[0]), external[0]);
 check('links.js 在 index.html 之前加载',
@@ -105,7 +109,6 @@ console.log('\n=== 功能点 ===');
     ['点击次数保存', /save\("clicks"/],
     ['三种视图（全部/星标/常用）', /data-view="all"[\s\S]*data-view="star"[\s\S]*data-view="top"/],
     ['快捷键 /', /e\.key === "\/"/],
-    ['快捷键 Ctrl+K', /e\.key === "k" \|\| e\.key === "K"/],
     ['上下键选择', /ArrowDown/],
     ['回车打开', /e\.key === "Enter"/],
     ['Esc 清空', /e\.key === "Escape"/],
@@ -142,6 +145,11 @@ console.log('\n=== 功能点 ===');
     ['启动时应用本地顺序', /state\.data = C\.applyOrder\(data, state\.order\)/],
   ];
   must.forEach(([name, re]) => check(`包含：${name}`, re.test(html)));
+
+  /* Ctrl+K 已统一交给全站 shell.js：本页不再自行绑定，避免两个监听器打架 */
+  check('本页不再自行绑定 Ctrl+K（交给 shell.js）', !/e\.key === "k"/.test(html));
+  check('shell.js 提供 Ctrl+K 全局命令面板', /e\.key === "k" \|\| e\.key === "K"/.test(shell));
+  check('shell.js 提供主题切换按钮', /eraser\.theme/.test(shell) && /shellTheme/.test(shell));
 
   /* 用户数据一律走 textContent，只有静态文案才用 innerHTML */
   const innerHtmlUses = [...html.matchAll(/\.innerHTML\s*=\s*([^;]+);/g)].map(m => m[1].trim());

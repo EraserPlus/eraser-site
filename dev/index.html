@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>
+/* 尽早定主题，避免闪白；没存过就跟随系统偏好（切换按钮与命令面板见 shell.js） */
+(function(){try{var t=localStorage.getItem("eraser.theme");if(t!=="light"&&t!=="dark"){t=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";}document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();
+</script>
 <meta name="robots" content="noindex">
 <title>开发交接 · Eraser 的小站</title>
 <link rel="stylesheet" href="../style.css">
@@ -27,17 +31,15 @@
 .callout.blue { background: rgba(37,99,235,.07); border-color: rgba(37,99,235,.35); }
 .callout.red { background: rgba(207,34,46,.07); border-color: rgba(207,34,46,.35); }
 .callout.amber { background: rgba(154,103,0,.08); border-color: rgba(154,103,0,.35); }
-@media (prefers-color-scheme: dark) {
-  .callout.blue { background: rgba(96,165,250,.08); border-color: rgba(96,165,250,.35); }
-  .callout.red { background: rgba(248,81,73,.08); border-color: rgba(248,81,73,.35); }
-  .callout.amber { background: rgba(210,153,34,.08); border-color: rgba(210,153,34,.35); }
-}
+html[data-theme="dark"] .callout.blue { background: rgba(96,165,250,.08); border-color: rgba(96,165,250,.35); }
+html[data-theme="dark"] .callout.red { background: rgba(248,81,73,.08); border-color: rgba(248,81,73,.35); }
+html[data-theme="dark"] .callout.amber { background: rgba(210,153,34,.08); border-color: rgba(210,153,34,.35); }
 .callout b { display: block; margin-bottom: 4px; }
 .steps { counter-reset: st; list-style: none; margin-left: 0 !important; }
 .steps li { counter-increment: st; position: relative; padding: 10px 0 10px 44px; border-bottom: 1px dashed var(--line); }
 .steps li:last-child { border-bottom: none; }
 .steps li::before { content: counter(st); position: absolute; left: 4px; top: 10px; width: 26px; height: 26px; border-radius: 50%; background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; }
-@media (prefers-color-scheme: dark) { .steps li::before { color: #0d1117; } }
+html[data-theme="dark"] .steps li::before { color: #0d1117; }
 .steps li b { margin-right: 4px; }
 .timeline { margin: 12px 0; font-size: 14px; }
 .timeline .row { display: flex; gap: 12px; padding: 6px 0; border-bottom: 1px dashed var(--line); }
@@ -196,5 +198,6 @@ CI 全绿合并 → 线上实测 → 回来更新交接页）。</code></pre>
 
   <p class="muted" style="margin-top:28px">本页由每批工作的负责人（AI）维护：批次记录 +1 行、当前版本号与新待办同步更新。页面本身不进主站导航，地址固定：<code>eraser.de5.net/dev/</code></p>
 </div>
+<script src="../shell.js"></script>
 </body>
 </html>
