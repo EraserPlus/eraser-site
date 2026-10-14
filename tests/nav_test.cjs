@@ -294,5 +294,90 @@ console.log('\n=== 真实数据跑一遍所有视图 ===');
   check('搜「娱乐」只返回娱乐分类', fun.length === 1 && fun[0].id === 'fun', JSON.stringify(fun.map(c => c.id)));
 }
 
+console.log('\n=== 分类筛选（桌面侧栏 / 移动横滑条共用） ===');
+{
+  const data = {
+    categories: [
+      { id: 'a', name: '甲', links: [
+        { name: 'One', url: 'https://one.com', desc: 'first', tags: ['t1'] },
+        { name: 'Two', url: 'https://two.com', desc: 'second', tags: ['t2'] }
+      ]},
+      { id: 'b', name: '乙', links: [
+        { name: 'Three', url: 'https://three.com', desc: 'third', tags: ['t1', 't2'] }
+      ]},
+      { id: 'c', name: '丙', links: [
+        { name: 'Four', url: 'https://four.com', desc: 'fourth', tags: [] }
+      ]}
+    ]
+  };
+
+  let r = C.filterCategories(data, { cat: 'a' });
+  check('按分类筛选只留该分类', r.length === 1 && r[0].id === 'a' && r[0].links.length === 2,
+        JSON.stringify(r.map(c => c.id)));
+  check('分类按钮点第二下等于取消（由界面层处理），这里只验证 id 过滤',
+        C.filterCategories(data, { cat: 'zzz' }).length === 0);
+  check('不传 cat 返回全部分类', C.filterCategories(data, {}).length === 3);
+  check('cat 与搜索叠加', (() => {
+    const x = C.filterCategories(data, { cat: 'a', query: 'one' });
+    return x.length === 1 && x[0].links.length === 1;
+  })());
+  check('cat 与标签叠加', (() => {
+    const x = C.filterCategories(data, { cat: 'b', tags: ['t1'] });
+    return x.length === 1 && x[0].links.length === 1;
+  })());
+}
+
+console.log('\n=== 最近访问 ===');
+{
+  const data = {
+    categories: [
+      { id: 'a', name: '甲', links: [
+        { name: 'One', url: 'https://one.com' },
+        { name: 'Two', url: 'https://two.com' }
+      ]},
+      { id: 'b', name: '乙', links: [
+        { name: 'Three', url: 'https://three.com' }
+      ]}
+    ]
+  };
+  const recents = [
+    { url: 'https://one.com', t: 100 },
+    { url: 'https://three.com', t: 300 },
+    { url: 'https://two.com', t: 200 },
+    { url: 'https://one.com', t: 400 }   // 同一 url 再次访问：只留一次，时间为新时间
+  ];
+
+  const list = C.recentLinks(data, recents);
+  check('recentLinks 按时间倒序',
+        list.map(l => l.url).join() === 'https://one.com,https://three.com,https://two.com',
+        list.map(l => l.url).join());
+  check('recentLinks 去重', list.length === 3, String(list.length));
+  check('recentLinks 忽略数据里不存在的 url',
+        C.recentLinks(data, [{ url: 'https://nope.com', t: 1 }]).length === 0);
+  check('recentLinks 容忍空值和坏记录',
+        C.recentLinks(data, null).length === 0 && C.recentLinks(data, [null, {}, { t: 5 }]).length === 0);
+  check('recentLinks limit 生效', C.recentLinks(data, recents, 1).length === 1);
+
+  let r = C.filterCategories(data, { view: 'recent', recents });
+  check('最近视图跨分类返回', r.length === 2, JSON.stringify(r.map(c => c.id)));
+  check('最近视图组内也按时间倒序',
+        r.filter(c => c.id === 'a')[0].links.map(l => l.url).join() === 'https://one.com,https://two.com',
+        JSON.stringify(r.filter(c => c.id === 'a')[0].links.map(l => l.url)));
+  check('没有访问记录时最近视图为空', C.filterCategories(data, { view: 'recent', recents: [] }).length === 0);
+  check('不传 recents 不炸', C.filterCategories(data, { view: 'recent' }).length === 0);
+  check('recentLimit 限制展示总数', (() => {
+    const x = C.filterCategories(data, { view: 'recent', recents, recentLimit: 2 });
+    return x.reduce((n, c) => n + c.links.length, 0) === 2;
+  })());
+  check('最近视图 + 分类筛选叠加', (() => {
+    const x = C.filterCategories(data, { view: 'recent', recents, cat: 'a' });
+    return x.length === 1 && x[0].id === 'a' && x[0].links.length === 2;
+  })());
+  check('最近视图 + 搜索叠加', (() => {
+    const x = C.filterCategories(data, { view: 'recent', recents, query: 'three' });
+    return x.length === 1 && x[0].id === 'b';
+  })());
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
