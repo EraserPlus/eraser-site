@@ -448,14 +448,16 @@ console.log('\n=== 内容接口 /api/content ===');
   check('伪协议网址 → 400', res.statusCode === 400, String(res.statusCode));
 
   /* --- 搜索关键词 --- */
-  fakeDb((t) => /SELECT id FROM content WHERE id/.test(t) ? [{ id: 1 }] : [row({ id: 7, type: 'nav_link', data: { name: 'B站', url: 'https://bilibili.com', keywords: ['bilibili', '哔哩哔哩'] } })]);
+  fakeDb((t) => /SELECT id FROM content WHERE id/.test(t) ? [{ id: 1 }] : [row({ id: 7, type: 'nav_link', data: { name: 'B站', url: 'https://bilibili.com', keywords: ['bilibili', '哔哩哔哩'], tip: '备用入口' } })]);
   res = await call(contentRoute, 'POST', { token: TOKEN, body: {
     type: 'nav_link', parent_id: 1,
-    data: { name: 'B站', url: 'https://bilibili.com', keywords: 'bilibili, 哔哩哔哩，bilibili' }
+    data: { name: 'B站', url: 'https://bilibili.com', keywords: 'bilibili, 哔哩哔哩，bilibili', tip: '备用入口' }
   } });
   check('带搜索关键词保存 → 200', res.statusCode === 200, String(res.statusCode));
   check('关键词被归一化成数组', JSON.stringify(res.json.item.data.keywords) === '["bilibili","哔哩哔哩"]',
         JSON.stringify(res.json.item.data && res.json.item.data.keywords));
+  check('提示词一并保存', res.json.item.data && res.json.item.data.tip === '备用入口',
+        JSON.stringify(res.json.item.data && res.json.item.data.tip));
 
   fakeDb((t) => /UPDATE/.test(t)
     ? [row({ id: 8, type: 'nav_link', data: { name: '旧', url: 'https://old.com', keywords: ['x', 'y'] } })]

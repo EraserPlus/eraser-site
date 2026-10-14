@@ -100,6 +100,9 @@ console.log('\n=== 查询解析与匹配 ===');
   check('命中搜索关键词（中文别名）', C.matchesQuery(aliased, ['b站']));
   check('命中搜索关键词（全称别名）', C.matchesQuery(aliased, ['哔哩哔哩']));
   check('关键词也进 haystack', C.haystack(aliased, '').indexOf('b站') !== -1);
+  const tipped = { name: 'Bilibili', url: 'https://bilibili.com', tip: '备用入口' };
+  check('命中提示词也能搜到', C.matchesQuery(tipped, ['备用入口']));
+  check('提示词也进 haystack', C.haystack(tipped, '').indexOf('备用入口') !== -1);
   check('没关键词的老链接不受影响', C.matchesQuery({ name: 'x', url: 'https://x.com' }, ['x']));
 }
 

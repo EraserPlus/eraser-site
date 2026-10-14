@@ -135,6 +135,7 @@ console.log('\n=== 功能点 ===');
     ['最近访问显示相对时间', /function relTime/],
     ['卡片悬停显示完整网址', /a\.title = link\.url/],
     ['链接带搜索关键词（进搜索索引）', /link\.keywords/],
+    ['链接带提示词（进搜索索引 + 卡片小字）', /highlighted\(link\.tip, terms, "tip"\)/],
   ];
   must.forEach(([name, re]) => check(`包含：${name}`, re.test(html)));
 

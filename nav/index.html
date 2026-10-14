@@ -135,6 +135,8 @@ a.card .top{display:flex;align-items:center;gap:6px}
 a.card .nm{font-weight:600;font-size:14.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 a.card .url{font-size:12px;color:#94a3b8;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 a.card .ds{font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 提示词：后台给链接写的小提示，前台卡片以小字显示 */
+a.card .tip{font-size:11.5px;color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 a.card .tg{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
 a.card .tg i{
   font-style:normal;font-size:11px;padding:1px 7px;border-radius:20px;
@@ -216,6 +218,7 @@ body.dense a.card .tm{display:none}
   a.card:hover{ border-color:#1e3a5f; }
   a.card .url{ color:var(--muted); }
   a.card .tm{ color:var(--muted); }
+  a.card .tip{ color:var(--muted); }
   a.card .tg i{ background:var(--sunk); color:var(--muted); }
   .acts .star,.acts .copy{ color:#4b5563; }
   .acts .copy:hover{ color:var(--blue); background:var(--blue-l); }
@@ -350,9 +353,9 @@ function parseQuery(q){
 }
 
 /* extra 用来把所属分类名也纳入搜索范围，这样搜「娱乐」能搜出该分类下的站；
-   keywords 是后台给链接设的搜索关键词（别名），也一并进索引 */
+   keywords 是后台给链接设的搜索关键词（别名），tip 是给自己的提示词，也一并进索引 */
 function haystack(link, extra){
-  return norm([link.name, link.url, link.desc, (link.tags || []).join(" "), (link.keywords || []).join(" "), extra || ""].join(" "));
+  return norm([link.name, link.url, link.desc, link.tip, (link.tags || []).join(" "), (link.keywords || []).join(" "), extra || ""].join(" "));
 }
 
 function matchesQuery(link, terms, extra){
@@ -673,6 +676,7 @@ function buildCard(link, terms, meta){
   body.appendChild(top);
   body.appendChild(highlighted(C.hostOf(link.url), terms, "url"));
   if (link.desc) body.appendChild(highlighted(link.desc, terms, "ds"));
+  if (link.tip) body.appendChild(highlighted(link.tip, terms, "tip"));
   if (meta) body.appendChild(el("span", "tm", meta));
 
   if (link.tags && link.tags.length){
@@ -1030,7 +1034,7 @@ function navFromApi(j){
         name: c.data.name,
         links: links.filter(function(l){ return l.parent_id === c.id; })
           .map(function(l){
-            return { name: l.data.name, url: l.data.url, desc: l.data.desc,
+            return { name: l.data.name, url: l.data.url, desc: l.data.desc, tip: l.data.tip,
                      tags: l.data.tags || [], keywords: l.data.keywords || [] };
           })
       };
