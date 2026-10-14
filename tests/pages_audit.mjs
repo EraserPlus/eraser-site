@@ -12,7 +12,7 @@ const check = (name, ok, extra) => {
 const read = (f) => fs.readFileSync(path.join(REPO, f), 'utf8');
 
 const PAGES = ['index.html', 'nav/index.html', 'blog/index.html', 'blog/post.html',
-               'search/index.html', 'about/index.html', 'tools/index.html',
+               'about/index.html', 'tools/index.html',
                'collect/index.html'];
 
 console.log('=== 所有页面（7 个）：结构与语法 ===');for (const f of PAGES) {
@@ -61,6 +61,7 @@ for (const f of PAGES) {
   const html = read(f);
   check(`${f} 品牌名统一`, /<span class="logo">🧩 Eraser 的小站<\/span>/.test(html));
   check(`${f} 菜单含「搜索」`, /搜索<\/a>/.test(html));
+  check(`${f} 导航没有多余的「首页」入口`, !/>首页<\/a>/.test(html));
   check(`${f} 引用全站 style.css`, /<link[^>]*href="[^"]*style\.css"/.test(html));
   check(`${f} 标了当前页 active`, /class="active"/.test(html));
 }
@@ -71,8 +72,7 @@ console.log('\n=== 静态兜底：接口挂了也不能白屏 ===');
     ['nav/index.html', /applyData\(window\.NAV_DATA\)/, '先渲染 links.js'],
     ['blog/index.html', /id="list"/, '列表有静态内容'],
     ['about/index.html', /id="article"/, '正文有静态内容'],
-    ['index.html', /id="welcomeTitle"/, '欢迎语有静态内容'],
-    ['search/index.html', /id="q"/, '搜索框'],
+    ['index.html', /id="q"/, '搜索框'],
     ['collect/index.html', /id="hint-anime"/, '两个栏目有静态空状态'],
   ];
   for (const [f, re, what] of cases) {
@@ -88,12 +88,11 @@ console.log('\n=== Markdown 渲染安全 ===');
   const uses = [
     ['blog/post.html', /art\.innerHTML\s*=\s*window\.MD\s*\?\s*MD\.render/],
     ['about/index.html', /art\.innerHTML\s*=\s*window\.MD\s*\?\s*MD\.render/],
-    ['index.html', /p\.innerHTML\s*=\s*MD\.render/],
   ];
   for (const [f, re] of uses) {
     check(`${f} 用 MD.render 渲染（内部会先转义）`, re.test(read(f)));
   }
-  for (const f of ['blog/post.html', 'about/index.html', 'index.html']) {
+  for (const f of ['blog/post.html', 'about/index.html']) {
     const html = read(f);
     check(`${f} 加载了 md.js`, /<script src="[^"]*md\.js"><\/script>/.test(html));
     const assigns = [...html.matchAll(/\.innerHTML\s*=\s*([^;]+);/g)].map(m => m[1].trim());
@@ -127,9 +126,9 @@ console.log('\n=== 博客列表页 ===');
   check('标题用 textContent 设置', /name\.textContent = d\.title/.test(html));
 }
 
-console.log('\n=== 搜索页 ===');
+console.log('\n=== 全站搜索页（现为首页 /）===');
 {
-  const html = read('search/index.html');
+  const html = read('index.html');
   check('从网址读 q 参数', /decodeURIComponent/.test(html));
   check('搜索请求走同源 /api/search', /fetch\("\/api\/search\?q="/.test(html));
   check('没搜词时显示静态引导（不白屏）', /showIdle/.test(html) && /输入关键词，回车开始搜索/.test(html));
@@ -140,12 +139,14 @@ console.log('\n=== 搜索页 ===');
   check('结果分组含追更栏目', /type: "media"/.test(html) && /name: "追更"/.test(html));
 }
 
-console.log('\n=== 首页 ===');
+console.log('\n=== 旧首页已下线（首页与搜索合并）===');
 {
   const html = read('index.html');
-  check('欢迎语有 id 可被替换', /id="welcomeTitle"/.test(html) && /id="welcomeText"/.test(html));
-  check('五个分区卡片都在', (html.match(/class="card"/g) || []).length === 5);
-  check('读取的是 home 这个页面标识', /"home"/.test(html));
+  check('旧的欢迎语已移除', !/id="welcomeTitle"/.test(html) && !/id="welcomeText"/.test(html));
+  check('旧的五分区卡片已移除', !/class="card"/.test(html));
+  check('不再读 home 页面标识', !/"home"/.test(html));
+  check('根路径导航项是「搜索」且高亮', /<a href="index\.html" class="active">搜索<\/a>/.test(html));
+  check('独立的 /search/ 页已删除', !fs.existsSync(path.join(REPO, 'search', 'index.html')));
 }
 
 console.log('\n=== 关于页 ===');

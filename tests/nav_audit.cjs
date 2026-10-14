@@ -162,9 +162,9 @@ console.log('\n=== 与站点其它页的一致性 ===');
   check('菜单文字与其他页一致（搜索）', /搜索<\/a>/.test(html));
   check('本页导航项标记为 active', /<a href="index\.html" class="active">导航<\/a>/.test(html));
 
-  const expected = ['../index.html', '../search/index.html', '../tools/index.html',
+  const expected = ['../index.html', '../tools/index.html',
                     '../blog/index.html', '../collect/index.html', 'index.html', '../about/index.html'];
-  check('七个分区链接齐全', expected.every(h => html.includes(`href="${h}"`)));
+  check('六个分区链接齐全', expected.every(h => html.includes(`href="${h}"`)));
 
   /* 导航栏样式不应该在本页重复定义 */
   check('本页没有重复定义 .navbar 样式（交给 style.css）', !/\.navbar\s*\{/.test(html));
