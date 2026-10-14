@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+/* 尽早定主题，避免闪白；没存过就跟随系统偏好（切换按钮与命令面板见 shell.js） */
+(function(){try{var t=localStorage.getItem("eraser.theme");if(t!=="light"&&t!=="dark"){t=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";}document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();
+</script>
 <title>网址导航 · Eraser 小站</title>
 <link rel="stylesheet" href="../style.css">
 <style>
@@ -191,55 +195,53 @@ body.dense a.card .tm{display:none}
   .right button{padding:8px 12px}
 }
 
-/* ===== 暗色：跟随系统（纯 CSS，无 JS 无切换按钮） ===== */
+/* ===== 暗色：手动切换（html[data-theme="dark"]，按钮见 shell.js） ===== */
 /* 覆盖上面 :root 的变量为暗色值（参照 admin 后台暗色方案，品牌蓝提亮保证对比度），
    并把本页硬编码的浅色表面/描边/文字逐一改成暗色，与变量配套。
    说明：375px 宽度下 .grid 有 600px 断点、toolbar/tagbar/catbar 均已 flex/横滑，
    顶栏换行由 style.css 的 768px 断点负责（本页引了 style.css），实测无破损。
    图标底色/文字是 JS 里按名称生成的 hsl() 动态色（禁动逻辑），暗色下保持原样。 */
-@media (prefers-color-scheme: dark){
-  :root{
-    --bg:#0d1117; --card:#161b22; --sunk:#1c2128;
-    --ink:#e6edf3; --muted:#7d8590; --line:#272c33;
-    --blue:#60a5fa; --blue-d:#3b82f6; --blue-l:#16233a;
-    --red:#ff7b72; --red-l:#2d1517;
-    --green:#3fb950; --green-l:#0f2417;
-    --amber:#d29922; --amber-l:#2b2210;
-    --mark:#713f12;
-  }
-  #q{ background:var(--card); }
-  .views{ background:var(--card); }
-  .views button:hover{ background:var(--sunk); }
-  .views button.active{ color:#0d1117; }
-  .right button{ background:var(--card); }
-  .right button:hover{ background:var(--sunk); }
-  .chip{ background:var(--card); }
-  .chip:hover{ border-color:#3d444d; }
-  .chip.active{ color:#0d1117; }
-  .tagbar .clear{ border-color:#3d444d; }
-  .cath .n{ background:var(--sunk); }
-  a.card:hover{ border-color:#1e3a5f; }
-  a.card .url{ color:var(--muted); }
-  a.card .tm{ color:var(--muted); }
-  a.card .tip{ color:var(--muted); }
-  a.card .tg i{ background:var(--sunk); color:var(--muted); }
-  .acts .star,.acts .copy{ color:#4b5563; }
-  .acts .copy:hover{ color:var(--blue); background:var(--blue-l); }
-  .acts .star:hover,.acts .star.on{ color:#f59e0b; }
-  .footnote code{ background:var(--sunk); }
-  .searchwrap kbd{ background:var(--sunk); }
-  .note.ok{ border-color:#1f4429; color:var(--green); }
-  .note.warn{ border-color:#4a3a12; color:var(--amber); }
-  .note.err{ border-color:#4a1f1f; color:var(--red); }
-  .side-title{ color:var(--muted); }
-  .sideitem{ color:var(--ink); }
-  .sideitem:hover{ background:var(--sunk); }
-  .sideitem.active{ background:var(--blue-l); color:var(--blue); }
-  .sideitem .n{ background:rgba(255,255,255,.06); color:var(--muted); }
-  .sideitem.active .n{ background:rgba(96,165,250,.16); color:var(--blue); }
-  .btntop{ background:var(--card); border-color:var(--line); color:var(--muted); box-shadow:0 2px 10px rgba(0,0,0,.4); }
-  .btntop:hover{ color:var(--blue); border-color:#1e3a5f; }
+html[data-theme="dark"]{
+  --bg:#0d1117; --card:#161b22; --sunk:#1c2128;
+  --ink:#e6edf3; --muted:#7d8590; --line:#272c33;
+  --blue:#60a5fa; --blue-d:#3b82f6; --blue-l:#16233a;
+  --red:#ff7b72; --red-l:#2d1517;
+  --green:#3fb950; --green-l:#0f2417;
+  --amber:#d29922; --amber-l:#2b2210;
+  --mark:#713f12;
 }
+html[data-theme="dark"] #q{ background:var(--card); }
+html[data-theme="dark"] .views{ background:var(--card); }
+html[data-theme="dark"] .views button:hover{ background:var(--sunk); }
+html[data-theme="dark"] .views button.active{ color:#0d1117; }
+html[data-theme="dark"] .right button{ background:var(--card); }
+html[data-theme="dark"] .right button:hover{ background:var(--sunk); }
+html[data-theme="dark"] .chip{ background:var(--card); }
+html[data-theme="dark"] .chip:hover{ border-color:#3d444d; }
+html[data-theme="dark"] .chip.active{ color:#0d1117; }
+html[data-theme="dark"] .tagbar .clear{ border-color:#3d444d; }
+html[data-theme="dark"] .cath .n{ background:var(--sunk); }
+html[data-theme="dark"] a.card:hover{ border-color:#1e3a5f; }
+html[data-theme="dark"] a.card .url{ color:var(--muted); }
+html[data-theme="dark"] a.card .tm{ color:var(--muted); }
+html[data-theme="dark"] a.card .tip{ color:var(--muted); }
+html[data-theme="dark"] a.card .tg i{ background:var(--sunk); color:var(--muted); }
+html[data-theme="dark"] .acts .star,html[data-theme="dark"] .acts .copy{ color:#4b5563; }
+html[data-theme="dark"] .acts .copy:hover{ color:var(--blue); background:var(--blue-l); }
+html[data-theme="dark"] .acts .star:hover,html[data-theme="dark"] .acts .star.on{ color:#f59e0b; }
+html[data-theme="dark"] .footnote code{ background:var(--sunk); }
+html[data-theme="dark"] .searchwrap kbd{ background:var(--sunk); }
+html[data-theme="dark"] .note.ok{ border-color:#1f4429; color:var(--green); }
+html[data-theme="dark"] .note.warn{ border-color:#4a3a12; color:var(--amber); }
+html[data-theme="dark"] .note.err{ border-color:#4a1f1f; color:var(--red); }
+html[data-theme="dark"] .side-title{ color:var(--muted); }
+html[data-theme="dark"] .sideitem{ color:var(--ink); }
+html[data-theme="dark"] .sideitem:hover{ background:var(--sunk); }
+html[data-theme="dark"] .sideitem.active{ background:var(--blue-l); color:var(--blue); }
+html[data-theme="dark"] .sideitem .n{ background:rgba(255,255,255,.06); color:var(--muted); }
+html[data-theme="dark"] .sideitem.active .n{ background:rgba(96,165,250,.16); color:var(--blue); }
+html[data-theme="dark"] .btntop{ background:var(--card); border-color:var(--line); color:var(--muted); box-shadow:0 2px 10px rgba(0,0,0,.4); }
+html[data-theme="dark"] .btntop:hover{ color:var(--blue); border-color:#1e3a5f; }
 </style>
 </head>
 <body>
@@ -1041,9 +1043,6 @@ document.addEventListener("keydown", function(e){
   if (!typing && e.key === "/"){
     e.preventDefault(); qEl.focus(); qEl.select(); return;
   }
-  if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")){
-    e.preventDefault(); qEl.focus(); qEl.select(); return;
-  }
   if (e.key === "Escape"){
     if (qEl.value){ qEl.value = ""; state.query = ""; kbdHint.classList.remove("hide"); render(); }
     else qEl.blur();
@@ -1123,5 +1122,6 @@ function navFromApi(j){
 
 })();
 </script>
+<script src="../shell.js"></script>
 </body>
 </html>

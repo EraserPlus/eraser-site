@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>
+/* 尽早定主题，避免闪白；没存过就跟随系统偏好（切换按钮与命令面板见 shell.js） */
+(function(){try{var t=localStorage.getItem("eraser.theme");if(t!=="light"&&t!=="dark"){t=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";}document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();
+</script>
 <title>博客 - Eraser 的小站</title>
 <link rel="stylesheet" href="../style.css">
 <link rel="alternate" type="application/rss+xml" title="RSS 订阅" href="/api/rss">
@@ -95,5 +99,6 @@
     .catch(function(){ hint.style.display = ""; });   // 接口挂了就显示空状态提示
 })();
 </script>
+<script src="../shell.js"></script>
 </body>
 </html>

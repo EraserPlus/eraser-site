@@ -226,12 +226,14 @@ console.log('\n=== 全部源文件语法检查 ===');
   };
   walk('api');
   walk('admin');
+  /* 根目录的全站浏览器脚本（Markdown 渲染器 / 公共交互层）也查语法 */
+  files.push('md.js', 'shell.js');
 
   for (const f of files) {
     if (!f.endsWith('.js')) continue;
     const src = fs.readFileSync(path.join(REPO, f), 'utf8');
-    /* admin/ 下是浏览器脚本（依赖 window），只能用 new Function 查语法，不能 import */
-    if (f.startsWith('admin/')) {
+    /* admin/ 与根目录脚本是浏览器脚本（依赖 window/document），只能 new Function 查语法，不能 import */
+    if (f.startsWith('admin/') || f === 'md.js' || f === 'shell.js') {
       try { new Function(src); check(`${f} 语法正确（浏览器脚本）`, true); }
       catch (e) { check(`${f} 语法正确（浏览器脚本）`, false, e.message); }
       continue;
