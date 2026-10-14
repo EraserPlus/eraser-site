@@ -247,6 +247,7 @@ textarea:focus{ outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgb
       <button data-tab="events">日程</button>
       <button data-tab="nav">导航</button>
       <button data-tab="post">博客</button>
+      <button data-tab="media">追更</button>
       <button data-tab="page">页面</button>
     </div>
 
@@ -390,6 +391,15 @@ textarea:focus{ outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgb
         </p>
       </div>
       <div id="pageHost"></div>
+    </section>
+
+    <section id="tab-media" class="hide">
+      <div class="card"><h2>📺 追更</h2>
+        <p style="font-size:13px;color:var(--ink2);margin:0">
+          追番 / 漫画的留档。状态改成「看完 / 读完」后，前台会自动把它挪进对应栏目的收纳栏。
+        </p>
+      </div>
+      <div id="mediaHost"></div>
     </section>
 
     <p class="foot">数据存在服务器上，手机和电脑看到同一份<br>登录状态保留 30 天</p>
@@ -969,7 +979,7 @@ $("calToday").addEventListener("click", function(){
   selDay = todayStr(); renderCalendar(); renderDayEvents();
 });
 
-var TABS = ["today", "todos", "events", "nav", "post", "page"];
+var TABS = ["today", "todos", "events", "nav", "post", "media", "page"];
 
 document.querySelectorAll(".tabs button").forEach(function(btn){
   btn.addEventListener("click", function(){
@@ -1009,7 +1019,8 @@ function exportBackup(){
   Promise.all([
     api("todos"), api("events"),
     api("content?type=post"), api("content?type=file"),
-    api("content?type=page"), api("content?type=nav")
+    api("content?type=page"), api("content?type=nav"),
+    api("content?type=media")
   ]).then(function(r){
     var backup = {
       exportedAt: new Date().toISOString(),
@@ -1019,7 +1030,8 @@ function exportBackup(){
       posts: (r[2] && r[2].items) || [],
       files: (r[3] && r[3].items) || [],
       pages: (r[4] && r[4].items) || [],
-      nav: { categories: (r[5] && r[5].categories) || [], links: (r[5] && r[5].links) || [] }
+      nav: { categories: (r[5] && r[5].categories) || [], links: (r[5] && r[5].links) || [] },
+      media: (r[6] && r[6].items) || []
     };
     var blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
     var url = URL.createObjectURL(blob);
@@ -1028,7 +1040,7 @@ function exportBackup(){
     a.download = "eraser-backup-" + ymd(new Date()) + ".json";
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(function(){ URL.revokeObjectURL(url); }, 15000);
-    say("app", "备份已下载：待办 / 日程 / 文章 / 文件 / 页面 / 导航", "ok");
+    say("app", "备份已下载：待办 / 日程 / 文章 / 文件 / 页面 / 导航 / 追更", "ok");
   }).catch(function(e){
     say("app", "导出失败：" + (e && e.message ? e.message : "未知错误"), "err");
   }).then(function(){

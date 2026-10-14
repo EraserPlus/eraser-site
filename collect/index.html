@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>追更 · Eraser 的小站</title>
+<link rel="stylesheet" href="../style.css">
+<style>
+/* 追更页专属样式：栏目 / 记录卡 / 状态徽章 / 收纳栏 */
+.mg-sec { margin-top: 30px; }
+.mg-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+.mg-head h2 { margin: 0; font-size: 18px; }
+.mg-head .cnt { color: var(--muted); font-size: 13px; }
+.mg-card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  padding: 12px 16px; margin-bottom: 10px;
+  display: flex; align-items: center; gap: 14px;
+}
+.mg-card .cover { width: 44px; height: 60px; object-fit: cover; border-radius: 6px; flex-shrink: 0; background: var(--sunk); }
+.mg-card .body { flex: 1; min-width: 0; }
+.mg-card .nm { font-weight: 600; font-size: 15px; word-break: break-word; }
+.mg-card .nm a { color: inherit; }
+.mg-card .nm a:hover { color: var(--blue); }
+.mg-card .sub { color: var(--muted); font-size: 13px; margin-top: 3px; word-break: break-word; }
+.mg-card .right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.mg-score { color: #9a6700; font-size: 13px; white-space: nowrap; }
+.badge { font-size: 12px; padding: 2px 10px; border-radius: 999px; white-space: nowrap; }
+.badge-wish { background: rgba(110,119,129,.14); color: #6e7781; }
+.badge-watching { background: rgba(37,99,235,.12); color: #2563eb; }
+.badge-finished { background: rgba(26,127,55,.12); color: #1a7f37; }
+.badge-paused { background: rgba(154,103,0,.14); color: #9a6700; }
+@media (prefers-color-scheme: dark) {
+  .badge-wish { background: rgba(139,148,158,.16); color: #8b949e; }
+  .badge-watching { background: rgba(96,165,250,.16); color: #60a5fa; }
+  .badge-finished { background: rgba(63,185,80,.16); color: #3fb950; }
+  .badge-paused { background: rgba(210,153,34,.16); color: #d29922; }
+  .mg-score { color: #d29922; }
+}
+.mg-fold {
+  display: flex; align-items: center; justify-content: space-between;
+  color: var(--muted); font-size: 13px; cursor: pointer;
+  padding: 9px 14px; border: 1px dashed var(--line2); border-radius: 10px;
+  user-select: none; margin-bottom: 10px;
+}
+.mg-fold:hover { border-color: var(--blue); color: var(--blue); }
+.mg-fold .tri { display: inline-block; transition: transform .15s; margin-right: 8px; }
+.mg-fold.open .tri { transform: rotate(90deg); }
+.mg-done .mg-card { opacity: .78; }
+@media (max-width: 560px) {
+  .mg-card { flex-wrap: wrap; }
+  .mg-card .right { width: 100%; justify-content: flex-end; }
+}
+</style>
+</head>
+<body>
+<div class="navbar">
+  <span class="logo">🧩 Eraser 的小站</span>
+  <nav>
+    <a href="../index.html">首页</a>
+    <a href="../search/index.html">搜索</a>
+    <a href="../tools/index.html">工具箱</a>
+    <a href="../blog/index.html">博客</a>
+    <a href="index.html" class="active">追更</a>
+    <a href="../nav/index.html">导航</a>
+    <a href="../about/index.html">关于</a>
+  </nav>
+</div>
+<div class="container">
+  <h1>追更</h1>
+  <p class="muted">追番、漫画，看过的都留档在这。</p>
+
+  <section class="mg-sec">
+    <div class="mg-head"><h2>追番</h2><span class="cnt" id="cnt-anime"></span></div>
+    <p class="muted" id="hint-anime">还没有记录。去管理后台的「追更」标签加第一条。</p>
+    <div id="list-anime"></div>
+    <div class="mg-fold" id="fold-anime" style="display:none"><span><span class="tri">▸</span><span id="foldtxt-anime"></span></span><span id="foldcnt-anime"></span></div>
+    <div class="mg-done" id="done-anime" style="display:none"></div>
+  </section>
+
+  <section class="mg-sec">
+    <div class="mg-head"><h2>漫画</h2><span class="cnt" id="cnt-comic"></span></div>
+    <p class="muted" id="hint-comic">还没有记录。去管理后台的「追更」标签加第一条。</p>
+    <div id="list-comic"></div>
+    <div class="mg-fold" id="fold-comic" style="display:none"><span><span class="tri">▸</span><span id="foldtxt-comic"></span></span><span id="foldcnt-comic"></span></div>
+    <div class="mg-done" id="done-comic" style="display:none"></div>
+  </section>
+</div>
+
+<script>
+/* 追更：追番 / 漫画的留档。
+   先静态兜底（上面的空状态）→ 再读接口渲染 → 失败保持静态，永不白屏；
+   数据库里还没内容，保留静态兜底。 */
+(function () {
+  var LABEL = {
+    anime: { wish: "想看", watching: "在看", finished: "看完", paused: "搁置", done: "已看完" },
+    comic: { wish: "想读", watching: "在读", finished: "读完", paused: "搁置", done: "已读完" }
+  };
+  function $(id) { return document.getElementById(id); }
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function safeUrl(u) {
+    u = String(u == null ? "" : u);
+    return /^https?:\/\//i.test(u) ? u : "";
+  }
+
+  function makeCard(it, lab) {
+    var d = it.data || {};
+    var card = el("div", "mg-card");
+
+    var cover = safeUrl(d.cover);
+    if (cover) {
+      var img = el("img", "cover");
+      img.src = cover;
+      img.alt = "";
+      img.loading = "lazy";
+      img.addEventListener("error", function () { if (img.parentNode) img.parentNode.removeChild(img); });
+      card.appendChild(img);
+    }
+
+    var body = el("div", "body");
+    var nm = el("div", "nm");
+    var link = safeUrl(d.url);
+    if (link) {
+      var a = el("a", null, d.name || "");
+      a.href = link;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      nm.appendChild(a);
+    } else {
+      nm.textContent = d.name || "";
+    }
+    body.appendChild(nm);
+
+    var bits = [];
+    if (d.note) bits.push(d.note);
+    if (d.date) bits.push(d.date);
+    if (bits.length) body.appendChild(el("div", "sub", bits.join(" · ")));
+    card.appendChild(body);
+
+    var right = el("div", "right");
+    if (d.score != null && d.score !== "") {
+      right.appendChild(el("span", "mg-score", "★ " + Number(d.score).toFixed(1)));
+    }
+    right.appendChild(el("span", "badge badge-" + (lab[d.status] ? d.status : "wish"), lab[d.status] || ""));
+    card.appendChild(right);
+
+    return card;
+  }
+
+  function renderSection(key, items) {
+    var lab = LABEL[key];
+    var list = $("list-" + key), hint = $("hint-" + key);
+    var fold = $("fold-" + key), foldtxt = $("foldtxt-" + key), foldcnt = $("foldcnt-" + key);
+    var doneBox = $("done-" + key), cnt = $("cnt-" + key);
+
+    /* 新的排前面 */
+    items = items.slice().sort(function (a, b) {
+      return String(b.updated_at || "").localeCompare(String(a.updated_at || ""));
+    });
+
+    var active = [], done = [];
+    items.forEach(function (it) {
+      if (it.data && it.data.status === "finished") done.push(it);
+      else active.push(it);
+    });
+
+    cnt.textContent = items.length ? "共 " + items.length + " 部" : "";
+
+    list.innerHTML = "";
+    doneBox.innerHTML = "";
+    hint.style.display = items.length ? "none" : "";   // 数据库里还没内容，保留静态兜底
+
+    active.forEach(function (it) { list.appendChild(makeCard(it, lab)); });
+    if (!active.length && items.length) {
+      list.appendChild(el("p", "muted", "当前没有在追的，都收在下面的收纳栏里。"));
+    }
+
+    if (done.length) {
+      fold.style.display = "";
+      foldtxt.textContent = lab.done;
+      foldcnt.textContent = done.length + " 部";
+      done.forEach(function (it) { doneBox.appendChild(makeCard(it, lab)); });
+      if (!fold.dataset.bound) {
+        fold.dataset.bound = "1";
+        fold.addEventListener("click", function () {
+          fold.classList.toggle("open");
+          doneBox.style.display = fold.classList.contains("open") ? "" : "none";
+        });
+      }
+    } else {
+      fold.style.display = "none";
+      doneBox.style.display = "none";
+    }
+  }
+
+  function apply(items) {
+    ["anime", "comic"].forEach(function (key) {
+      renderSection(key, items.filter(function (it) {
+        return it.data && it.data.category === key;
+      }));
+    });
+  }
+
+  if (!window.fetch) return;
+  fetch("/api/content?type=media", { headers: { Accept: "application/json" } })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (j) { apply((j && j.items) || []); })
+    .catch(function () { /* 接口挂了：保持静态空状态，不白屏 */ });
+})();
+</script>
+</body>
+</html>

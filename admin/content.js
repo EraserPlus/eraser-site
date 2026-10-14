@@ -1,8 +1,8 @@
 /* ===========================================================================
-   admin/content.js · 内容管理（导航 / 博客 / 文件 / 页面）
+   admin/content.js · 内容管理（导航 / 博客 / 页面 / 追更）
    ---------------------------------------------------------------------------
    由 admin/index.html 加载，复用它的 api() 和 say()。
-   四种内容共用「字段定义 → 通用表单 / 通用列表」的写法，避免重复代码。
+   各种内容共用「字段定义 → 通用表单 / 通用列表」的写法，避免重复代码。
    =========================================================================== */
 (function (global) {
   "use strict";
@@ -43,6 +43,24 @@
         { k: "key", l: "页面标识", t: "text", ph: "about / home", req: true },
         { k: "title", l: "标题", t: "text", req: true },
         { k: "content", l: "正文（Markdown）", t: "md", req: true }
+      ]
+    },
+    media: {
+      name: "追更",
+      fields: [
+        { k: "category", l: "栏目", t: "select", opts: [["anime", "追番"], ["comic", "漫画"]], req: true },
+        { k: "name", l: "名称", t: "text", ph: "比如：葬送的芙莉莲", req: true },
+        { k: "status", l: "状态", t: "select", req: true, opts: [
+            ["wish", "想看 / 想读"],
+            ["watching", "在看 / 在读"],
+            ["finished", "看完 / 读完（自动进收纳栏）"],
+            ["paused", "搁置（弃坑 / 缓一缓）"]
+        ] },
+        { k: "score", l: "评分（可空，0-10）", t: "text", ph: "比如：9.0 或 8.5，留空不显示" },
+        { k: "note", l: "备注（可空）", t: "text", ph: "一句话，比如：周五更新 · 看到第 8 话" },
+        { k: "date", l: "日期（可空）", t: "text", ph: "比如：2026-10-14" },
+        { k: "url", l: "链接（可空）", t: "text", ph: "https://…（豆瓣 / B站 / bgm 页面）" },
+        { k: "cover", l: "封面图链接（可空）", t: "text", ph: "https://…图片地址，留空则只显示文字" }
       ]
     }
   };
@@ -135,6 +153,15 @@
         line.appendChild(el("span", null, "打勾则在前台显示"));
         wrap.appendChild(line);
         inputs[f.k] = cb;
+      } else if (f.t === "select") {
+        var sel = el("select");
+        (f.opts || []).forEach(function (o) {
+          var opt = el("option", null, o[1]);
+          opt.value = o[0];
+          sel.appendChild(opt);
+        });
+        wrap.appendChild(sel);
+        inputs[f.k] = sel;
       } else {
         var inp = el("input");
         inp.type = "text";
@@ -238,6 +265,11 @@
         var v = data ? data[f.k] : "";
         if (f.t === "bool") inputs[f.k].checked = data ? (v !== false) : true;
         else if (f.t === "tags") inputs[f.k].value = tagsToText(v);
+        else if (f.t === "select") {
+          var opts = f.opts || [];
+          var has = opts.some(function (o) { return o[0] === v; });
+          inputs[f.k].value = has ? v : (opts[0] ? opts[0][0] : "");
+        }
         else inputs[f.k].value = v == null ? "" : v;
       });
     };
@@ -522,7 +554,7 @@
     openForm(item ? "编辑" + SCHEMA[type].name : "新增" + SCHEMA[type].name, form);
   }
 
-  var cache = { post: [], page: [] };
+  var cache = { post: [], page: [], media: [] };
   function reload(type) {
     return api("content?type=" + type).then(function (j) { cache[type] = j.items || []; });
   }
@@ -573,6 +605,23 @@
           title: function (i) { return i.data.title + "（" + i.data.key + "）"; },
           meta: function () { return []; },
           note: function (i) { return md ? md.plain(i.data.content, 80) : ""; }
+        });
+      });
+    },
+    media: function () {
+      return reload("media").then(function () {
+        renderList("media", "mediaHost", {
+          title: function (i) { return i.data.name || "(未命名)"; },
+          meta: function (i) {
+            var m = [];
+            m.push(i.data.category === "comic" ? "漫画" : "追番");
+            var st = { wish: "想看", watching: "在看", finished: "看完", paused: "搁置" }[i.data.status];
+            if (st) m.push(st);
+            if (i.data.score != null && i.data.score !== "") m.push(i.data.score + " 分");
+            if (i.data.date) m.push(i.data.date);
+            return m;
+          },
+          note: function (i) { return i.data.note || ""; }
         });
       });
     }

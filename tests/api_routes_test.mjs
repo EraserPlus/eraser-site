@@ -402,6 +402,12 @@ console.log('\n=== 内容接口 /api/content ===');
   res = await call(contentRoute, 'GET', { query: { type: 'post' } });
   check('未登录也能读文章列表 → 200', res.statusCode === 200 && res.json.items.length === 1);
 
+  fakeDb(() => [row({ id: 5, type: 'media', data: { category: 'anime', name: '葬送的芙莉莲', status: 'watching', score: 9 } })]);
+  res = await call(contentRoute, 'GET', { query: { type: 'media' } });
+  check('未登录也能读追更列表 → 200', res.statusCode === 200 && res.json.items.length === 1);
+  check('追更数据原样返回（评分是数字）',
+        res.json.items[0].data.status === 'watching' && res.json.items[0].data.score === 9);
+
   fakeDb(noop);
   res = await call(contentRoute, 'GET', { query: { type: 'hack' } });
   check('未知类型 → 400', res.statusCode === 400, String(res.statusCode));
@@ -429,6 +435,10 @@ console.log('\n=== 内容接口 /api/content ===');
   fakeDb(noop);
   res = await call(contentRoute, 'POST', { token: TOKEN, body: { type: 'nav_category', data: { name: '' } } });
   check('空名字 → 400', res.statusCode === 400, String(res.statusCode));
+
+  fakeDb(noop);
+  res = await call(contentRoute, 'POST', { token: TOKEN, body: { type: 'media', data: { category: 'book', name: 'x', status: 'wish' } } });
+  check('追更栏目非法（非追番/漫画）→ 400', res.statusCode === 400, String(res.statusCode));
 
   /* --- nav_link 必须挂在已存在的分类下 --- */
   fakeDb(() => []);
