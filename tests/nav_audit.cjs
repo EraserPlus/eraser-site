@@ -87,8 +87,8 @@ console.log('\n=== 本地存储 ===');
         /localStorage\.getItem\("nav\." \+ key\)/.test(html) &&
         /localStorage\.setItem\("nav\." \+ key/.test(html));
   const logical = [...new Set([...html.matchAll(/(?:load|save)\("([a-z]+)"/g)].map(m => m[1]))].sort();
-  check('只用了 3 个逻辑键：clicks / folded / stars',
-        logical.join(',') === 'clicks,folded,stars', logical.join(','));
+  check('只用了 5 个逻辑键：clicks / density / folded / recent / stars',
+        logical.join(',') === 'clicks,density,folded,recent,stars', logical.join(','));
   check('读写都包在 try/catch 里（隐私模式不炸）',
         (html.match(/try\s*\{[^}]*localStorage/g) || []).length >= 2);
   check('没有往 localStorage 存明文链接内容以外的敏感数据',
@@ -115,6 +115,17 @@ console.log('\n=== 功能点 ===');
     ['卡片新窗口打开且带 noopener', /rel = "noopener noreferrer"/],
     ['空状态提示', /没有匹配的链接/],
     ['搜索框关掉拼写检查', /spellcheck="false"/],
+    ['最近访问视图（第四个视图）', /data-view="recent"/],
+    ['最近访问记录与去重', /function pushRecent/],
+    ['桌面分类侧栏', /id="side"/],
+    ['移动端分类横滑条', /id="catbar"/],
+    ['分类筛选状态（cat）', /cat: state\.cat/],
+    ['密度切换（紧凑/舒适）', /id="btnDensity"/],
+    ['卡片复制链接按钮', /el\("span", "copy"/],
+    ['复制提示对 URL 转义', /esc\(link\.url\)/],
+    ['剪贴板 API + execCommand 兜底', /execCommand\("copy"\)/],
+    ['回到顶部按钮', /id="btnTop"/],
+    ['桌面/移动双端断点', /min-width:1024px/],
   ];
   must.forEach(([name, re]) => check(`包含：${name}`, re.test(html)));
 

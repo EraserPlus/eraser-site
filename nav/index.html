@@ -52,6 +52,29 @@ h1{font-size:26px;margin:0 0 4px;letter-spacing:-.2px}
 }
 .right button:hover{color:var(--ink);background:#f8fafc}
 
+/* ===== 双端布局：桌面左侧分类栏 + 右侧主区；移动端单列 + 横滑分类条 ===== */
+.layout{display:block}
+.main{min-width:0}
+.side{display:none}
+.side-title{font-size:12px;color:var(--muted);margin:0 0 8px 2px;letter-spacing:.08em}
+.catbar{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 6px;margin-bottom:8px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.catbar::-webkit-scrollbar{display:none}
+.catbar .chip{flex:0 0 auto;white-space:nowrap}
+@media(min-width:1024px){
+  .layout{display:grid;grid-template-columns:210px minmax(0,1fr);gap:26px;align-items:start}
+  .side{display:block;position:sticky;top:78px}
+  .catbar{display:none}
+  .sideitem{
+    display:flex;justify-content:space-between;align-items:center;width:100%;
+    font-family:inherit;font-size:14px;padding:9px 12px;border:none;background:transparent;
+    color:var(--ink);border-radius:9px;cursor:pointer;text-align:left;margin-bottom:2px;
+  }
+  .sideitem:hover{background:#f1f5f9}
+  .sideitem.active{background:var(--blue-l);color:var(--blue);font-weight:600}
+  .sideitem .n{font-size:12px;font-weight:400;color:var(--muted);background:rgba(15,23,42,.06);border-radius:20px;padding:1px 8px}
+  .sideitem.active .n{background:rgba(37,99,235,.12);color:var(--blue)}
+}
+
 /* 标签条 */
 .tagbar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
 .chip{
@@ -81,6 +104,14 @@ h1{font-size:26px;margin:0 0 4px;letter-spacing:-.2px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(252px,1fr));gap:10px}
 @media(max-width:600px){.grid{grid-template-columns:1fr}}
 
+/* 紧凑密度：一屏看更多，描述行收起来 */
+body.dense .grid{grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}
+body.dense a.card{padding:9px 11px;gap:9px}
+body.dense a.card .ico{flex-basis:28px;width:28px;height:28px;border-radius:8px;font-size:13px}
+body.dense a.card .ds{display:none}
+body.dense .cat{margin-bottom:18px}
+body.dense .cath button{font-size:15px}
+
 /* 卡片 */
 a.card{
   display:flex;gap:11px;align-items:flex-start;padding:12px 13px;
@@ -104,12 +135,16 @@ a.card .tg i{
   background:#f1f5f9;color:#64748b;cursor:pointer;
 }
 a.card .tg i:hover{background:var(--blue-l);color:var(--blue-d)}
-.star{
-  position:absolute;top:9px;right:10px;font-size:13px;color:#cbd5e1;cursor:pointer;
-  line-height:1;padding:2px 3px;
+/* 卡片右上角操作组：复制 + 星标 */
+.acts{position:absolute;top:8px;right:9px;display:flex;align-items:center;gap:1px}
+.acts .star,.acts .copy{
+  font-size:13px;color:#cbd5e1;cursor:pointer;line-height:1;padding:3px 4px;border-radius:6px;
+  font-family:inherit;
 }
-.star:hover{color:#f59e0b}
-.star.on{color:#f59e0b}
+.acts .copy{font-size:11px;padding:3px 5px}
+.acts .copy:hover{color:var(--blue);background:var(--blue-l)}
+.acts .star:hover{color:#f59e0b}
+.acts .star.on{color:#f59e0b}
 mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
 
 /* 空状态 / 提示 */
@@ -123,10 +158,29 @@ mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
 .footnote{color:var(--muted);font-size:12.5px;text-align:center;margin-top:34px;line-height:1.9}
 .footnote code{background:#f1f5f9;border-radius:4px;padding:1px 5px;font-size:12px}
 
+/* 回到顶部：滚动过一屏才出现，双端一致 */
+.btntop{
+  position:fixed;right:18px;bottom:22px;width:42px;height:42px;border-radius:50%;
+  border:1px solid var(--line);background:var(--card);color:var(--muted);font-size:17px;
+  display:none;align-items:center;justify-content:center;cursor:pointer;
+  box-shadow:0 2px 10px rgba(15,23,42,.10);z-index:50;font-family:inherit;
+}
+.btntop.show{display:flex}
+.btntop:hover{color:var(--blue);border-color:#bfdbfe}
+
+/* 移动端：输入框 16px 防 iOS 聚焦自动放大 */
+@media(max-width:600px){
+  #q{font-size:16px}
+  .container{padding:20px 14px 64px}
+  .toolbar{gap:8px}
+  .views button{padding:7px 12px}
+  .right button{padding:8px 12px}
+}
+
 /* ===== 暗色：跟随系统（纯 CSS，无 JS 无切换按钮） ===== */
 /* 覆盖上面 :root 的变量为暗色值（参照 admin 后台暗色方案，品牌蓝提亮保证对比度），
    并把本页硬编码的浅色表面/描边/文字逐一改成暗色，与变量配套。
-   说明：375px 宽度下 .grid 有 600px 断点、toolbar/tagbar/views 均已 flex-wrap，
+   说明：375px 宽度下 .grid 有 600px 断点、toolbar/tagbar/catbar 均已 flex/横滑，
    顶栏换行由 style.css 的 768px 断点负责（本页引了 style.css），实测无破损。
    图标底色/文字是 JS 里按名称生成的 hsl() 动态色（禁动逻辑），暗色下保持原样。 */
 @media (prefers-color-scheme: dark){
@@ -153,12 +207,22 @@ mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
   a.card:hover{ border-color:#1e3a5f; }
   a.card .url{ color:var(--muted); }
   a.card .tg i{ background:var(--sunk); color:var(--muted); }
-  .star{ color:#4b5563; }
+  .acts .star,.acts .copy{ color:#4b5563; }
+  .acts .copy:hover{ color:var(--blue); background:var(--blue-l); }
+  .acts .star:hover,.acts .star.on{ color:#f59e0b; }
   .footnote code{ background:var(--sunk); }
   .searchwrap kbd{ background:var(--sunk); }
   .note.ok{ border-color:#1f4429; color:var(--green); }
   .note.warn{ border-color:#4a3a12; color:var(--amber); }
   .note.err{ border-color:#4a1f1f; color:var(--red); }
+  .side-title{ color:var(--muted); }
+  .sideitem{ color:var(--ink); }
+  .sideitem:hover{ background:var(--sunk); }
+  .sideitem.active{ background:var(--blue-l); color:var(--blue); }
+  .sideitem .n{ background:rgba(255,255,255,.06); color:var(--muted); }
+  .sideitem.active .n{ background:rgba(96,165,250,.16); color:var(--blue); }
+  .btntop{ background:var(--card); border-color:var(--line); color:var(--muted); box-shadow:0 2px 10px rgba(0,0,0,.4); }
+  .btntop:hover{ color:var(--blue); border-color:#1e3a5f; }
 }
 </style>
 </head>
@@ -191,8 +255,10 @@ mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
       <button type="button" data-view="all" class="active">全部</button>
       <button type="button" data-view="star">星标</button>
       <button type="button" data-view="top">常用</button>
+      <button type="button" data-view="recent">最近</button>
     </div>
     <div class="right">
+      <button type="button" id="btnDensity" title="一屏看更多，描述行收起来">紧凑模式</button>
       <button type="button" id="btnFold">折叠全部</button>
       <button type="button" id="btnExport">导出 links.js</button>
       <button type="button" id="btnImport">导入</button>
@@ -200,18 +266,29 @@ mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
     </div>
   </div>
 
-  <div class="tagbar" id="tagbar"></div>
-  <div class="count" id="count"></div>
-  <div class="note hide" id="note"></div>
+  <div class="layout">
+    <aside class="side" id="side" aria-label="分类导航">
+      <div class="side-title">分类</div>
+      <div id="sideList"></div>
+    </aside>
+    <div class="main">
+      <div class="catbar" id="catbar"></div>
+      <div class="tagbar" id="tagbar"></div>
+      <div class="count" id="count"></div>
+      <div class="note hide" id="note"></div>
 
-  <div id="content"></div>
+      <div id="content"></div>
 
-  <p class="footnote">
-    加链接请改 <code>nav/links.js</code>，格式说明写在该文件开头<br>
-    快捷键：<code>/</code> 搜索 · <code>↑</code><code>↓</code> 选择 · <code>Enter</code> 打开 · <code>Esc</code> 清空<br>
-    星标和常用次数存在浏览器本地，换设备不会同步
-  </p>
+      <p class="footnote">
+        链接可在「后台 → 导航」标签里管理；<code>nav/links.js</code> 是断网兜底数据<br>
+        快捷键：<code>/</code> 搜索 · <code>↑</code><code>↓</code> 选择 · <code>Enter</code> 打开 · <code>Esc</code> 清空<br>
+        星标、常用和最近访问存在浏览器本地，换设备不会同步
+      </p>
+    </div>
+  </div>
 </div>
+
+<button type="button" id="btnTop" class="btntop" aria-label="回到顶部" title="回到顶部">↑</button>
 
 <script src="links.js"></script>
 
@@ -282,6 +359,24 @@ function matchesTags(link, tags){
   return true;
 }
 
+/* 最近访问：recents 是 [{url, t}]（t 为毫秒时间戳）。
+   按时间倒序去重，只保留数据里还存在的链接，最多 limit 条。 */
+function recentLinks(data, recents, limit){
+  var seen = {}, out = [];
+  var all = allLinks(data);
+  var sorted = (recents || []).slice().sort(function(a, b){ return ((b && b.t) || 0) - ((a && a.t) || 0); });
+  for (var k = 0; k < sorted.length; k++){
+    var r = sorted[k];
+    if (!r || !r.url || seen[r.url]) continue;
+    seen[r.url] = 1;
+    for (var i = 0; i < all.length; i++){
+      if (all[i].url === r.url){ out.push(all[i]); break; }
+    }
+    if (limit && out.length >= limit) break;
+  }
+  return out;
+}
+
 /* 返回过滤后的分类；空分类会被丢掉 */
 function filterCategories(data, opts){
   opts = opts || {};
@@ -290,9 +385,32 @@ function filterCategories(data, opts){
   var stars = opts.stars || [];
   var clicks = opts.clicks || {};
   var view = opts.view || "all";
+  var cat = opts.cat || "";
   var out = [];
 
+  /* 最近视图：先按时间倒序取出最近访问，再按分类归组，组内也按时间排 */
+  if (view === "recent"){
+    var recent = recentLinks(data, opts.recents, opts.recentLimit || 30);
+    var rank = {};
+    recent.forEach(function(l, i){ rank[l.url] = i; });
+    categoriesOf(data).forEach(function(c){
+      if (cat && c.id !== cat) return;
+      var links = (c.links || []).filter(function(l){
+        if (rank[l.url] === undefined) return false;
+        if (!matchesQuery(l, terms, c.name)) return false;
+        if (!matchesTags(l, tags)) return false;
+        return true;
+      });
+      if (links.length){
+        links.sort(function(a, b){ return rank[a.url] - rank[b.url]; });
+        out.push({ id: c.id, name: c.name, links: links });
+      }
+    });
+    return out;
+  }
+
   categoriesOf(data).forEach(function(c){
+    if (cat && c.id !== cat) return;
     var links = (c.links || []).filter(function(l){
       if (!matchesQuery(l, terms, c.name)) return false;
       if (!matchesTags(l, tags)) return false;
@@ -370,6 +488,7 @@ return {
   norm: norm, hostOf: hostOf, initialOf: initialOf, hueOf: hueOf,
   categoriesOf: categoriesOf, allLinks: allLinks, countLinks: countLinks,
   parseQuery: parseQuery, matchesQuery: matchesQuery, matchesTags: matchesTags,
+  recentLinks: recentLinks,
   filterCategories: filterCategories, collectTags: collectTags,
   matchRanges: matchRanges, serialize: serialize, parseImport: parseImport
 };
@@ -416,20 +535,26 @@ var state = {
   query: "",
   tags: [],
   view: "all",
+  cat: "",
+  density: load("density", "comfy"),
   stars: load("stars", []),
   clicks: load("clicks", {}),
+  recent: load("recent", []),
   folded: load("folded", {})
 };
 var sel = -1;
+var RECENT_MAX = 50;      /* 最近访问最多记多少条 */
+var RECENT_SHOW = 30;     /* 最近视图最多展示多少条 */
 
 var qEl = $("q"), kbdHint = $("kbdHint"), tagbar = $("tagbar"), content = $("content"),
     countEl = $("count"), noteEl = $("note"), viewsEl = $("views"),
     btnFold = $("btnFold"), btnExport = $("btnExport"), btnImport = $("btnImport"),
-    fileImport = $("fileImport");
+    btnDensity = $("btnDensity"), btnTop = $("btnTop"),
+    fileImport = $("fileImport"), sideList = $("sideList"), catbar = $("catbar");
 
 /* ---------- 提示条 ---------- */
 var noteTimer = null;
-/* 只用于我们自己拼的静态文案；任何来自文件的内容都要先 esc() */
+/* 只用于我们自己拼的静态文案；任何来自文件/数据的内容都要先 esc() */
 function esc(s){
   return String(s == null ? "" : s)
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -455,6 +580,27 @@ function highlighted(text, terms, cls){
   });
   if (pos < s.length) span.appendChild(document.createTextNode(s.slice(pos)));
   return span;
+}
+
+/* ---------- 复制到剪贴板（clipboard API + 老浏览器兜底） ---------- */
+function copyText(text, done){
+  var ok = false;
+  function fallback(){
+    try {
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+    } catch (e) { ok = false; }
+    done(ok);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(function(){ done(true); }, fallback);
+  } else {
+    fallback();
+  }
 }
 
 /* ---------- 单张卡片 ---------- */
@@ -493,7 +639,21 @@ function buildCard(link, terms){
   }
   a.appendChild(body);
 
-  /* 星标 */
+  /* 右上角操作组：复制 + 星标 */
+  var acts = el("span", "acts");
+
+  var copy = el("span", "copy", "复制");
+  copy.title = "复制链接";
+  copy.addEventListener("click", function(ev){
+    ev.preventDefault();
+    ev.stopPropagation();
+    copyText(link.url, function(ok){
+      note(ok ? "已复制 <b>" + esc(link.url) + "</b>"
+              : "复制失败，请手动选择网址复制", ok ? "ok" : "err");
+    });
+  });
+  acts.appendChild(copy);
+
   var starred = state.stars.indexOf(link.url) !== -1;
   var star = el("span", "star" + (starred ? " on" : ""), starred ? "★" : "☆");
   star.title = starred ? "取消星标" : "加星标";
@@ -502,14 +662,56 @@ function buildCard(link, terms){
     ev.stopPropagation();
     toggleStar(link.url);
   });
-  a.appendChild(star);
+  acts.appendChild(star);
+  a.appendChild(acts);
 
   a.addEventListener("click", function(){
     state.clicks[link.url] = (state.clicks[link.url] || 0) + 1;
     save("clicks", state.clicks);
+    pushRecent(link.url);
   });
 
   return a;
+}
+
+/* ---------- 最近访问 ---------- */
+function pushRecent(url){
+  var list = state.recent.filter(function(r){ return r && r.url !== url; });
+  list.unshift({ url: url, t: Date.now() });
+  if (list.length > RECENT_MAX) list = list.slice(0, RECENT_MAX);
+  state.recent = list;
+  save("recent", list);
+}
+
+/* ---------- 分类筛选（桌面侧栏 + 移动端横滑条，同一套数据） ---------- */
+function catButtons(){
+  var wrap = document.createDocumentFragment();
+  var all = el("button", "sideitem" + (state.cat ? "" : " active"));
+  all.type = "button";
+  all.appendChild(el("span", null, "全部分类"));
+  all.appendChild(el("span", "n", String(C.countLinks(state.data))));
+  all.addEventListener("click", function(){ setCat(""); });
+  wrap.appendChild(all);
+  C.categoriesOf(state.data).forEach(function(c){
+    var b = el("button", "sideitem" + (state.cat === c.id ? " active" : ""));
+    b.type = "button";
+    b.title = c.name;
+    b.appendChild(el("span", null, c.name));
+    b.appendChild(el("span", "n", String((c.links || []).length)));
+    b.addEventListener("click", function(){ setCat(c.id); });
+    wrap.appendChild(b);
+  });
+  return wrap;
+}
+function setCat(id){
+  state.cat = (id === state.cat) ? "" : id;
+  render();
+}
+function renderCatNav(){
+  sideList.textContent = "";
+  sideList.appendChild(catButtons());
+  catbar.textContent = "";
+  catbar.appendChild(catButtons());
 }
 
 /* ---------- 标签条 ---------- */
@@ -546,21 +748,39 @@ function toggleStar(url){
   render();
 }
 
+/* ---------- 密度 ---------- */
+function applyDensity(){
+  document.body.classList.toggle("dense", state.density === "compact");
+  btnDensity.textContent = state.density === "compact" ? "舒适模式" : "紧凑模式";
+}
+btnDensity.addEventListener("click", function(){
+  state.density = state.density === "compact" ? "comfy" : "compact";
+  save("density", state.density);
+  applyDensity();
+});
+
 /* ---------- 主渲染 ---------- */
 function render(){
   var terms = C.parseQuery(state.query);
   var cats = C.filterCategories(state.data, {
     query: state.query, tags: state.tags, view: state.view,
-    stars: state.stars, clicks: state.clicks
+    cat: state.cat, stars: state.stars, clicks: state.clicks,
+    recents: state.recent, recentLimit: RECENT_SHOW
   });
   var shown = cats.reduce(function(n, c){ return n + c.links.length; }, 0);
   var total = C.countLinks(state.data);
 
   renderTagbar();
+  renderCatNav();
 
   /* 计数 */
-  if (state.query || state.tags.length || state.view !== "all"){
-    countEl.innerHTML = "找到 <b>" + shown + "</b> 条 · 共 " + total + " 条";
+  var catName = "";
+  if (state.cat){
+    C.categoriesOf(state.data).forEach(function(c){ if (c.id === state.cat) catName = c.name; });
+  }
+  if (state.query || state.tags.length || state.view !== "all" || state.cat){
+    countEl.innerHTML = (catName ? "「" + esc(catName) + "」" : "") +
+      "找到 <b>" + shown + "</b> 条 · 共 " + total + " 条";
   } else {
     countEl.innerHTML = "共 <b>" + total + "</b> 条";
   }
@@ -573,6 +793,10 @@ function render(){
       empty.innerHTML = "还没有星标站点。<br>把鼠标移到卡片右上角，点 ☆ 就能加星标。";
     } else if (state.view === "top"){
       empty.innerHTML = "还没有常用记录。<br>点开过的站点会按次数自动排到这里。";
+    } else if (state.view === "recent"){
+      empty.innerHTML = "还没有访问记录。<br>点开过的站点会按时间排到这里。";
+    } else if (state.cat){
+      empty.innerHTML = "这个分类下没有匹配的链接。<br>点「全部分类」看看别的。";
     } else {
       empty.innerHTML = "没有匹配的链接。<br>试试换个词，或者点上面的「清除标签」。";
     }
@@ -679,6 +903,14 @@ fileImport.addEventListener("change", function(){
   });
 });
 
+/* ---------- 回到顶部 ---------- */
+window.addEventListener("scroll", function(){
+  btnTop.classList.toggle("show", (window.pageYOffset || document.documentElement.scrollTop) > 600);
+}, { passive: true });
+btnTop.addEventListener("click", function(){
+  window.scrollTo({ top: 0, behavior: "smooth" });
+});
+
 /* ---------- 键盘 ---------- */
 document.addEventListener("keydown", function(e){
   var tag = (e.target && e.target.tagName || "").toLowerCase();
@@ -753,6 +985,7 @@ function navFromApi(j){
 
   /* 先用静态数据渲染，避免等接口时白屏 */
   applyData(window.NAV_DATA);
+  applyDensity();
 
   if (!window.fetch) return;
   fetch("/api/content?type=nav", { headers: { Accept: "application/json" } })

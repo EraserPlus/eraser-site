@@ -45,8 +45,8 @@ eraser-site/
 │   ├── api_routes_test.mjs 四个接口全流程：鉴权/CRUD/注入/限流/配置/PATCH 合并语义/RSS 订阅源（150 项）
 │   ├── pages_audit.mjs   8 个公开页面：结构/零站外资源/静态兜底/注入防护（119 项）
 │   ├── admin_audit.mjs   管理后台：主题/隐私/接口/安全/功能点（87 项）
-│   ├── nav_test.cjs      导航页核心逻辑：数据体检/查询/视图/高亮/导入导出（91 项）
-│   ├── nav_audit.cjs     导航页静态审计：结构/零外部请求/DOM 接线/功能点（54 项）
+│   ├── nav_test.cjs      导航页核心逻辑：数据体检/查询/视图/最近访问/高亮/导入导出（114 项）
+│   ├── nav_audit.cjs     导航页静态审计：结构/零外部请求/DOM 接线/功能点（65 项）
 │   ├── stubs/@neondatabase/serverless/   手写假驱动（只记录 SQL 不连库）
 │   └── stubs/@vercel/blob/               手写假驱动（只记录 put 调用不连 Blob）
 │
@@ -54,7 +54,7 @@ eraser-site/
 │
 ├── about/index.html      关于页（内容可在后台改）
 ├── nav/                  网址导航页
-│   ├── index.html        全部界面与逻辑（约 26KB）
+│   ├── index.html        全部界面与逻辑（约 37KB，桌面侧栏 + 移动横滑双端布局）
 │   └── links.js          静态兜底数据（纯数据，无代码）
 ├── blog/
 │   ├── index.html        文章列表（读 /api/content?type=post）
@@ -231,9 +231,9 @@ await sql`
 | `tests/api_routes_test.mjs` | 四个接口全流程：未登录 401、CRUD、入参 400、404、405、优先级、SQL 注入、登录限流、缺配置 503、409 唯一性、级联删除、响应头、PATCH 合并语义（只更新出现的字段，done_at 三态）、RSS 订阅源（公开/草稿过滤/XML 转义/空库合法）、文件上传（401/405/503/超 4MB/空 body/文件名清洗/路径穿越） | 170 |
 | `tests/pages_audit.mjs` | 8 个公开页：内联脚本语法、零站外资源、同源 fetch、导航栏统一、静态兜底、Markdown 安全、各页功能点 | 119 |
 | `tests/admin_audit.mjs` | 后台：结构、深浅色主题、隐私（noindex/零站外资源）、Bearer 令牌、XSS 防护、七个标签功能点 | 87 |
-| `tests/nav_test.cjs` | 导航核心逻辑：links.js 数据体检、hostOf/initialOf/hueOf、查询匹配、分类过滤、标签收集、高亮区间、导入导出往返、真实数据全视图 | 91 |
-| `tests/nav_audit.cjs` | 导航静态审计：结构、零外部请求、DOM 接线、localStorage 键规范、功能点、全站一致性 | 54 |
-| **合计** | | **732** |
+| `tests/nav_test.cjs` | 导航核心逻辑：links.js 数据体检、hostOf/initialOf/hueOf、查询匹配、分类过滤（含侧栏 cat）、最近访问、标签收集、高亮区间、导入导出往返、真实数据全视图 | 114 |
+| `tests/nav_audit.cjs` | 导航静态审计：结构、零外部请求、DOM 接线、localStorage 键规范、功能点（含最近视图/密度切换/复制/回到顶部）、全站一致性 | 65 |
+| **合计** | | **775** |
 
 > 注：`api_test.mjs` 的项数随 `api/` 与 `admin/` 下的 `.js` 文件数浮动（每个文件一条语法断言）；`api/hello.js` 删除后为 102，`api/rss.js` 加入后为 103，`api/upload.js` 加入后为 104。
 
