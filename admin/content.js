@@ -21,7 +21,8 @@
         { k: "name", l: "名称", t: "text", ph: "比如：GitHub", req: true },
         { k: "url", l: "网址", t: "text", ph: "https://…", req: true },
         { k: "desc", l: "说明（可空）", t: "text", ph: "一句话说明" },
-        { k: "tags", l: "标签（逗号分隔）", t: "tags", ph: "代码, 英文" }
+        { k: "tags", l: "标签（逗号分隔）", t: "tags", ph: "代码, 英文" },
+        { k: "keywords", l: "搜索关键词（逗号分隔）", t: "tags", ph: "别名、拼音、缩写，搜这些词也能找到" }
       ]
     },
     post: {
@@ -66,6 +67,19 @@
   }
   function tagsToText(t) { return Array.isArray(t) ? t.join(", ") : (t || ""); }
 
+  /* ---------------- 草稿自动保存（写长文不怕误关） ---------------- */
+  function draftKeyOf(type) { return "eraser.admin.draft." + type; }
+  function loadDraft(key) {
+    try { return localStorage.getItem(key) || ""; } catch (e) { return ""; }
+  }
+  function saveDraft(key, value) {
+    try { if (value && value.trim()) localStorage.setItem(key, value); else localStorage.removeItem(key); } catch (e) {}
+  }
+  function clearDraft(key) {
+    try { localStorage.removeItem(key); } catch (e) {}
+  }
+  var draftTimers = [];
+
   /* ---------------- 通用表单 ---------------- */
   /* 返回一个 <div>，调用 form.read() 取数据、form.fill(item) 回填 */
   function buildForm(type, onSave, onCancel) {
@@ -82,18 +96,43 @@
         var ta = el("textarea");
         ta.rows = 12;
         ta.placeholder = "支持 Markdown：# 标题、**粗体**、- 列表、`代码`、[链接](https://…)、```代码块```";
+        /* 实时预览：输入即渲染，不用点「预览」按钮 */
+        var prev = el("div", "mdprev");
+        var cnt = el("div", "mdcnt");
+        var dkey = draftKeyOf(type);
+        function paint() {
+          cnt.textContent = ta.value.length + " 字";
+          prev.innerHTML = md ? md.render(ta.value) : "";
+        }
+        ta.addEventListener("input", function () { paint(); saveDraft(dkey, ta.value); });
+        ta.addEventListener("blur", function () { saveDraft(dkey, ta.value); });
+        var dt = setInterval(function () { saveDraft(dkey, ta.value); }, 3000);
+        draftTimers.push(dt);
+
+        /* 有未保存草稿时给出恢复/丢弃条 */
+        var saved = loadDraft(dkey);
+        if (saved && saved.trim()) {
+          var dbar = el("div", "draftbar");
+          dbar.appendChild(el("span", null, "检测到未保存的草稿（" + saved.length + " 字）"));
+          var rb = el("button", "btn ghost sm", "恢复");
+          rb.type = "button";
+          rb.addEventListener("click", function () { ta.value = saved; paint(); });
+          var db = el("button", "btn ghost sm", "丢弃");
+          db.type = "button";
+          db.addEventListener("click", function () {
+            clearDraft(dkey);
+            if (dbar.parentNode) dbar.parentNode.removeChild(dbar);
+          });
+          dbar.appendChild(rb); dbar.appendChild(db);
+          wrap.appendChild(dbar);
+        }
+
         wrap.appendChild(ta);
-        inputs[f.k] = ta;
-        var prev = el("div", "mdprev hide");
-        var btn = el("button", "btn ghost sm mdprevbtn", "预览");
-        btn.type = "button";
-        btn.addEventListener("click", function () {
-          var on = prev.classList.toggle("hide");
-          btn.textContent = on ? "预览" : "收起预览";
-          if (!on) prev.innerHTML = md ? md.render(ta.value) : "";
-        });
-        wrap.appendChild(btn);
+        wrap.appendChild(cnt);
         wrap.appendChild(prev);
+        inputs[f.k] = ta;
+        box.mdKeys = box.mdKeys || [];
+        box.mdKeys.push(dkey);
       } else if (f.t === "bool") {
         var cb = el("input");
         cb.type = "checkbox";
@@ -197,6 +236,10 @@
     box.appendChild(acts);
 
     box.read = function () { return inputs; };
+    /* 保存成功后由调用方触发：清掉已入库内容的草稿 */
+    box.clearDraft = function () {
+      (box.mdKeys || []).forEach(function (k) { clearDraft(k); });
+    };
     box.fill = function (data) {
       spec.fields.forEach(function (f) {
         var v = data ? data[f.k] : "";
@@ -236,6 +279,8 @@
     if (formNode.focusFirst) formNode.focusFirst();
   }
   function closeForm() {
+    draftTimers.forEach(function (t) { clearInterval(t); });
+    draftTimers.length = 0;
     if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
     overlay = null;
     document.body.style.overflow = "";
@@ -405,7 +450,7 @@
                   return api("content", {
                     method: "POST",
                     body: { type: "nav_link", parent_id: id,
-                            data: { name: l.name, url: l.url, desc: l.desc, tags: l.tags || [] } }
+                            data: { name: l.name, url: l.url, desc: l.desc, tags: l.tags || [], keywords: l.keywords || [] } }
                   });
                 });
               });
@@ -471,7 +516,11 @@
   function editItem(type, item, hostId, opts) {
     var form = buildForm(type, function (data, unlock) {
       var p = item ? update(item.id, data, unlock) : create(type, data, null, unlock);
-      p.then(function () { closeForm(); return reload(type); })
+      p.then(function () {
+        if (form.clearDraft) form.clearDraft();
+        closeForm();
+        return reload(type);
+      })
        .then(function () { renderList(type, hostId, opts); say("app", item ? "已保存" : "已添加"); });
     }, closeForm);
     form.fill(item ? item.data : null);

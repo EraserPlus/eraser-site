@@ -134,6 +134,7 @@ console.log('\n=== 功能点 ===');
     ['搜索词在网址行也高亮', /highlighted\(C\.hostOf/],
     ['最近访问显示相对时间', /function relTime/],
     ['卡片悬停显示完整网址', /a\.title = link\.url/],
+    ['链接带搜索关键词（进搜索索引）', /link\.keywords/],
   ];
   must.forEach(([name, re]) => check(`包含：${name}`, re.test(html)));
 

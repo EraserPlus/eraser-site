@@ -447,6 +447,24 @@ console.log('\n=== 内容接口 /api/content ===');
   res = await call(contentRoute, 'POST', { token: TOKEN, body: { type: 'nav_link', parent_id: 1, data: { name: 'a', url: 'javascript:alert(1)' } } });
   check('伪协议网址 → 400', res.statusCode === 400, String(res.statusCode));
 
+  /* --- 搜索关键词 --- */
+  fakeDb((t) => /SELECT id FROM content WHERE id/.test(t) ? [{ id: 1 }] : [row({ id: 7, type: 'nav_link', data: { name: 'B站', url: 'https://bilibili.com', keywords: ['bilibili', '哔哩哔哩'] } })]);
+  res = await call(contentRoute, 'POST', { token: TOKEN, body: {
+    type: 'nav_link', parent_id: 1,
+    data: { name: 'B站', url: 'https://bilibili.com', keywords: 'bilibili, 哔哩哔哩，bilibili' }
+  } });
+  check('带搜索关键词保存 → 200', res.statusCode === 200, String(res.statusCode));
+  check('关键词被归一化成数组', JSON.stringify(res.json.item.data.keywords) === '["bilibili","哔哩哔哩"]',
+        JSON.stringify(res.json.item.data && res.json.item.data.keywords));
+
+  fakeDb((t) => /UPDATE/.test(t)
+    ? [row({ id: 8, type: 'nav_link', data: { name: '旧', url: 'https://old.com', keywords: ['x', 'y'] } })]
+    : [row({ id: 8, type: 'nav_link', data: { name: '旧', url: 'https://old.com' } })]);
+  res = await call(contentRoute, 'PATCH', { token: TOKEN, body: { id: 8, data: { keywords: ['x', 'y'] } } });
+  check('PATCH 补关键词 → 200', res.statusCode === 200, String(res.statusCode));
+  check('PATCH 后关键词合并生效', JSON.stringify(res.json.item.data.keywords) === '["x","y"]',
+        JSON.stringify(res.json.item.data && res.json.item.data.keywords));
+
   /* --- 唯一性 --- */
   fakeDb(() => [{ id: 5 }]);
   res = await call(contentRoute, 'POST', { token: TOKEN, body: { type: 'post', data: { slug: 'a', title: 't', content: 'c' } } });

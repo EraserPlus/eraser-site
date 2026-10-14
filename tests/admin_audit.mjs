@@ -139,16 +139,23 @@ console.log('\n=== 内容管理（导航 / 博客 / 文件 / 页面）===');
   catch (e) { check('admin/content.js 语法正确', false, e.message); }
 
   const cMust = [
-    ['四种内容都有字段定义', /nav_category:[\s\S]*nav_link:[\s\S]*post:[\s\S]*file:[\s\S]*page:/],
+    ['四种内容都有字段定义', /nav_category:[\s\S]*nav_link:[\s\S]*post:[\s\S]*page:/],
+    ['链接表单带搜索关键词字段', /\{ k: "keywords", l: "搜索关键词/],
     ['通用表单构建器', /function buildForm\(type, onSave, onCancel\)/],
     ['表单弹层', /function openForm\(title, formNode\)/],
     ['导航：可导入旧的 links.js', /function importFromLinksJs/],
     ['导入用 parseLinksJs 解析（links.js 是 JS literal，不能 JSON.parse）', /var data = parseLinksJs\(text\);/],
+    ['导入 links.js 时带上搜索关键词', /keywords: l\.keywords \|\| \[\]/],
     ['导航：分类可增删改', /function editCategory/],
     ['导航：链接可增删改', /function editLink/],
     ['删除前二次确认', /if \(!confirm\(/],
     ['失败时提示不静默', /catch\(function \(e\) \{ say\("app", e\.message, "err"\); \}\)/],
     ['Markdown 预览用 MD.render', /md\.render\(ta\.value\)/],
+    ['Markdown 实时预览（输入即渲染）', /ta\.addEventListener\("input", function \(\) \{ paint\(\)/],
+    ['草稿自动保存', /function saveDraft/],
+    ['草稿恢复/丢弃条', /检测到未保存的草稿/],
+    ['保存成功后清草稿', /box\.clearDraft/],
+    ['关弹层时停掉草稿定时器', /draftTimers\.forEach/],
   ];
   cMust.forEach(([name, re]) => check(`content.js 包含：${name}`, re.test(cjs)));
 

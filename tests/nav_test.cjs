@@ -94,6 +94,13 @@ console.log('\n=== 查询解析与匹配 ===');
   check('标签全中才通过', C.matchesTags(gh, ['代码', '英文']));
   check('标签缺一不通过', !C.matchesTags(gh, ['代码', '不存在']));
   check('链接没标签时被标签筛掉', !C.matchesTags({ name: 'x', url: 'y' }, ['代码']));
+
+  /* 搜索关键词（后台设置的别名）：名称不中，关键词中也要能搜到 */
+  const aliased = { name: 'Bilibili', url: 'https://bilibili.com', desc: '视频', tags: ['视频'], keywords: ['B站', '哔哩哔哩'] };
+  check('命中搜索关键词（中文别名）', C.matchesQuery(aliased, ['b站']));
+  check('命中搜索关键词（全称别名）', C.matchesQuery(aliased, ['哔哩哔哩']));
+  check('关键词也进 haystack', C.haystack(aliased, '').indexOf('b站') !== -1);
+  check('没关键词的老链接不受影响', C.matchesQuery({ name: 'x', url: 'https://x.com' }, ['x']));
 }
 
 console.log('\n=== 分类过滤 ===');

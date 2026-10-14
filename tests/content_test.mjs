@@ -59,6 +59,16 @@ console.log('\n=== nav_link ===');
   check('标签最多 20 个', t3.tags.length === 20, String(t3.tags.length));
   const t4 = C.normalize('nav_link', { name: 'a', url: 'https://a.com', tags: ['  x  ', '', '  '] });
   check('空标签被丢掉、标签去空格', JSON.stringify(t4.tags) === '["x"]', JSON.stringify(t4.tags));
+
+  const k1 = C.normalize('nav_link', { name: 'a', url: 'https://a.com', keywords: ['git', 'github', 'git'] });
+  check('关键词去重', JSON.stringify(k1.keywords) === '["git","github"]', JSON.stringify(k1.keywords));
+  const k2 = C.normalize('nav_link', { name: 'a', url: 'https://a.com', keywords: 'git, 代码托管，hub' });
+  check('关键词支持逗号分隔字符串（中英文逗号都行）', JSON.stringify(k2.keywords) === '["git","代码托管","hub"]', JSON.stringify(k2.keywords));
+  check('不传关键词给空数组', JSON.stringify(C.normalize('nav_link', { name: 'a', url: 'https://a.com' }).keywords) === '[]');
+  const k3 = C.normalize('nav_link', { name: 'a', url: 'https://a.com', keywords: Array(30).fill(0).map((_, i) => 'k' + i) });
+  check('关键词最多 20 个', k3.keywords.length === 20, String(k3.keywords.length));
+  const k4 = C.normalize('nav_link', { name: 'a', url: 'https://a.com', keywords: ['  x  ', '', '  '] });
+  check('空关键词被丢掉、去空格', JSON.stringify(k4.keywords) === '["x"]', JSON.stringify(k4.keywords));
 }
 
 console.log('\n=== post ===');

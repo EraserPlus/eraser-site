@@ -349,9 +349,10 @@ function parseQuery(q){
   return norm(q).split(/\s+/).filter(Boolean);
 }
 
-/* extra 用来把所属分类名也纳入搜索范围，这样搜「娱乐」能搜出该分类下的站 */
+/* extra 用来把所属分类名也纳入搜索范围，这样搜「娱乐」能搜出该分类下的站；
+   keywords 是后台给链接设的搜索关键词（别名），也一并进索引 */
 function haystack(link, extra){
-  return norm([link.name, link.url, link.desc, (link.tags || []).join(" "), extra || ""].join(" "));
+  return norm([link.name, link.url, link.desc, (link.tags || []).join(" "), (link.keywords || []).join(" "), extra || ""].join(" "));
 }
 
 function matchesQuery(link, terms, extra){
@@ -526,7 +527,7 @@ function toMarkdown(data){
 return {
   norm: norm, hostOf: hostOf, initialOf: initialOf, hueOf: hueOf,
   categoriesOf: categoriesOf, allLinks: allLinks, countLinks: countLinks,
-  parseQuery: parseQuery, matchesQuery: matchesQuery, matchesTags: matchesTags,
+  parseQuery: parseQuery, matchesQuery: matchesQuery, matchesTags: matchesTags, haystack: haystack,
   recentLinks: recentLinks, relTime: relTime, toMarkdown: toMarkdown,
   filterCategories: filterCategories, collectTags: collectTags,
   matchRanges: matchRanges, serialize: serialize, parseImport: parseImport
@@ -1029,7 +1030,8 @@ function navFromApi(j){
         name: c.data.name,
         links: links.filter(function(l){ return l.parent_id === c.id; })
           .map(function(l){
-            return { name: l.data.name, url: l.data.url, desc: l.data.desc, tags: l.data.tags || [] };
+            return { name: l.data.name, url: l.data.url, desc: l.data.desc,
+                     tags: l.data.tags || [], keywords: l.data.keywords || [] };
           })
       };
     }).filter(function(c){ return c.links.length; })
