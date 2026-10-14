@@ -12,7 +12,7 @@
 
 ```text
 eraser-site/
-├── index.html            首页（导航栏 + 五个分区卡片）
+├── index.html            首页 = 全站搜索（导航栏 + 搜索框 + 分组结果）
 ├── style.css             全站统一样式（改这里 = 公开页换肤）
 ├── md.js                 自研 Markdown 渲染器（内置转义，见「已知取舍」）
 ├── vercel.json           响应头配置：/api/ 不缓存，静态资源缓存 1 小时 + 安全头
@@ -45,9 +45,9 @@ eraser-site/
 ├── tests/                七套测试 + 测试用假数据库驱动
 │   ├── api_test.mjs      令牌/密码/入参校验/favicon SSRF 与魔数识别/api 与 admin 源文件语法（156 项）
 │   ├── content_test.mjs  六种内容类型归一化（含追更）/ Markdown 渲染与安全（136 项）
-│   ├── api_routes_test.mjs 接口全流程：鉴权/CRUD/注入/限流/PATCH 合并语义/RSS/上传/favicon/追更（206 项）
-│   ├── pages_audit.mjs   8 个公开页面（含追更/交接页）：结构/零站外资源/静态兜底/注入防护（154 项）
-│   ├── admin_audit.mjs   管理后台：主题/隐私/接口/安全/功能点（123 项）
+│   ├── api_routes_test.mjs 接口全流程：鉴权/CRUD/注入/限流/PATCH 合并语义/RSS/上传/favicon/追更（212 项）
+│   ├── pages_audit.mjs   7 个公开页面（含追更/交接页）：结构/零站外资源/静态兜底/注入防护（149 项）
+│   ├── admin_audit.mjs   管理后台：主题/隐私/接口/安全/功能点（124 项）
 │   ├── nav_test.cjs      导航页核心逻辑：数据体检/查询/视图/最近访问/高亮/导入导出（145 项）
 │   ├── nav_audit.cjs     导航页静态审计：结构/零外部请求/DOM 接线/功能点（79 项）
 │   ├── stubs/@neondatabase/serverless/   手写假驱动（只记录 SQL 不连库）
@@ -62,8 +62,6 @@ eraser-site/
 ├── blog/
 │   ├── index.html        文章列表（读 /api/content?type=post）
 │   └── post.html         文章详情（?slug=xxx，用 md.js 渲染正文）
-├── search/
-│   └── index.html        全站搜索页（读 /api/search，静态兜底）
 ├── collect/
 │   └── index.html        追更页（追番/漫画留档，读 /api/content?type=media）
 ├── dev/
@@ -75,7 +73,7 @@ eraser-site/
 
 ### 数据流（文字版）
 
-**公开页（7 个：/、/nav/、/blog/、/blog/post.html、/search/、/about/、/tools/）**
+**公开页（6 个分区 / 7 个页面：/（全站搜索）、/nav/、/blog/ 与 blog/post.html、/collect/、/about/、/tools/）**
 
 ```text
 打开页面
@@ -114,7 +112,7 @@ eraser-site/
 npm test
 ```
 
-一条命令按顺序跑完七套测试，共 **999 项**，全部通过即说明站点核心逻辑健康。
+一条命令按顺序跑完七套测试，共 **1001 项**，全部通过即说明站点核心逻辑健康。
 
 - **不需要真数据库 / 真 Blob**：`tests/stubs/` 里有手写的假 Neon 驱动（全局 `__FAKE_DB__` 预设 SQL 返回值）和假 @vercel/blob 驱动（全局 `__FAKE_BLOB__` 预设 put 返回值），只验证逻辑不连外部服务。
 - CI 里也是同一套路：`npm ci` 装回真包后，用假驱动覆盖 `node_modules/@neondatabase/serverless`，再 `npm test`。
@@ -254,12 +252,12 @@ T12 起密码生成器已下架（主人预留位置回头补内容），数组�
 | --- | --- | --- |
 | `tests/api_test.mjs` | 令牌签发/校验/过期/改密码失效、密码校验、safeEqual、requireAuth、配置自检、入参校验、favicon SSRF 防护与图片魔数识别、api/ 与 admin/ 源文件语法 | 156 |
 | `tests/content_test.mjs` | 六种内容类型归一化（含追更 media：栏目/状态枚举、评分 0-10、可空字段）、Markdown 渲染 / 图片 / 安全性 / 边界、plain() 摘要 | 136 |
-| `tests/api_routes_test.mjs` | 接口全流程：未登录 401、CRUD、入参 400、404、405、优先级、SQL 注入、登录限流、缺配置 503、409 唯一性、级联删除、响应头、PATCH 合并语义、RSS 订阅源、文件上传、favicon 代理、追更（公开读 / 非法栏目 400） | 206 |
-| `tests/pages_audit.mjs` | 8 个公开页面（含追更/开发交接页）：内联脚本语法、零站外资源、同源 fetch、导航栏统一、静态兜底、Markdown 安全、各页功能点 | 154 |
-| `tests/admin_audit.mjs` | 后台：结构、深浅色主题、隐私（noindex/零站外资源）、Bearer 令牌、XSS 防护、七个标签功能点（含追更表单与列表）、Markdown 实时预览与草稿自动保存 | 123 |
+| `tests/api_routes_test.mjs` | 接口全流程：未登录 401、CRUD、入参 400、404、405、优先级、SQL 注入、登录限流、缺配置 503、409 唯一性、级联删除、响应头、PATCH 合并语义、RSS 订阅源、文件上传、favicon 代理、追更（公开读 / 非法栏目 400） | 212 |
+| `tests/pages_audit.mjs` | 7 个公开页面（含追更/开发交接页）：内联脚本语法、零站外资源、同源 fetch、导航栏统一、静态兜底、Markdown 安全、各页功能点 | 149 |
+| `tests/admin_audit.mjs` | 后台：结构、深浅色主题、隐私（noindex/零站外资源）、Bearer 令牌、XSS 防护、七个标签功能点（含追更表单与列表）、Markdown 实时预览与草稿自动保存 | 124 |
 | `tests/nav_test.cjs` | 导航核心逻辑：links.js 数据体检、hostOf/initialOf/hueOf、查询匹配、分类过滤（含侧栏 cat）、最近访问、标签收集、高亮区间、导入导出往返、真实数据全视图 | 145 |
 | `tests/nav_audit.cjs` | 导航静态审计：结构、零外部请求、DOM 接线、localStorage 键规范、功能点（含最近视图/密度切换/复制/回到顶部）、全站一致性 | 79 |
-| **合计** | | **999** |
+| **合计** | | **1001** |
 
 > 注：`api_test.mjs` 的项数随 `api/` 与 `admin/` 下的 `.js` 文件数浮动（每个文件一条语法断言），当前为 156。
 
