@@ -145,6 +145,7 @@ console.log('\n=== 内容管理（导航 / 博客 / 页面）===');
     ['追更：栏目和状态用下拉框', /\{ k: "category", l: "栏目", t: "select"/],
     ['追更：状态四种齐全', /\["wish"[\s\S]*\["watching"[\s\S]*\["finished"[\s\S]*\["paused"/],
     ['追更：列表显示栏目 / 状态 / 评分', /category === "comic" \? "漫画" : "追番"/],
+    ['追更的链接与封面带上传按钮（可达）', /\{ file: \["url"\], media: \["url", "cover"\] \}/],
     ['下拉框有选项（select 构建）', /var sel = el\("select"\)/],
     ['链接表单带搜索关键词字段', /\{ k: "keywords", l: "搜索关键词/],
     ['通用表单构建器', /function buildForm\(type, onSave, onCancel\)/],

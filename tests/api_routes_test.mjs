@@ -834,6 +834,22 @@ console.log('\n=== 全站搜索 /api/search ===');
   check('SQL 覆盖了链接的关键词字段', executed.some(e => /keywords/.test(e.text)),
         executed.map(e => e.text).join(' | ').slice(0, 200));
 
+  /* 追更（media）也进搜索：有链接走原地址，没链接回落到追更页 */
+  fakeDb(() => [
+    row({ id: 4, type: 'media', data: { name: '葬送的芙莉莲', note: '周五更新 · 看到第 8 话', url: 'https://bgm.tv/subject/1' } }),
+    row({ id: 5, type: 'media', data: { name: '没填链接的条目', note: '先放着' } }),
+  ]);
+  r = await call(searchRoute, 'GET', { query: { q: '芙莉莲' } });
+  check('追更内容能搜到 → 200', r.statusCode === 200 && r.json.results.length === 2,
+        JSON.stringify(r.json).slice(0, 160));
+  check('追更标题取 name', r.json.results[0].title === '葬送的芙莉莲', r.json.results[0].title);
+  check('追更描述取 note', r.json.results[0].desc === '周五更新 · 看到第 8 话', r.json.results[0].desc);
+  check('追更有链接则指向原地址', r.json.results[0].url === 'https://bgm.tv/subject/1', r.json.results[0].url);
+  check('追更没链接则回落到 /collect/', r.json.results[1].url === '/collect/', r.json.results[1].url);
+  check('SQL 覆盖了追更的 name/note/url 字段',
+        executed.some(e => /'media'/.test(e.text) && /note/.test(e.text)),
+        executed.map(e => e.text).join(' | ').slice(0, 200));
+
   /* 注入防护：恶意字符串只作为参数，不拼进 SQL */
   const evil = "'; DROP TABLE content; --";
   executed = [];
