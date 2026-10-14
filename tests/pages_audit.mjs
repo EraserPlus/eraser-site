@@ -12,7 +12,8 @@ const check = (name, ok, extra) => {
 const read = (f) => fs.readFileSync(path.join(REPO, f), 'utf8');
 
 const PAGES = ['index.html', 'nav/index.html', 'blog/index.html', 'blog/post.html',
-               'search/index.html', 'about/index.html', 'tools/index.html'];
+               'search/index.html', 'about/index.html', 'tools/index.html',
+               'collect/index.html'];
 
 console.log('=== 所有页面（7 个）：结构与语法 ===');for (const f of PAGES) {
   const html = read(f);
@@ -72,6 +73,7 @@ console.log('\n=== 静态兜底：接口挂了也不能白屏 ===');
     ['about/index.html', /id="article"/, '正文有静态内容'],
     ['index.html', /id="welcomeTitle"/, '欢迎语有静态内容'],
     ['search/index.html', /id="q"/, '搜索框'],
+    ['collect/index.html', /id="hint-anime"/, '两个栏目有静态空状态'],
   ];
   for (const [f, re, what] of cases) {
     check(`${f} 保留${what}`, re.test(read(f)));
@@ -141,7 +143,7 @@ console.log('\n=== 首页 ===');
 {
   const html = read('index.html');
   check('欢迎语有 id 可被替换', /id="welcomeTitle"/.test(html) && /id="welcomeText"/.test(html));
-  check('四个分区卡片都在', (html.match(/class="card"/g) || []).length === 4);
+  check('五个分区卡片都在', (html.match(/class="card"/g) || []).length === 5);
   check('读取的是 home 这个页面标识', /"home"/.test(html));
 }
 
@@ -164,6 +166,19 @@ console.log('=== 工具箱页 ===');
   check('预留了加工具的接口说明', /预留接口/.test(html));
   check('工具名/描述用 textContent 渲染', /name\.textContent = t\.name/.test(html));
   check('密码生成器已下架', !fs.existsSync(path.join(REPO, 'tools', 'password.html')));
+}
+
+console.log('\n=== 追更页 ===');
+{
+  const html = read('collect/index.html');
+  check('两个栏目骨架（追番 / 漫画）', /id="list-anime"/.test(html) && /id="list-comic"/.test(html));
+  check('读的是 media 内容类型', /content\?type=media/.test(html));
+  check('看完的自动进收纳栏（按状态分流）', /status === "finished"/.test(html));
+  check('收纳栏默认收起、点击展开', /fold\.classList\.toggle\("open"\)/.test(html));
+  check('名称用 textContent 渲染（防注入）', /nm\.textContent = d\.name/.test(html));
+  check('站外链接只放行 http(s)', /function safeUrl/.test(html));
+  check('站外链接带 noopener', /noopener/.test(html));
+  check('封面图加载失败自动隐藏', /img\.addEventListener\("error"/.test(html));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

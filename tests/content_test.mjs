@@ -22,6 +22,7 @@ console.log('=== 类型识别 ===');
   check('post 是已知类型', C.knownType('post'));
   check('file 是已知类型', C.knownType('file'));
   check('page 是已知类型', C.knownType('page'));
+  check('media 是已知类型（追更）', C.knownType('media'));
   check('未知类型不被认', !C.knownType('hack'));
   check('原型链上的属性不算已知类型', !C.knownType('constructor') && !C.knownType('toString'));
   check('只有 nav_link 需要父分类',
@@ -101,6 +102,34 @@ console.log('\n=== file / page ===');
   check('page key 过滤非法字符', C.normalize('page', { key: 'a b/c!', title: 't', content: 'x' }).key === 'abc',
         C.normalize('page', { key: 'a b/c!', title: 't', content: 'x' }).key);
   check('page key 全非法时报错', code(() => C.normalize('page', { key: '!!!', title: 't', content: 'x' })) === 'BAD_INPUT');
+}
+
+console.log('\n=== media（追更）===');
+{
+  const base = { category: 'anime', name: '葬送的芙莉莲', status: 'watching' };
+  const r = C.normalize('media', base);
+  check('正常通过', r.category === 'anime' && r.name === '葬送的芙莉莲' && r.status === 'watching');
+  check('评分/备注/日期/链接/封面可留空',
+        r.score === null && r.note === null && r.date === null && r.url === null && r.cover === null);
+  check('名称去首尾空格', C.normalize('media', { ...base, name: '  x  ' }).name === 'x');
+  check('缺名称报错', code(() => C.normalize('media', { category: 'anime', status: 'wish' })) === 'BAD_INPUT');
+  check('栏目只能是追番/漫画', code(() => C.normalize('media', { ...base, category: 'book' })) === 'BAD_INPUT');
+  check('状态只能是四种之一', code(() => C.normalize('media', { ...base, status: 'watched' })) === 'BAD_INPUT');
+  check('四种状态都通过',
+        ['wish', 'watching', 'finished', 'paused'].every(s => C.normalize('media', { ...base, status: s }).status === s));
+  check('漫画栏目通过', C.normalize('media', { ...base, category: 'comic' }).category === 'comic');
+  check('评分接受数字字符串', C.normalize('media', { ...base, score: '9.0' }).score === 9);
+  check('评分接受数字', C.normalize('media', { ...base, score: 8.5 }).score === 8.5);
+  check('评分最多保留一位小数', C.normalize('media', { ...base, score: 8.47 }).score === 8.5);
+  check('评分空串等于不评分', C.normalize('media', { ...base, score: '' }).score === null);
+  check('评分为 0 合法', C.normalize('media', { ...base, score: 0 }).score === 0);
+  check('满分 10 合法', C.normalize('media', { ...base, score: 10 }).score === 10);
+  check('评分超上限报错', code(() => C.normalize('media', { ...base, score: 10.5 })) === 'BAD_INPUT');
+  check('评分负数报错', code(() => C.normalize('media', { ...base, score: -1 })) === 'BAD_INPUT');
+  check('评分非数字报错', code(() => C.normalize('media', { ...base, score: 'abc' })) === 'BAD_INPUT');
+  check('备注/日期/链接/封面正常保留',
+        C.normalize('media', { ...base, note: '周五更新', date: '2026-10-14', url: 'https://bgm.tv/subject/1', cover: 'https://x.com/c.jpg' }).note === '周五更新');
+  check('多传字段被丢掉', !('evil' in C.normalize('media', { ...base, evil: 1 })));
 }
 
 console.log('\n=== 未知类型 ===');

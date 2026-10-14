@@ -1,7 +1,7 @@
 /* ===========================================================================
    站点内容的类型定义与校验
    ---------------------------------------------------------------------------
-   五种类型共用一张 content 表，各自的字段放在 data(jsonb) 里。
+   六种类型共用一张 content 表，各自的字段放在 data(jsonb) 里。
    这里负责：每个类型允许哪些字段、怎么校验、怎么归一化。
    =========================================================================== */
 
@@ -30,6 +30,11 @@ const TYPES = {
     public: true,
     needsParent: false,
     fields: ['key', 'title', 'content'],
+  },
+  media: {
+    public: true,
+    needsParent: false,
+    fields: ['category', 'name', 'status', 'score', 'note', 'date', 'url', 'cover'],
   },
 };
 
@@ -118,6 +123,29 @@ export function normalize(type, raw) {
     if (!out.key) throw bad('页面标识只能用小写字母、数字、下划线和连字符');
     out.title = str(d.title, '标题', { max: 200 });
     out.content = str(d.content, '正文', { max: 100000 });
+  } else if (type === 'media') {
+    /* 追更：追番 / 漫画的留档记录 */
+    const cat = str(d.category, '栏目', { max: 20 });
+    if (cat !== 'anime' && cat !== 'comic') throw bad('栏目只能是 anime（追番）或 comic（漫画）');
+    out.category = cat;
+    out.name = str(d.name, '名称', { max: 120 });
+    const st = str(d.status, '状态', { max: 20 });
+    if (st !== 'wish' && st !== 'watching' && st !== 'finished' && st !== 'paused') {
+      throw bad('状态只能是 wish / watching / finished / paused');
+    }
+    out.status = st;
+    const sc = d.score;
+    if (sc == null || sc === '') {
+      out.score = null;
+    } else {
+      const n = Number(sc);
+      if (!Number.isFinite(n) || n < 0 || n > 10) throw bad('评分要填 0 到 10 之间的数字，留空表示不评分');
+      out.score = Math.round(n * 10) / 10;   // 最多一位小数
+    }
+    out.note = str(d.note, '备注', { max: 200, required: false });
+    out.date = str(d.date, '日期', { max: 20, required: false });
+    out.url = str(d.url, '链接', { max: 2000, required: false });
+    out.cover = str(d.cover, '封面图地址', { max: 2000, required: false });
   }
 
   return out;

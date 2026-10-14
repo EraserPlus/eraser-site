@@ -121,15 +121,16 @@ console.log('\n=== 功能点 ===');
 console.log('\n=== 内容管理（导航 / 博客 / 页面）===');
 {
   const must = [
-    ['六个标签页', /data-tab="today"[\s\S]*data-tab="todos"[\s\S]*data-tab="events"[\s\S]*data-tab="nav"[\s\S]*data-tab="post"[\s\S]*data-tab="page"/],
+    ['七个标签页', /data-tab="today"[\s\S]*data-tab="todos"[\s\S]*data-tab="events"[\s\S]*data-tab="nav"[\s\S]*data-tab="post"[\s\S]*data-tab="media"[\s\S]*data-tab="page"/],
     ['导航标签内容区', /id="tab-nav"[\s\S]*id="navHost"/],
     ['博客标签内容区', /id="tab-post"[\s\S]*id="postHost"/],
+    ['追更标签内容区', /id="tab-media"[\s\S]*id="mediaHost"/],
     ['页面标签内容区', /id="tab-page"[\s\S]*id="pageHost"/],
     ['加载了 Markdown 渲染器', /<script src="\.\.\/md\.js"><\/script>/],
     ['加载了内容管理模块', /<script src="content\.js"><\/script>/],
     ['初始化时把 api 和 say 传进去', /ContentAdmin\.init\(\{\s*api:\s*api,\s*say:\s*say\s*\}\)/],
     ['切标签时调用内容渲染', /ContentAdmin\.render\(tab\)/],
-    ['标签栏可横向滚动（手机上有 6 个标签）', /\.tabs\{\s*overflow-x:auto/],
+    ['标签栏可横向滚动（手机上有 7 个标签）', /\.tabs\{\s*overflow-x:auto/],
     ['表单弹层样式', /\.cf-overlay\{/],
     ['Markdown 预览样式', /\.mdprev\{/],
   ];
@@ -140,7 +141,11 @@ console.log('\n=== 内容管理（导航 / 博客 / 页面）===');
   catch (e) { check('admin/content.js 语法正确', false, e.message); }
 
   const cMust = [
-    ['四种内容都有字段定义', /nav_category:[\s\S]*nav_link:[\s\S]*post:[\s\S]*page:/],
+    ['五种内容都有字段定义', /nav_category:[\s\S]*nav_link:[\s\S]*post:[\s\S]*page:[\s\S]*media:/],
+    ['追更：栏目和状态用下拉框', /\{ k: "category", l: "栏目", t: "select"/],
+    ['追更：状态四种齐全', /\["wish"[\s\S]*\["watching"[\s\S]*\["finished"[\s\S]*\["paused"/],
+    ['追更：列表显示栏目 / 状态 / 评分', /category === "comic" \? "漫画" : "追番"/],
+    ['下拉框有选项（select 构建）', /var sel = el\("select"\)/],
     ['链接表单带搜索关键词字段', /\{ k: "keywords", l: "搜索关键词/],
     ['通用表单构建器', /function buildForm\(type, onSave, onCancel\)/],
     ['表单弹层', /function openForm\(title, formNode\)/],
