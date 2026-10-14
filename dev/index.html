@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>开发交接 · Eraser 的小站</title>
+<link rel="stylesheet" href="../style.css">
+<style>
+/* 交接页专属：文档风格（标题锚线 / 表格 / 代码块 / 提示块 / 步骤） */
+.doc-head { background: var(--card); border-bottom: 1px solid var(--line); padding: 12px 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.doc-head .logo { font-weight: 700; font-size: 17px; color: var(--logo); }
+.doc-head a { color: var(--ink3); font-size: 14px; }
+.doc-head .tag { margin-left: auto; font-size: 12px; color: var(--muted); }
+.doc h2 { font-size: 19px; margin: 36px 0 12px; padding-left: 10px; border-left: 3px solid var(--blue); }
+.doc h3 { font-size: 15px; margin: 20px 0 8px; }
+.doc p { margin: 8px 0; }
+.doc ul, .doc ol { margin: 8px 0 8px 22px; }
+.doc li { margin: 4px 0; }
+.doc table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+.doc th, .doc td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+.doc th { background: var(--sunk); font-weight: 600; white-space: nowrap; }
+.doc code { background: var(--sunk); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+.doc pre { background: var(--sunk); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; overflow-x: auto; font-family: ui-monospace, Consolas, monospace; font-size: 13px; line-height: 1.6; margin: 10px 0; }
+.doc pre code { background: none; border: none; padding: 0; }
+.callout { border-radius: 10px; padding: 14px 16px; margin: 14px 0; font-size: 14px; border: 1px solid; }
+.callout.blue { background: rgba(37,99,235,.07); border-color: rgba(37,99,235,.35); }
+.callout.red { background: rgba(207,34,46,.07); border-color: rgba(207,34,46,.35); }
+.callout.amber { background: rgba(154,103,0,.08); border-color: rgba(154,103,0,.35); }
+@media (prefers-color-scheme: dark) {
+  .callout.blue { background: rgba(96,165,250,.08); border-color: rgba(96,165,250,.35); }
+  .callout.red { background: rgba(248,81,73,.08); border-color: rgba(248,81,73,.35); }
+  .callout.amber { background: rgba(210,153,34,.08); border-color: rgba(210,153,34,.35); }
+}
+.callout b { display: block; margin-bottom: 4px; }
+.steps { counter-reset: st; list-style: none; margin-left: 0 !important; }
+.steps li { counter-increment: st; position: relative; padding: 10px 0 10px 44px; border-bottom: 1px dashed var(--line); }
+.steps li:last-child { border-bottom: none; }
+.steps li::before { content: counter(st); position: absolute; left: 4px; top: 10px; width: 26px; height: 26px; border-radius: 50%; background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; }
+@media (prefers-color-scheme: dark) { .steps li::before { color: #0d1117; } }
+.steps li b { margin-right: 4px; }
+.timeline { margin: 12px 0; font-size: 14px; }
+.timeline .row { display: flex; gap: 12px; padding: 6px 0; border-bottom: 1px dashed var(--line); }
+.timeline .row:last-child { border-bottom: none; }
+.timeline .when { color: var(--muted); white-space: nowrap; width: 84px; flex-shrink: 0; }
+.timeline .what { flex: 1; }
+.timeline .no { font-weight: 600; width: 56px; flex-shrink: 0; }
+.timeline .row.latest .no { color: var(--blue); }
+@media (max-width: 560px) {
+  .timeline .row { flex-wrap: wrap; }
+  .timeline .when { width: auto; }
+}
+</style>
+</head>
+<body>
+<div class="doc-head">
+  <span class="logo">🧩 Eraser 的小站</span>
+  <a href="../index.html">← 回首页</a>
+  <span class="tag">开发交接 · 最后更新 2026-10-14</span>
+</div>
+<div class="container doc">
+  <h1>开发交接</h1>
+  <p class="muted">这一页写给「接手的下一个人 / 下一个 AI」：读完它，你就能接着开发这个小站，不踩坑、不断线。</p>
+
+  <div class="callout blue">
+    <b>🤖 你是接手的 AI？先做三件事：</b>
+    ① 读完全页（大约 3 分钟）；② 找到本机工作副本，对照「工作流程」第 1 步核对版本；③ 向站长确认本次要做什么，然后照「工作流程」六步执行。不确定的地方参考「红线与约定」，别自由发挥。
+  </div>
+
+  <h2>0. 一句话认识这个站</h2>
+  <p><b>Eraser 的个人小站</b>：不面向公众、无商业、单人使用，一切取舍以「一个人用起来省事」为准。现在是：首页 / 搜索 / 工具箱 / 博客 / <b>追更</b> / 导航 / 关于 七个前台页面 + 一个带 7 个标签的后台。</p>
+
+  <h2>1. 项目速览</h2>
+  <table>
+    <tr><th>站点</th><td><a href="https://eraser.de5.net" rel="noopener">eraser.de5.net</a>（备用域名 eraser.888.moe 待配置）</td></tr>
+    <tr><th>代码仓库</th><td><a href="https://github.com/EraserPlus/eraser-site" rel="noopener">github.com/EraserPlus/eraser-site</a>（公开）+ 本机工作副本</td></tr>
+    <tr><th>技术栈</th><td>纯静态 HTML/CSS/JS + Vercel Serverless Functions（Node ESM）+ Neon Postgres，<b>零构建</b></td></tr>
+    <tr><th>托管</th><td>Vercel Hobby 免费档。push main → 自动部署，1~2 分钟生效</td></tr>
+    <tr><th>数据库</th><td>Neon Postgres，三张表：content（六种内容共用）/ todos / events。闲置约 5 分钟休眠，首次访问慢几秒属正常</td></tr>
+    <tr><th>后台</th><td><code>/admin/</code> 密码登录（站长持有），7 个标签：今天 / 待办 / 日程 / 导航 / 博客 / 追更 / 页面</td></tr>
+    <tr><th>测试</th><td>七套 999 项，一条命令：<code>npm test</code>。提交前必须全绿</td></tr>
+    <tr><th>当前版本</th><td>main @ <code>5a1b9cb</code>（M1 追更页，2026-10-14）· 本页为 M2 批次</td></tr>
+  </table>
+
+  <h2>2. 工作流程（六步，别跳步）</h2>
+  <ol class="steps">
+    <li><b>对齐</b> —— 找到本机工作副本（在 C 盘 WorkBuddy AI 目录下搜索 <code>.repo/eraser-site</code>，找不到就问站长）。<b>不要乱 git reset</b>：本机 clone 的 HEAD 停在远古分支，<code>git status</code> 大多是无意义的噪音；可靠做法是「blob 逐一比对」（见第 3 节末尾的附注）。</li>
+    <li><b>改动</b> —— 小步改，遵守「红线与约定」。数据库 schema 能不动就不动（content 表 jsonb 存字段，加内容类型无需建表）。</li>
+    <li><b>测试</b> —— <code>npm test</code> 七套全绿。新功能必须带新测试，不绿不提交。</li>
+    <li><b>推送</b> —— 本机 <code>git push</code> 直连不通，用仓库里的脚本走 GitHub API 推送（见下方「环境特殊性」）。推送后创建 PR。</li>
+    <li><b>上线</b> —— 等 PR 的 CI 和 Vercel 检查全绿 → 合并 → 等 1~2 分钟 → 线上实测（curl 状态码 + 浏览器/无头 Chrome 看真页面）。</li>
+    <li><b>收尾</b> —— 回来更新本页：批次记录加一行、当前版本号、当前待办。这是硬性规矩，不是可选项。</li>
+  </ol>
+
+  <h2>3. 本机环境特殊性（不遵守会卡死）</h2>
+  <div class="callout amber">
+    <b>这台机器的四个坑，先记住再动手：</b>
+    ① <code>git push</code> 直连不通（schannel 证书吊销检查，改配置也无解）→ 用 <code>dev/push-branch.sh</code> 脚本走 gh CLI 推送；② Node 不能创建子进程（spawnSync 报 EBUSY）→ 别写需要子进程的脚本，截图用「Bash 起 Chrome + Node 连 CDP」模式；③ <b>禁止 <code>npm install</code></b>（会把 node_modules 里的假驱动冲成真包，测试全挂），只允许 <code>npm install --package-lock-only</code>；④ 测试用的假驱动在 <code>tests/stubs/</code>（Neon 与 Vercel Blob 的手写 stub），本地和 CI 都不连真服务。
+  </div>
+  <h3>推送与提交（第 4 步的具体做法）</h3>
+  <pre><code># 1) 写提交清单 manifest.tsv（每行：A/M/D + Tab + 文件路径，相对仓库根）
+#    A 新增 / M 修改 / D 删除，只列本次要提交的文件
+
+# 2) 推送分支（git push 不通，走脚本）
+COMMIT_MSG="批次名：一句话说明" bash dev/push-branch.sh &lt;分支名&gt; &lt;manifest.tsv&gt; main
+
+# 3) 创建 PR
+gh pr create -R EraserPlus/eraser-site --base main --head &lt;分支名&gt; \
+  --title "..." --body-file &lt;PR 正文文件&gt;</code></pre>
+  <p class="muted">脚本参数：先 DRY_RUN=1 演练一遍更稳；gh 子命令记得带 <code>-R EraserPlus/eraser-site</code>。</p>
+  <h3>附注：核对工作副本与线上是否一致（第 1 步的完整做法）</h3>
+  <p>拿 main 的每个文件 blob SHA 与本地 <code>git hash-object</code> 逐一比对，差集基本只有你本次的改动；反向再用 <code>comm -23</code> 找「本地多出、线上没有」的文件（历史残留，别误提交）。</p>
+  <pre><code># 拉 main 全量文件清单（path + blob SHA）
+gh api "repos/EraserPlus/eraser-site/git/trees/main?recursive=1" \
+  --jq '.tree[] | select(.type=="blob") | .path + "\t" + .sha' > /tmp/main_tree.tsv
+
+# 逐文件比对
+while IFS=$'\t' read -r path sha; do
+  if [ -f "$path" ]; then
+    [ "$(git hash-object "$path")" != "$sha" ] && echo "DIFF  $path"
+  else
+    echo "MISS  $path"
+  fi
+done < /tmp/main_tree.tsv</code></pre>
+
+  <h2>4. 红线与约定（改之前必须知道）</h2>
+  <ul>
+    <li><b>不换框架、不引构建步骤、不拆大单文件</b>（nav/index.html、admin/index.html 都是刻意保持的单文件——「双击能开、断网能看」是核心资产）。</li>
+    <li><b>公开页静态兜底硬规则</b>：先渲染写死内容 → 再 fetch 同源 API 覆盖 → 失败保持静态，<b>永不白屏</b>；空数据显示空状态提示。</li>
+    <li><b>防注入</b>：前台页用 DOM API + textContent 构建列表；md.js 转义三铁律（先整体 esc 再生成标签 / 已转义不再二次 esc / URL 过白名单）。</li>
+    <li><b>PATCH 全是合并语义</b>：只更新请求体里出现的字段；清空要显式传 null。</li>
+    <li><b>行尾 LF、UTF-8 无 BOM</b>；新文件写完顺手检查。</li>
+    <li><b>敏感信息绝不进仓库</b>：密码、令牌只在 Vercel 环境变量里。仓库是公开的。</li>
+    <li><b>每批独立提交、独立可回滚</b>（git revert 即可）；测试全绿才合并。</li>
+  </ul>
+
+  <h2>5. 站点地图（改哪里的速查）</h2>
+  <table>
+    <tr><th>前台页面</th><td><code>index.html</code> 首页 / <code>search/</code> 全站搜索 / <code>tools/</code> 工具箱（数据驱动，加工具改 TOOLS 数组）/ <code>blog/</code> 博客（列表 + post.html 文章页）/ <code>collect/</code> 追更（追番 + 漫画留档）/ <code>nav/</code> 网址导航（links.js 静态兜底 + 后台数据）/ <code>about/</code> 关于</td></tr>
+    <tr><th>前台公共</th><td><code>style.css</code> 全站样式（CSS 变量 + 系统暗色 + 768px 断点）/ <code>md.js</code> Markdown 渲染（转义三铁律）</td></tr>
+    <tr><th>后台</th><td><code>admin/index.html</code>（单文件：登录 + 7 标签 + 导出备份）+ <code>admin/content.js</code>（内容表单与列表，SCHEMA 驱动）</td></tr>
+    <tr><th>接口 api/</th><td><code>auth.js</code> 登录 / <code>todos.js</code> 待办 / <code>events.js</code> 日程 / <code>content.js</code> 内容（六种类型 CRUD）/ <code>search.js</code> 搜索 / <code>rss.js</code> 博客订阅源 / <code>upload.js</code> 上传（Vercel Blob）/ <code>favicon.js</code> 图标代理；公共层在 <code>api/_lib/</code></td></tr>
+    <tr><th>内容类型</th><td>content 表六种：nav_category / nav_link / post / file（已下架，数据保留）/ page / <b>media（追更，M1 新增）</b>。类型定义与校验在 <code>api/_lib/content.js</code></td></tr>
+    <tr><th>测试</th><td><code>tests/</code> 七套：api / content / api_routes / pages_audit / admin_audit / nav_test / nav_audit；假驱动 <code>tests/stubs/</code>；CI 在 <code>.github/workflows/ci.yml</code></td></tr>
+  </table>
+
+  <h3>常见任务：加一个新内容板块（照 M1 抄）</h3>
+  <ol>
+    <li><code>api/_lib/content.js</code>：TYPES 加条目 + normalize 加校验分支（字段白名单、枚举、长度）；</li>
+    <li><code>admin/content.js</code>：SCHEMA 加字段定义 + RENDERERS 加列表渲染；<code>admin/index.html</code>：加 tab 按钮、section、TABS 数组；导出备份记得带上新类型；</li>
+    <li>前台新页面：复制 <code>collect/index.html</code> 的模式（静态兜底 → fetch → 渲染）；</li>
+    <li>全站导航栏同步加链接；<code>tests/pages_audit.mjs</code> 的 PAGES 数组加新页面；</li>
+    <li>补测试（normalize 用例、接口用例、页面专项），<code>npm test</code> 全绿，走六步流程上线。</li>
+  </ol>
+
+  <h2>6. 批次记录（每批做完回来加一行）</h2>
+  <div class="timeline">
+    <div class="row"><span class="no">T01</span><span class="what">工程基建：测试进仓库 + CI + .gitattributes + vercel.json + README 重写</span><span class="when">10-13</span></div>
+    <div class="row"><span class="no">T02</span><span class="what">公开页清理 + 暗色模式 + 移动端适配</span><span class="when">10-14</span></div>
+    <div class="row"><span class="no">T03</span><span class="what">后台一键导出备份 + PATCH 合并语义</span><span class="when">10-14</span></div>
+    <div class="row"><span class="no">T04</span><span class="what">博客三小件：图片 / RSS / 上下篇</span><span class="when">10-14</span></div>
+    <div class="row"><span class="no">T05</span><span class="what">文件真上传（Vercel Blob 服务端代理）</span><span class="when">10-14</span></div>
+    <div class="row"><span class="no">T06</span><span class="what">修复「从 links.js 导入」失败（JS literal 解析）</span><span class="when">10-14</span></div>
+    <div class="row"><span class="no">T07</span><span class="what">导航页双端完善（侧栏 / 横滑 / 密度 / 最近访问）</span><span class="when">10-14</span></div>
+    <div class="row"><span class="no">T08</span><span class="what">导航实用功能（favicon / 导出 Markdown / 高亮）</span><span class="when">10-14</span></div>
+    <div class="row"><span class="no">T09</span><span class="what">链接搜索关键词 + 博客实时编辑</span><span class="when">10-14</span></div>
+    <div class="row"><span class="no">T10</span><span class="what">全站搜索上线 + 文件仓库下架（数据保留）</span><span class="when">10-14</span></div>
+    <div class="row"><span class="no">T11</span><span class="what">日程「计划表」视图</span><span class="when">10-14</span></div>
+    <div class="row"><span class="no">T12</span><span class="what">工具箱瘦身（数据驱动 + 预留加工具接口）</span><span class="when">10-14</span></div>
+    <div class="row"><span class="no">T13</span><span class="what">链接提示词 + 博客一键发布</span><span class="when">10-14</span></div>
+    <div class="row"><span class="no">T15</span><span class="what">站点运行徽章 + 导航分类拖拽排序（T14+T15 合批，PR #20）</span><span class="when">10-14</span></div>
+    <div class="row latest"><span class="no">M1</span><span class="what"><b>追更页上线</b>：追番 / 漫画两个栏目 + 看完自动收纳栏；media 内容类型；后台第 7 标签；导出备份纳入追更（PR #21）</span><span class="when">10-14</span></div>
+    <div class="row latest"><span class="no">M2</span><span class="what"><b>本页上线</b>：开发交接页（给接手的 AI）；推送脚本收进仓库 dev/</span><span class="when">10-14</span></div>
+  </div>
+
+  <h2>7. 当前待办 / 已知事项</h2>
+  <ul>
+    <li><b>Vercel Blob 连接确认</b>：后台上传功能依赖 <code>BLOB_READ_WRITE_TOKEN</code>，未连接时点上传会提示 503（可手填链接兜底）。需要站长在 Vercel 控制台连一次 Blob Store 并点一次「文件 → 上传」验证。</li>
+    <li><b>domains.config.yaml 归档</b>：备用域名 eraser.888.moe 的记录（待站长在 Vercel 添加域名 + DNS 配置后生效）。</li>
+    <li><b>PR #11 待关闭</b>：被 #12 取代的旧修复 PR（一行命令的事）。</li>
+    <li>（可选后续）把「追更」数据接入全站搜索；给追更页加更多分类（改 content.js 枚举 + 前台加栏目）。</li>
+  </ul>
+
+  <h2>8. 给下一个 AI 的指令（可直接复制给站长）</h2>
+  <div class="callout blue">
+    <b>复制下面这段，连同本次任务一起发给下一个 AI：</b>
+    <pre><code>你是接手 eraser.de5.net 小站（GitHub: EraserPlus/eraser-site）的 AI。
+先完整阅读 https://eraser.de5.net/dev/ （开发交接页，包含：项目速览 / 六步工作流程 /
+本机环境特殊性 / 红线约定 / 站点地图 / 批次记录 / 待办）。
+读完后：① 向我汇报你理解的现状与工作流程；② 确认本次任务；③ 按页面里的
+「工作流程」六步执行（改动 → npm test 全绿 → 用 dev/push-branch.sh 推送 → PR →
+CI 全绿合并 → 线上实测 → 回来更新交接页）。</code></pre>
+  </div>
+
+  <p class="muted" style="margin-top:28px">本页由每批工作的负责人（AI）维护：批次记录 +1 行、当前版本号与新待办同步更新。页面本身不进主站导航，地址固定：<code>eraser.de5.net/dev/</code></p>
+</div>
+</body>
+</html>
