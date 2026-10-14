@@ -143,6 +143,7 @@ console.log('\n=== 内容管理（导航 / 博客 / 文件 / 页面）===');
     ['通用表单构建器', /function buildForm\(type, onSave, onCancel\)/],
     ['表单弹层', /function openForm\(title, formNode\)/],
     ['导航：可导入旧的 links.js', /function importFromLinksJs/],
+    ['导入用 parseLinksJs 解析（links.js 是 JS literal，不能 JSON.parse）', /var data = parseLinksJs\(text\);/],
     ['导航：分类可增删改', /function editCategory/],
     ['导航：链接可增删改', /function editLink/],
     ['删除前二次确认', /if \(!confirm\(/],
@@ -164,6 +165,44 @@ console.log('\n=== 与全站一致性 ===');
   check('标题正确', /<title>管理后台 · Eraser 小站<\/title>/.test(html));
   check('主色与全站一致（#2563eb）', html.includes('#2563eb'));
   check('管理页没有加入公开导航栏（保持隐蔽）', !/class="navbar"/.test(html));
+}
+
+/* parseLinksJs 的运行时用例：用标记从 content.js 抽出纯函数直接跑。
+   回归背景：links.js 是手写的 JS 对象 literal（键名不带引号），JSON.parse 必挂。 */
+console.log('\n=== links.js 导入解析 ===');
+{
+  const cjs = fs.readFileSync(path.join(REPO, 'admin', 'content.js'), 'utf8');
+  const S = '/* ===== LINKS-IMPORT-START ===== */';
+  const E = '/* ===== LINKS-IMPORT-END ===== */';
+  const a = cjs.indexOf(S), b = cjs.indexOf(E);
+  check('content.js 带 LINKS-IMPORT 标记', a >= 0 && b > a, `a=${a} b=${b}`);
+
+  let parseLinksJs = null;
+  if (a >= 0 && b > a) {
+    try { parseLinksJs = new Function(cjs.slice(a, b) + '\nreturn parseLinksJs;')(); } catch (e) {}
+  }
+  check('能提取出 parseLinksJs 函数', typeof parseLinksJs === 'function');
+
+  const raw = fs.readFileSync(path.join(REPO, 'nav', 'links.js'), 'utf8');
+  let data = null, rawErr = null;
+  try { data = parseLinksJs(raw); } catch (e) { rawErr = e.message; }
+  check('parseLinksJs 能解析 links.js 原文', !!data && Array.isArray(data.categories), String(rawErr));
+  check('解析出 11 个分类', !!data && data.categories.length === 11,
+        data ? String(data.categories.length) : String(rawErr));
+  const total = data ? data.categories.reduce((n, c) => n + c.links.length, 0) : 0;
+  check('解析出 34 条链接', !!data && total === 34, String(total));
+
+  let e1 = null;
+  try { parseLinksJs('window.NAV_DATA = {oops};'); } catch (e) { e1 = e.message; }
+  check('垃圾输入抛错且错误信息非空', !!e1 && e1.length > 0, String(e1));
+
+  let e2 = null;
+  try { parseLinksJs('window.NAV_DATA = {categories: "x"};'); } catch (e) { e2 = e.message; }
+  check('categories 不是数组时报「找不到 categories 数组」', e2 === '找不到 categories 数组', String(e2));
+
+  let e3 = null;
+  try { parseLinksJs('window.NAV_DATA = {categories:[{id:"a",name:"A"}]};'); } catch (e) { e3 = e.message; }
+  check('分类缺 links 时报错', !!e3, String(e3));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

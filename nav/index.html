@@ -349,12 +349,16 @@ function serialize(data){
   return "window.NAV_DATA = " + JSON.stringify(data, null, 2) + ";\n";
 }
 
-/* 接受两种输入：导出的 links.js 原文，或纯 JSON */
+/* 接受两种输入：导出的 links.js 原文，或纯 JSON。
+   links.js 原文是手写的 JS 对象 literal（键名不带引号），JSON.parse 不了，
+   先用 Function 求值兜底（与页面直接 <script> 加载它等价）。 */
 function parseImport(text){
   var s = String(text == null ? "" : text).trim();
   var m = s.match(/window\.NAV_DATA\s*=\s*([\s\S]*?);?\s*$/);
   if (m) s = m[1];
-  var obj = JSON.parse(s);
+  var obj;
+  try { obj = JSON.parse(s); }               // 导航页导出的格式（键名带引号）
+  catch (e) { obj = (new Function("return (" + s + ")"))(); }  // 手写的原始 links.js（键名不带引号）
   if (!obj || !Array.isArray(obj.categories)) throw new Error("找不到 categories 数组");
   obj.categories.forEach(function(c, i){
     if (!c || !Array.isArray(c.links)) throw new Error("第 " + (i + 1) + " 个分类缺少 links 数组");

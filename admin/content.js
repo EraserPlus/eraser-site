@@ -369,13 +369,30 @@
     openForm(link ? "编辑链接" : "添加链接", form);
   }
 
+  /* ===== LINKS-IMPORT-START ===== */
+  /* 解析 links.js 原文（window.NAV_DATA = {...};）。
+     注意：links.js 是手写的 JS 对象 literal（键名不带引号），不是合法 JSON，
+     不能 JSON.parse（历史上就是这么挂的：Expected property name）。
+     用 Function 求值——内容是自己仓库的同源文件，与导航页直接 <script> 加载它等价，
+     无额外风险。 */
+  function parseLinksJs(text) {
+    var s = String(text == null ? "" : text);
+    var m = s.match(/window\.NAV_DATA\s*=\s*([\s\S]*?);?\s*$/);
+    if (!m) throw new Error("links.js 格式看不懂");
+    var data = (new Function("return (" + m[1] + ")"))();
+    if (!data || !Array.isArray(data.categories)) throw new Error("找不到 categories 数组");
+    data.categories.forEach(function (c, i) {
+      if (!c || !Array.isArray(c.links)) throw new Error("第 " + (i + 1) + " 个分类缺少 links 数组");
+    });
+    return data;
+  }
+  /* ===== LINKS-IMPORT-END ===== */
+
   /* 把旧的 links.js 数据一次性导入数据库 */
   function importFromLinksJs() {
     if (!confirm("把 links.js 里现有的分类和链接全部导入？只在数据库为空时做一次。")) return;
     fetch("../nav/links.js").then(function (r) { return r.text(); }).then(function (text) {
-      var m = text.match(/window\.NAV_DATA\s*=\s*([\s\S]*?);\s*$/);
-      if (!m) throw new Error("links.js 格式看不懂");
-      var data = JSON.parse(m[1]);
+      var data = parseLinksJs(text);
       var chain = Promise.resolve(0);
       (data.categories || []).forEach(function (cat) {
         chain = chain.then(function (n) {
