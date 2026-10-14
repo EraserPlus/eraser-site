@@ -55,7 +55,7 @@
 <body>
 <div class="doc-head">
   <span class="logo">🧩 Eraser 的小站</span>
-  <a href="../index.html">← 回首页</a>
+  <a href="../index.html">← 回搜索</a>
   <span class="tag">开发交接 · 最后更新 2026-10-14</span>
 </div>
 <div class="container doc">
@@ -68,7 +68,7 @@
   </div>
 
   <h2>0. 一句话认识这个站</h2>
-  <p><b>Eraser 的个人小站</b>：不面向公众、无商业、单人使用，一切取舍以「一个人用起来省事」为准。现在是：首页 / 搜索 / 工具箱 / 博客 / <b>追更</b> / 导航 / 关于 七个前台页面 + 一个带 7 个标签的后台。</p>
+  <p><b>Eraser 的个人小站</b>：不面向公众、无商业、单人使用，一切取舍以「一个人用起来省事」为准。现在是：搜索（首页） / 工具箱 / 博客 / <b>追更</b> / 导航 / 关于 六个前台页面 + 一个带 7 个标签的后台。</p>
 
   <h2>1. 项目速览</h2>
   <table>
@@ -78,8 +78,8 @@
     <tr><th>托管</th><td>Vercel Hobby 免费档。push main → 自动部署，1~2 分钟生效</td></tr>
     <tr><th>数据库</th><td>Neon Postgres，三张表：content（六种内容共用）/ todos / events。闲置约 5 分钟休眠，首次访问慢几秒属正常</td></tr>
     <tr><th>后台</th><td><code>/admin/</code> 密码登录（站长持有），7 个标签：今天 / 待办 / 日程 / 导航 / 博客 / 追更 / 页面</td></tr>
-    <tr><th>测试</th><td>七套 999 项，一条命令：<code>npm test</code>。提交前必须全绿</td></tr>
-    <tr><th>当前版本</th><td>main @ <code>ff02996</code> · 最近批次 M4 追更接入搜索 + 上传按钮可达（2026-10-14）</td></tr>
+    <tr><th>测试</th><td>七套 1001 项，一条命令：<code>npm test</code>。提交前必须全绿</td></tr>
+    <tr><th>当前版本</th><td>main @ <code>ccb99c8</code> · 最近批次 M5 首页并入全站搜索（2026-10-14）</td></tr>
   </table>
 
   <h2>2. 工作流程（六步，别跳步）</h2>
@@ -136,7 +136,7 @@ done < /tmp/main_tree.tsv</code></pre>
 
   <h2>5. 站点地图（改哪里的速查）</h2>
   <table>
-    <tr><th>前台页面</th><td><code>index.html</code> 首页 / <code>search/</code> 全站搜索 / <code>tools/</code> 工具箱（数据驱动，加工具改 TOOLS 数组）/ <code>blog/</code> 博客（列表 + post.html 文章页）/ <code>collect/</code> 追更（追番 + 漫画留档）/ <code>nav/</code> 网址导航（links.js 静态兜底 + 后台数据）/ <code>about/</code> 关于</td></tr>
+    <tr><th>前台页面</th><td><code>index.html</code> 首页（= 全站搜索：搜索框 + 分组结果，<code>/?q=</code> 可直接带词进搜索） / <code>tools/</code> 工具箱（数据驱动，加工具改 TOOLS 数组）/ <code>blog/</code> 博客（列表 + post.html 文章页）/ <code>collect/</code> 追更（追番 + 漫画留档）/ <code>nav/</code> 网址导航（links.js 静态兜底 + 后台数据）/ <code>about/</code> 关于</td></tr>
     <tr><th>前台公共</th><td><code>style.css</code> 全站样式（CSS 变量 + 系统暗色 + 768px 断点）/ <code>md.js</code> Markdown 渲染（转义三铁律）</td></tr>
     <tr><th>后台</th><td><code>admin/index.html</code>（单文件：登录 + 7 标签 + 导出备份）+ <code>admin/content.js</code>（内容表单与列表，SCHEMA 驱动）</td></tr>
     <tr><th>接口 api/</th><td><code>auth.js</code> 登录 / <code>todos.js</code> 待办 / <code>events.js</code> 日程 / <code>content.js</code> 内容（六种类型 CRUD）/ <code>search.js</code> 搜索 / <code>rss.js</code> 博客订阅源 / <code>upload.js</code> 上传（Vercel Blob）/ <code>favicon.js</code> 图标代理；公共层在 <code>api/_lib/</code></td></tr>
@@ -173,11 +173,13 @@ done < /tmp/main_tree.tsv</code></pre>
     <div class="row latest"><span class="no">M2</span><span class="what"><b>本页上线</b>：开发交接页（给接手的 AI）；推送脚本收进仓库 dev/（PR #22）</span><span class="when">10-14</span></div>
     <div class="row latest"><span class="no">M3</span><span class="what">收尾：域名记录归档进仓库、README 同步、关闭历史 PR #11</span><span class="when">10-14</span></div>
     <div class="row latest"><span class="no">M4</span><span class="what"><b>追更接入全站搜索</b>（media 按名称 / 备注 / 链接检索，没填链接回落追更页）；<b>上传按钮可达化</b>：由不可达的 file 类型改挂到追更的「链接 / 封面图」（PR #24）</span><span class="when">10-14</span></div>
+    <div class="row latest"><span class="no">M5</span><span class="what"><b>首页并入全站搜索</b>：删掉独立 <code>search/</code>，根路径 <code>/</code> 整页改成搜索（原首页欢迎语 / 五卡片丢弃）；全站导航去掉重复的「首页」，「搜索」指向 <code>/</code>；后台页面标识只留 about（PR #26）</span><span class="when">10-14</span></div>
   </div>
 
   <h2>7. 当前待办 / 已知事项</h2>
   <ul>
     <li><b>Vercel Blob 连接确认</b>：上传按钮现挂在<b>追更表单的「链接 / 封面图」</b>（文件仓库下架后原入口已不可达）。后台上传依赖 <code>BLOB_READ_WRITE_TOKEN</code>，未连接时点上传会提示 503（可手填链接兜底）。需要站长在 Vercel 控制台连一次 Blob Store，再到后台任一条追更的「链接 / 封面图」点一次「上传」验证。</li>
+    <li><b>旧 <code>home</code> 页面标识已下线</b>：首页欢迎语随首页改版（M5）移除，已无任何页面渲染它；若后台「页面」里还留着 home 记录，可自行删除。</li>
     <li>（可选后续）备用域名 eraser.888.moe 在 Vercel 添加后生效（配置记录见仓库 <code>domains.config.yaml</code>）。追更加更多分类暂缓（站长表示暂不需要）。</li>
   </ul>
 
