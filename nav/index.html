@@ -123,6 +123,12 @@ a.card.sel{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.14)}
 a.card .ico{
   flex:0 0 34px;width:34px;height:34px;border-radius:9px;display:flex;
   align-items:center;justify-content:center;font-weight:600;font-size:15px;
+  position:relative;overflow:hidden;
+}
+/* favicon：服务端代理来的同源小图，盖在首字母图标上；抓不到就 onerror 隐藏，露出首字母 */
+a.card .icoimg{
+  position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);
+  object-fit:contain;background:var(--card);border-radius:6px;
 }
 a.card .body{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
 a.card .top{display:flex;align-items:center;gap:6px}
@@ -146,6 +152,9 @@ a.card .tg i:hover{background:var(--blue-l);color:var(--blue-d)}
 .acts .star:hover{color:#f59e0b}
 .acts .star.on{color:#f59e0b}
 mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
+/* 最近访问的相对时间（仅「最近」视图显示） */
+a.card .tm{font-size:11px;color:#94a3b8;margin-top:1px}
+body.dense a.card .tm{display:none}
 
 /* 空状态 / 提示 */
 .empty{text-align:center;color:var(--muted);padding:56px 20px;font-size:14px}
@@ -206,6 +215,7 @@ mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
   .cath .n{ background:var(--sunk); }
   a.card:hover{ border-color:#1e3a5f; }
   a.card .url{ color:var(--muted); }
+  a.card .tm{ color:var(--muted); }
   a.card .tg i{ background:var(--sunk); color:var(--muted); }
   .acts .star,.acts .copy{ color:#4b5563; }
   .acts .copy:hover{ color:var(--blue); background:var(--blue-l); }
@@ -261,6 +271,7 @@ mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
       <button type="button" id="btnDensity" title="一屏看更多，描述行收起来">紧凑模式</button>
       <button type="button" id="btnFold">折叠全部</button>
       <button type="button" id="btnExport">导出 links.js</button>
+      <button type="button" id="btnExportMd" title="导出成 Markdown 链接表，写博客时直接粘">导出 MD</button>
       <button type="button" id="btnImport">导入</button>
       <input type="file" id="fileImport" accept=".js,.json,.txt,text/javascript,application/json" style="display:none">
     </div>
@@ -484,11 +495,39 @@ function parseImport(text){
   return obj;
 }
 
+/* 相对时间：刚刚 / N 分钟前 / N 小时前 / N 天前 / 超过一周给 MM-DD */
+function relTime(t, now){
+  now = (now == null ? Date.now() : now);
+  var ts = Number(t) || 0;
+  var d = Math.max(0, now - ts);
+  if (d < 60000) return "刚刚";
+  if (d < 3600000) return Math.floor(d / 60000) + " 分钟前";
+  if (d < 86400000) return Math.floor(d / 3600000) + " 小时前";
+  if (d < 7 * 86400000) return Math.floor(d / 86400000) + " 天前";
+  var dt = new Date(ts);
+  return (dt.getMonth() + 1) + "-" + (dt.getDate() < 10 ? "0" : "") + dt.getDate();
+}
+
+/* 导出成 Markdown 链接表：写博客时直接粘 */
+function toMarkdown(data){
+  var lines = ["# 网址导航", ""];
+  categoriesOf(data).forEach(function(c){
+    lines.push("## " + c.name, "");
+    (c.links || []).forEach(function(l){
+      var line = "- [" + l.name + "](" + l.url + ")";
+      if (l.desc) line += " — " + l.desc;
+      lines.push(line);
+    });
+    lines.push("");
+  });
+  return lines.join("\n");
+}
+
 return {
   norm: norm, hostOf: hostOf, initialOf: initialOf, hueOf: hueOf,
   categoriesOf: categoriesOf, allLinks: allLinks, countLinks: countLinks,
   parseQuery: parseQuery, matchesQuery: matchesQuery, matchesTags: matchesTags,
-  recentLinks: recentLinks,
+  recentLinks: recentLinks, relTime: relTime, toMarkdown: toMarkdown,
   filterCategories: filterCategories, collectTags: collectTags,
   matchRanges: matchRanges, serialize: serialize, parseImport: parseImport
 };
@@ -548,7 +587,8 @@ var RECENT_SHOW = 30;     /* 最近视图最多展示多少条 */
 
 var qEl = $("q"), kbdHint = $("kbdHint"), tagbar = $("tagbar"), content = $("content"),
     countEl = $("count"), noteEl = $("note"), viewsEl = $("views"),
-    btnFold = $("btnFold"), btnExport = $("btnExport"), btnImport = $("btnImport"),
+    btnFold = $("btnFold"), btnExport = $("btnExport"), btnExportMd = $("btnExportMd"),
+    btnImport = $("btnImport"),
     btnDensity = $("btnDensity"), btnTop = $("btnTop"),
     fileImport = $("fileImport"), sideList = $("sideList"), catbar = $("catbar");
 
@@ -604,24 +644,35 @@ function copyText(text, done){
 }
 
 /* ---------- 单张卡片 ---------- */
-function buildCard(link, terms){
+function buildCard(link, terms, meta){
   var a = el("a", "card");
   a.href = link.url;
   a.target = "_blank";
   a.rel = "noopener noreferrer";
+  a.title = link.url;
 
   var hue = C.hueOf(link.name);
-  var ico = el("span", "ico", C.initialOf(link.name));
+  var ico = el("span", "ico");
+  ico.appendChild(document.createTextNode(C.initialOf(link.name)));
   ico.style.background = "hsl(" + hue + ", 70%, 92%)";
   ico.style.color = "hsl(" + hue + ", 55%, 32%)";
+  /* favicon 走服务端同源代理；抓不到就藏掉，露出底下的首字母图标 */
+  var fv = el("img", "icoimg");
+  fv.loading = "lazy";
+  fv.decoding = "async";
+  fv.alt = "";
+  fv.addEventListener("error", function(){ fv.style.display = "none"; });
+  fv.src = "/api/favicon?url=" + encodeURIComponent(link.url);
+  ico.appendChild(fv);
   a.appendChild(ico);
 
   var body = el("span", "body");
   var top = el("span", "top");
   top.appendChild(highlighted(link.name, terms, "nm"));
   body.appendChild(top);
-  body.appendChild(el("span", "url", C.hostOf(link.url)));
+  body.appendChild(highlighted(C.hostOf(link.url), terms, "url"));
   if (link.desc) body.appendChild(highlighted(link.desc, terms, "ds"));
+  if (meta) body.appendChild(el("span", "tm", meta));
 
   if (link.tags && link.tags.length){
     var tg = el("span", "tg");
@@ -786,6 +837,12 @@ function render(){
   }
 
   /* 分类与卡片 */
+  var recentAt = {};
+  if (state.view === "recent"){
+    state.recent.forEach(function(r){
+      if (r && r.url && recentAt[r.url] == null) recentAt[r.url] = r.t;
+    });
+  }
   content.textContent = "";
   if (!shown){
     var empty = el("div", "empty");
@@ -823,7 +880,9 @@ function render(){
       sec.appendChild(h);
 
       var grid = el("div", "grid");
-      cat.links.forEach(function(l){ grid.appendChild(buildCard(l, terms)); });
+      cat.links.forEach(function(l){
+        grid.appendChild(buildCard(l, terms, recentAt[l.url] ? C.relTime(recentAt[l.url]) : ""));
+      });
       sec.appendChild(grid);
       content.appendChild(sec);
     });
@@ -882,6 +941,10 @@ qEl.addEventListener("input", function(){
 btnExport.addEventListener("click", function(){
   download(new Blob([C.serialize(state.data)], { type: "text/javascript;charset=utf-8" }), "links.js");
   note("已导出 links.js。改完直接覆盖仓库里的 nav/links.js 就行。", "ok");
+});
+btnExportMd.addEventListener("click", function(){
+  download(new Blob([C.toMarkdown(state.data)], { type: "text/markdown;charset=utf-8" }), "links.md");
+  note("已导出 Markdown 链接表（links.md），写博客时直接粘。", "ok");
 });
 btnImport.addEventListener("click", function(){ fileImport.click(); });
 fileImport.addEventListener("change", function(){
