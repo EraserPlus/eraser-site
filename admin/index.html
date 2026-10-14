@@ -200,6 +200,11 @@ textarea:focus{ outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgb
            background:var(--amber-l); color:var(--amber); border:1px solid var(--amber);
            border-radius:9px; padding:8px 12px; margin:0 0 10px; }
 .draftbar span{ flex:1; min-width:140px; }
+/* 计划表 */
+.agday{ margin-bottom:18px; }
+.agday .agday-h{ display:flex; align-items:center; gap:8px; margin:0 0 8px; }
+.agday .agday-h b{ font-size:14.5px; }
+.agday .agday-h .cnt{ font-size:12px; color:var(--muted); background:var(--sunk); border-radius:20px; padding:1px 9px; }
 .cf-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:100;
              display:flex; align-items:flex-end; justify-content:center; }
 .cf-panel{ background:var(--bg); width:100%; max-width:640px; max-height:92vh; display:flex;
@@ -304,7 +309,11 @@ textarea:focus{ outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgb
     </section>
 
     <section id="tab-events" class="hide">
-      <div class="card">
+      <div class="views" id="evViews" style="margin-bottom:12px">
+        <button type="button" data-v="cal" class="active">月历</button>
+        <button type="button" data-v="agenda">计划表</button>
+      </div>
+      <div class="card" id="calCard">
         <div class="cal-head">
           <b id="calTitle">—</b>
           <span class="nav">
@@ -315,6 +324,12 @@ textarea:focus{ outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgb
         </div>
         <div class="cal-dow"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
         <div class="cal-grid" id="calGrid"></div>
+      </div>
+
+      <div class="card hide" id="agendaCard" style="margin-top:12px">
+        <h2>计划表 <span class="cnt" id="agendaCnt">0</span></h2>
+        <p style="font-size:13px;color:var(--ink2);margin:0 0 12px">今天起 60 天内的安排，按天分组；全天的事排在前。点条目可编辑。</p>
+        <div id="agendaList"></div>
       </div>
 
       <div class="card" style="margin-top:12px">
@@ -723,6 +738,80 @@ function renderDayEvents(){
   fillList($("dayEvents"), dayEvents.map(function(e){ return eventNode(e); }), "这天没有安排。");
 }
 
+/* ===== AGENDA-START ===== */
+/* 计划表纯逻辑：把未来的日程按天分组（不碰 DOM，可在 Node 里单独测）。
+   from：起始日期 "YYYY-MM-DD"（一般是今天）；days：展望天数。
+   返回 [{ date, label, items }]，组按日期升序；同一天内全天的在前，再按开始时间。 */
+function agendaGroups(events, from, days){
+  var WEEK = ["日","一","二","三","四","五","六"];
+  function pad(n){ return (n < 10 ? "0" : "") + n; }
+  var start = String(from || "").slice(0, 10);
+  var end = "";
+  if (days && start){
+    var d0 = new Date(start + "T00:00:00");
+    if (!isNaN(d0.getTime())){
+      d0.setDate(d0.getDate() + days);
+      end = d0.getFullYear() + "-" + pad(d0.getMonth()+1) + "-" + pad(d0.getDate());
+    }
+  }
+  var byDay = {};
+  (events || []).forEach(function(e){
+    var ds = String((e && e.start_at) || "").slice(0, 10);
+    if (!ds || ds < start) return;
+    if (end && ds > end) return;
+    (byDay[ds] = byDay[ds] || []).push(e);
+  });
+  return Object.keys(byDay).sort().map(function(ds){
+    var d = new Date(ds + "T00:00:00");
+    return {
+      date: ds,
+      label: (d.getMonth()+1) + " 月 " + d.getDate() + " 日 周" + WEEK[d.getDay()],
+      items: byDay[ds].slice().sort(function(a, b){
+        if (!!a.all_day !== !!b.all_day) return a.all_day ? -1 : 1;
+        return String(a.start_at || "").localeCompare(String(b.start_at || ""));
+      })
+    };
+  });
+}
+/* ===== AGENDA-END ===== */
+
+function renderAgenda(){
+  var groups = agendaGroups(events, todayStr(), 60);
+  var total = groups.reduce(function(n, g){ return n + g.items.length; }, 0);
+  $("agendaCnt").textContent = total;
+  var host = $("agendaList");
+  host.innerHTML = "";
+  if (!groups.length){
+    host.appendChild(el("div", "empty", "未来 60 天没有安排。在下面加一条，这里就会出现。"));
+    return;
+  }
+  groups.forEach(function(g){
+    var card = el("div", "agday");
+    var h = el("div", "agday-h");
+    h.appendChild(el("b", null, g.label));
+    h.appendChild(el("span", "cnt", String(g.items.length)));
+    card.appendChild(h);
+    g.items.forEach(function(e){ card.appendChild(eventNode(e)); });
+    host.appendChild(card);
+  });
+}
+
+/* 月历 / 计划表 切换 */
+var evView = "cal";
+function setEventView(v){
+  evView = v;
+  Array.prototype.forEach.call($("evViews").querySelectorAll("button"), function(x){
+    x.classList.toggle("active", x.dataset.v === v);
+  });
+  $("calCard").classList.toggle("hide", v !== "cal");
+  $("agendaCard").classList.toggle("hide", v !== "agenda");
+  if (v === "agenda") renderAgenda();
+}
+$("evViews").addEventListener("click", function(e){
+  var b = e.target.closest("button[data-v]");
+  if (b) setEventView(b.dataset.v);
+});
+
 function loadTodos(){ return api("todos").then(function(j){ todos = j.items || []; }); }
 function loadEvents(){ return api("events").then(function(j){ events = j.items || []; }); }
 
@@ -896,7 +985,7 @@ document.querySelectorAll(".tabs button").forEach(function(btn){
 function renderAll(){
   if (tab === "today") renderToday();
   else if (tab === "todos") renderTodos();
-  else if (tab === "events") { renderCalendar(); renderDayEvents(); }
+  else if (tab === "events") { renderCalendar(); renderDayEvents(); renderAgenda(); }
   else if (window.ContentAdmin) ContentAdmin.render(tab);
 }
 function refresh(){

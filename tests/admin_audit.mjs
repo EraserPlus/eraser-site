@@ -99,6 +99,9 @@ console.log('\n=== 功能点 ===');
     ['月历：有日程的日期显示圆点', /el\("span", "dot"\)/],
     ['月历：点日期切换选中日', /selDay = day/],
     ['日程：按天查看', /function renderDayEvents/],
+    ['计划表：月历/计划表切换', /id="evViews"[\s\S]*data-v="agenda"/],
+    ['计划表：按天分组渲染', /function renderAgenda/],
+    ['计划表：复用 eventNode 带编辑删除', /card\.appendChild\(eventNode\(e\)\)/],
     ['待办优先级：高 / 中 / 低', /data-p="2"[\s\S]*data-p="1"[\s\S]*data-p="0"/],
     ['待办筛选：未完成 / 全部 / 逾期 / 已完成', /data-f="open"[\s\S]*data-f="all"[\s\S]*data-f="over"[\s\S]*data-f="done"/],
     ['新增待办', /api\("todos",\{method:"POST"/],
@@ -208,6 +211,44 @@ console.log('\n=== links.js 导入解析 ===');
   let e3 = null;
   try { parseLinksJs('window.NAV_DATA = {categories:[{id:"a",name:"A"}]};'); } catch (e) { e3 = e.message; }
   check('分类缺 links 时报错', !!e3, String(e3));
+}
+
+/* agendaGroups 的运行时用例：用标记从 admin/index.html 抽出纯函数直接跑。
+   回归背景：计划表要按天分组、过滤过去、全天优先——逻辑错一天就乱。 */
+console.log('\n=== 计划表分组 ===');
+{
+  const S = '/* ===== AGENDA-START ===== */';
+  const E = '/* ===== AGENDA-END ===== */';
+  const a = html.indexOf(S), b = html.indexOf(E);
+  check('admin/index.html 带 AGENDA 标记', a >= 0 && b > a, `a=${a} b=${b}`);
+
+  let agendaGroups = null;
+  if (a >= 0 && b > a) {
+    try { agendaGroups = new Function(html.slice(a, b) + '\nreturn agendaGroups;')(); } catch (e) {}
+  }
+  check('能提取出 agendaGroups 函数', typeof agendaGroups === 'function');
+
+  const evs = [
+    { id: 1, title: '全天事', start_at: '2026-10-16T00:00:00Z', all_day: true },
+    { id: 2, title: '下午会', start_at: '2026-10-16T14:00:00Z', end_at: '2026-10-16T15:00:00Z' },
+    { id: 3, title: '昨天的事', start_at: '2026-10-13T09:00:00Z' },
+    { id: 4, title: '太远的', start_at: '2027-01-01T09:00:00Z' },
+  ];
+  const g = agendaGroups(evs, '2026-10-14', 60);
+  check('过去和超范围的被过滤', g.length === 1 && g[0].date === '2026-10-16', JSON.stringify(g.map(x => x.date)));
+  check('同一天全天的排在前', g.length === 1 && g[0].items[0].title === '全天事' && g[0].items[1].title === '下午会',
+        JSON.stringify(g[0].items.map(x => x.title)));
+  check('分组标签带月和星期', g.length === 1 && /10 月 16 日 周/.test(g[0].label), g[0].label);
+  check('多天按日期升序', (() => {
+    const r = agendaGroups([
+      { id: 5, title: 'b', start_at: '2026-10-20T09:00:00Z' },
+      { id: 6, title: 'a', start_at: '2026-10-15T09:00:00Z' },
+    ], '2026-10-14', 60);
+    return r.length === 2 && r[0].date === '2026-10-15' && r[1].date === '2026-10-20';
+  })());
+  check('空数组不炸', agendaGroups([], '2026-10-14', 60).length === 0);
+  check('坏数据不炸', agendaGroups([{ id: 9 }, null, { start_at: null }], '2026-10-14', 60).length === 0);
+  check('不传 days 就不限天数', agendaGroups([{ id: 7, start_at: '2030-01-01T00:00:00Z' }], '2026-10-14').length === 1);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
