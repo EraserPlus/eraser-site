@@ -12,10 +12,9 @@ const check = (name, ok, extra) => {
 const read = (f) => fs.readFileSync(path.join(REPO, f), 'utf8');
 
 const PAGES = ['index.html', 'nav/index.html', 'blog/index.html', 'blog/post.html',
-               'search/index.html', 'about/index.html', 'tools/index.html', 'tools/password.html'];
+               'search/index.html', 'about/index.html', 'tools/index.html'];
 
-console.log('=== 所有页面：结构与语法 ===');
-for (const f of PAGES) {
+console.log('=== 所有页面（7 个）：结构与语法 ===');for (const f of PAGES) {
   const html = read(f);
   const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
   let ok = true, err = '';
@@ -25,7 +24,7 @@ for (const f of PAGES) {
   check(`${f} 内联脚本语法正确（${scripts.length} 段）`, ok, err);
 }
 
-console.log('\n=== 所有页面：零站外资源 ===');
+console.log('\n=== 所有页面（7 个）：零站外资源 ===');
 for (const f of PAGES) {
   const html = read(f);
   /* 只算「会被加载的资源」。普通的外链 <a href> 是内容，不是资源，不算 */
@@ -46,7 +45,7 @@ for (const f of PAGES) {
         unsafe.map(a => a[1]).join(', '));
 }
 
-console.log('\n=== 所有页面：只请求同源接口 ===');
+console.log('\n=== 所有页面（7 个）：只请求同源接口 ===');
 for (const f of PAGES) {
   const html = read(f);
   const fetches = [...html.matchAll(/fetch\(\s*["'`]([^"'`]+)/g)].map(m => m[1]);
@@ -56,7 +55,7 @@ for (const f of PAGES) {
   check(`${f} 没有用其它网络 API`, other.length === 0, other.map(m => m[1]).join(', '));
 }
 
-console.log('\n=== 所有页面：导航栏统一 ===');
+console.log('\n=== 所有页面（7 个）：导航栏统一 ===');
 for (const f of PAGES) {
   const html = read(f);
   check(`${f} 品牌名统一`, /<span class="logo">🧩 Eraser 的小站<\/span>/.test(html));
@@ -151,6 +150,16 @@ console.log('\n=== 关于页 ===');
   const html = read('about/index.html');
   check('读取的是 about 这个页面标识', /"about"/.test(html));
   check('标题会跟着变', /document\.title = page\.data\.title/.test(html));
+}
+
+console.log('=== 工具箱页 ===');
+{
+  const html = read('tools/index.html');
+  check('工具清单是数据驱动（TOOLS 数组）', /var TOOLS = \[/.test(html));
+  check('空清单有空状态提示', /id="toolEmpty"/.test(html));
+  check('预留了加工具的接口说明', /预留接口/.test(html));
+  check('工具名/描述用 textContent 渲染', /name\.textContent = t\.name/.test(html));
+  check('密码生成器已下架', !fs.existsSync(path.join(REPO, 'tools', 'password.html')));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

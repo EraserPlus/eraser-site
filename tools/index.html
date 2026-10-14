@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>工具箱 - Eraser 的小站</title>
 <link rel="stylesheet" href="../style.css">
+<style>
+  /* 本页只写 style.css 里没有的样式 */
+  .hintline{font-size:12.5px;color:var(--muted);margin:22px auto 0;max-width:640px;line-height:1.9;
+            border:1px dashed var(--line);border-radius:10px;padding:10px 14px}
+  .hintline code{background:var(--sunk);border-radius:4px;padding:1px 5px;font-size:12px}
+  @media (prefers-color-scheme: dark){
+    .hintline code{background:var(--sunk)}
+  }
+</style>
 </head>
 <body>
 <div class="navbar">
@@ -22,12 +31,49 @@
   <h1>🧰 工具箱</h1>
   <p class="muted">所有工具均在浏览器本地运行，数据不会上传。</p>
 
-  <div class="list-item">
-    <div><div class="name">密码生成器</div><div class="desc">随机密码，一键复制</div></div>
-    <a href="password.html"><button class="ghost">打开</button></a>
-  </div>
+  <div id="toolList"></div>
+  <div class="empty" id="toolEmpty">工具箱还在筹备中，新工具会陆续上架。</div>
 
-  <!-- 新工具：复制上面这段 list-item，改名字和链接即可 -->
+  <p class="hintline">
+    <b>预留接口（给未来的工具留的位置）</b><br>
+    新工具 = 在 <code>tools/</code> 目录放一个 <code>xxx.html</code>，再把下方 <code>TOOLS</code> 数组加一行
+    <code>{ name: "名字", desc: "一句话", href: "xxx.html" }</code>，刷新即上架，无需改别的。
+  </p>
 </div>
+
+<script>
+/* TOOLS 是工具箱唯一的清单——加工具只改这里，删工具删行即可 */
+var TOOLS = [];
+
+(function renderTools(){
+  var host = document.getElementById("toolList");
+  var empty = document.getElementById("toolEmpty");
+  host.innerHTML = "";
+  if (!TOOLS.length){ empty.style.display = ""; return; }
+  empty.style.display = "none";
+  TOOLS.forEach(function(t){
+    var row = document.createElement("div");
+    row.className = "list-item";
+    var left = document.createElement("div");
+    var name = document.createElement("div");
+    name.className = "name";
+    name.textContent = t.name;
+    var desc = document.createElement("div");
+    desc.className = "desc";
+    desc.textContent = t.desc || "";
+    left.appendChild(name);
+    left.appendChild(desc);
+    row.appendChild(left);
+    var a = document.createElement("a");
+    a.href = t.href;
+    var b = document.createElement("button");
+    b.className = "ghost";
+    b.textContent = "打开";
+    a.appendChild(b);
+    row.appendChild(a);
+    host.appendChild(row);
+  });
+})();
+</script>
 </body>
 </html>
