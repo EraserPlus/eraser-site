@@ -79,7 +79,7 @@
     <tr><th>数据库</th><td>Neon Postgres，三张表：content（六种内容共用）/ todos / events。闲置约 5 分钟休眠，首次访问慢几秒属正常</td></tr>
     <tr><th>后台</th><td><code>/admin/</code> 密码登录（站长持有），7 个标签：今天 / 待办 / 日程 / 导航 / 博客 / 追更 / 页面</td></tr>
     <tr><th>测试</th><td>七套 999 项，一条命令：<code>npm test</code>。提交前必须全绿</td></tr>
-    <tr><th>当前版本</th><td>main @ <code>5a1b9cb</code>（M1 追更页，2026-10-14）· 本页为 M2 批次</td></tr>
+    <tr><th>当前版本</th><td>main @ <code>4177ebb</code> · 最近批次 M2 开发交接页（2026-10-14）</td></tr>
   </table>
 
   <h2>2. 工作流程（六步，别跳步）</h2>
@@ -170,15 +170,14 @@ done < /tmp/main_tree.tsv</code></pre>
     <div class="row"><span class="no">T13</span><span class="what">链接提示词 + 博客一键发布</span><span class="when">10-14</span></div>
     <div class="row"><span class="no">T15</span><span class="what">站点运行徽章 + 导航分类拖拽排序（T14+T15 合批，PR #20）</span><span class="when">10-14</span></div>
     <div class="row latest"><span class="no">M1</span><span class="what"><b>追更页上线</b>：追番 / 漫画两个栏目 + 看完自动收纳栏；media 内容类型；后台第 7 标签；导出备份纳入追更（PR #21）</span><span class="when">10-14</span></div>
-    <div class="row latest"><span class="no">M2</span><span class="what"><b>本页上线</b>：开发交接页（给接手的 AI）；推送脚本收进仓库 dev/</span><span class="when">10-14</span></div>
+    <div class="row latest"><span class="no">M2</span><span class="what"><b>本页上线</b>：开发交接页（给接手的 AI）；推送脚本收进仓库 dev/（PR #22）</span><span class="when">10-14</span></div>
+    <div class="row latest"><span class="no">M3</span><span class="what">收尾：域名记录归档进仓库、README 同步、关闭历史 PR #11</span><span class="when">10-14</span></div>
   </div>
 
   <h2>7. 当前待办 / 已知事项</h2>
   <ul>
     <li><b>Vercel Blob 连接确认</b>：后台上传功能依赖 <code>BLOB_READ_WRITE_TOKEN</code>，未连接时点上传会提示 503（可手填链接兜底）。需要站长在 Vercel 控制台连一次 Blob Store 并点一次「文件 → 上传」验证。</li>
-    <li><b>domains.config.yaml 归档</b>：备用域名 eraser.888.moe 的记录（待站长在 Vercel 添加域名 + DNS 配置后生效）。</li>
-    <li><b>PR #11 待关闭</b>：被 #12 取代的旧修复 PR（一行命令的事）。</li>
-    <li>（可选后续）把「追更」数据接入全站搜索；给追更页加更多分类（改 content.js 枚举 + 前台加栏目）。</li>
+    <li>（可选后续）把「追更」数据接入全站搜索；给追更页加更多分类（改 content.js 枚举 + 前台加栏目）；备用域名 eraser.888.moe 在 Vercel 添加后生效（配置记录见仓库 <code>domains.config.yaml</code>）。</li>
   </ul>
 
   <h2>8. 给下一个 AI 的指令（可直接复制给站长）</h2>

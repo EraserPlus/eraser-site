@@ -1,0 +1,58 @@
+# 域名配置记录
+# 适用项目：eraser-site (GitHub: EraserPlus/eraser-site)
+# 部署平台：Vercel Hobby 免费档
+# DNS 服务商：LacoHost.cc
+
+domains:
+  - name: "eraser.de5.net"
+    status: "active"              # 已在 Vercel 绑定并生效
+    type: "primary"
+    registrar: "LacoHost.cc"
+    expires: "2027-10-13"
+    dns_records:
+      - type: "A"
+        name: "@"
+        value: "76.76.21.21"      # Vercel 的 A 记录 IP（任意一个边缘节点 IP）
+        note: "主域名解析到 Vercel"
+      - type: "CNAME"
+        name: "www"
+        value: "cname.vercel-dns.com"
+        note: "www 子域名指向 Vercel"
+    vercel_config:
+      added_at: "2026-10-13"
+      verified: true
+      ssl: "automatic"
+
+  - name: "eraser.888.moe"
+    status: "pending"             # 待在 Vercel 添加并配置 DNS
+    type: "secondary"
+    registrar: "LacoHost.cc"
+    expires: "2027-10-13"
+    dns_records:
+      - type: "CNAME"
+        name: "eraser"
+        value: "cname.vercel-dns.com"
+        note: "二级域名 eraser.888.moe → CNAME 到 Vercel"
+    vercel_config:
+      added_at: null
+      verified: false
+      ssl: "pending"
+
+# Vercel 添加二级域名步骤：
+# 1. 登录 Vercel Dashboard → 项目 eraser-site → Settings → Domains
+# 2. 点击 "Add" → 输入 "eraser.888.moe" → Add
+# 3. Vercel 会提示添加 CNAME 记录：主机记录 "eraser"，记录值 "cname.vercel-dns.com"
+# 4. 回 LacoHost 后台 → 域名解析 → 添加上述 CNAME 记录
+# 5. 等待几分钟，Vercel 显示 "Valid Configuration" 即生效
+
+# 注意事项：
+# - 两个域名都指向同一个 Vercel 项目，内容完全一致
+# - Vercel 免费档支持无限个自定义域名
+# - SSL 证书由 Vercel 自动申请和续期（Let's Encrypt）
+# - LacoHost 每日签到可攒积分，到期前免费续期
+# - 代码在本地和 GitHub，换域名/平台随时可迁移
+
+# 验证命令（本地可跑）：
+# curl -I https://eraser.de5.net
+# curl -I https://eraser.888.moe
+# 期望：HTTP/2 200，有 strict-transport-security 头
