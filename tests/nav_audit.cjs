@@ -87,8 +87,8 @@ console.log('\n=== 本地存储 ===');
         /localStorage\.getItem\("nav\." \+ key\)/.test(html) &&
         /localStorage\.setItem\("nav\." \+ key/.test(html));
   const logical = [...new Set([...html.matchAll(/(?:load|save)\("([a-z]+)"/g)].map(m => m[1]))].sort();
-  check('只用了 5 个逻辑键：clicks / density / folded / recent / stars',
-        logical.join(',') === 'clicks,density,folded,recent,stars', logical.join(','));
+  check('只用了 6 个逻辑键：clicks / density / folded / order / recent / stars',
+        logical.join(',') === 'clicks,density,folded,order,recent,stars', logical.join(','));
   check('读写都包在 try/catch 里（隐私模式不炸）',
         (html.match(/try\s*\{[^}]*localStorage/g) || []).length >= 2);
   check('没有往 localStorage 存明文链接内容以外的敏感数据',
@@ -136,6 +136,10 @@ console.log('\n=== 功能点 ===');
     ['卡片悬停显示完整网址', /a\.title = link\.url/],
     ['链接带搜索关键词（进搜索索引）', /link\.keywords/],
     ['链接带提示词（进搜索索引 + 卡片小字）', /highlighted\(link\.tip, terms, "tip"\)/],
+    ['分类可拖拽排序（纯函数 + 持久化）', /function applyOrder[\s\S]*function moveCategory/],
+    ['分类标题可拖拽', /h\.draggable = true/],
+    ['拖拽顺序存本地', /save\("order", ids\)/],
+    ['启动时应用本地顺序', /state\.data = C\.applyOrder\(data, state\.order\)/],
   ];
   must.forEach(([name, re]) => check(`包含：${name}`, re.test(html)));
 

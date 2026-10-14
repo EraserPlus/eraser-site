@@ -150,6 +150,10 @@ console.log('\n=== 关于页 ===');
   const html = read('about/index.html');
   check('读取的是 about 这个页面标识', /"about"/.test(html));
   check('标题会跟着变', /document\.title = page\.data\.title/.test(html));
+  check('有站点运行徽章', /id="runDays"/.test(html));
+  check('徽章按上线日期算天数', /SITE_LAUNCH/.test(html) && /86400000/.test(html));
+  check('徽章在正文容器外（后台改正文不影响）',
+        html.indexOf('id="runDays"') > html.indexOf('id="article"'));
 }
 
 console.log('=== 工具箱页 ===');
