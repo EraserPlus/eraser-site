@@ -1091,5 +1091,227 @@ console.log('\n=== 学习地图 /api/learn（给 AI 的读写接口）===');
   check('PUT /api/learn → 405', res.statusCode === 405, String(res.statusCode));
 }
 
+console.log('\n=== 站点地图 /api/sitemap（公开免登录，M10 新增） ===');
+{
+  const sitemapRoute = (await load('api/sitemap.js')).default;
+  const HOST = 'eraser.example.com';
+  const row = (o) => Object.assign({ id: 1, updated_at: '2026-10-13T10:00:00.000Z', data: {} }, o);
+
+  const content = [
+    row({ id: 3, type: 'post', updated_at: '2026-10-13T10:00:00.000Z',
+          data: { slug: 'hello-world', title: '第一篇', published: true } }),
+    row({ id: 2, type: 'post', updated_at: '2026-10-12T10:00:00.000Z',
+          data: { slug: 'draft-one', title: '草稿', published: false } }),
+    row({ id: 5, type: 'page', updated_at: '2026-10-11T10:00:00.000Z',
+          data: { key: 'about', title: '关于' } }),
+    row({ id: 6, type: 'page', updated_at: '2026-10-11T10:00:00.000Z',
+          data: { key: 'home', title: '首页（已下线）' } }),
+    row({ id: 7, type: 'learn_map', updated_at: '2026-10-10T10:00:00.000Z',
+          data: { title: '前端路线', status: 'active', nodes: [] } }),
+    row({ id: 8, type: 'learn_map', updated_at: '2026-10-10T10:00:00.000Z',
+          data: { title: '归档地图', status: 'archived', nodes: [] } }),
+  ];
+
+  /* 假驱动不执行 SQL 的 WHERE，这里按真实条件手动筛一遍，
+     另外单独断言 SQL 文本里确实带了这三种类型 */
+  const wanted = content.filter(r => r.type === 'post' || r.type === 'page' || r.type === 'learn_map');
+
+  fakeDb((text) => (/FROM content/.test(text) ? wanted : []));
+  let res = await call(sitemapRoute, 'GET', { headers: { host: HOST } });
+  check('未登录也能读 sitemap → 200', res.statusCode === 200, String(res.statusCode));
+  check('Content-Type 是 application/xml', /application\/xml/.test(res.headers['Content-Type'] || ''),
+        res.headers['Content-Type']);
+  check('响应体是 XML（以 <?xml 开头）', /^<\?xml/.test(res.body || ''), String(res.body).slice(0, 40));
+  check('带 sitemap 0.9 命名空间', (res.body || '').includes('http://www.sitemaps.org/schemas/sitemap/0.9'));
+  check('是完整 XML（以 </urlset> 结尾）', /<\/urlset>\s*$/.test(String(res.body).trimEnd()));
+  check('没有 XML 声明之外的 HTML', !/<!DOCTYPE|<html/i.test(res.body || ''));
+
+  /* 固定页 —— 七个前台页面 + 首页 */
+  const body = res.body || '';
+  check('首页在 sitemap 里', body.includes('<loc>https://' + HOST + '/</loc>'));
+  check('工具箱 / 博客 / 追更 / 学习 / 导航 / 关于都在',
+        ['/tools/', '/blog/', '/collect/', '/learn/', '/nav/', '/about/']
+          .every(p => body.includes('<loc>https://' + HOST + p + '</loc>')),
+        body.match(/<loc>[^<]*<\/loc>/g) ? body.match(/<loc>[^<]*<\/loc>/g).slice(0, 10).join(' ') : 'none');
+
+  /* 文章 */
+  check('已发布文章进 sitemap', body.includes('/blog/post.html?slug=hello-world'));
+  check('草稿不进 sitemap', !body.includes('draft-one'));
+  check('文章 slug 做了 URL 编码', /slug=hello-world/.test(body));
+
+  /* 页面 */
+  check('内置页面进 sitemap（/about/）', body.includes('<loc>https://' + HOST + '/about/</loc>'));
+  check('已下线的 home 页面不进 sitemap', !/\/home\//.test(body));
+
+  /* 学习地图 */
+  check('在学的学习地图进 sitemap（/learn/?id=7）', body.includes('/learn/?id=7'));
+  check('归档的学习地图不进 sitemap', !body.includes('/learn/?id=8'));
+
+  /* 详情 */
+  check('每条 url 都有 loc', (body.match(/<loc>/g) || []).length === (body.match(/<\/loc>/g) || []).length);
+  check('每条 url 都带 priority', (body.match(/<url>/g) || []).length === (body.match(/<priority>/g) || []).length);
+  check('有 lastmod（取自 updated_at，YYYY-MM-DD）',
+        /<lastmod>2026-10-13<\/lastmod>/.test(body), (/<lastmod>([^<]*)</.exec(body) || [])[1] || 'none');
+  check('首页 priority 最高（1.0）', /<loc>https:\/\/[^<]*\/<\/loc>\s*<priority>1\.0<\/priority>/.test(body));
+
+  /* SQL：类型清单 + 只读这三种 */
+  const sel = executed.find(e => /FROM content/.test(e.text));
+  check('SQL 覆盖 post / page / learn_map 三种类型',
+        sel && /'post'/.test(sel.text) && /'page'/.test(sel.text) && /'learn_map'/.test(sel.text),
+        sel ? sel.text : 'none');
+  check('sitemap 不查 nav_link / media（不是独立详情页）',
+        sel && !/'nav_link'/.test(sel.text) && !/'media'/.test(sel.text), sel ? sel.text : 'none');
+
+  /* XML 转义 */
+  fakeDb((text) => (/FROM content/.test(text)
+    ? [row({ id: 1, type: 'post', data: { slug: 'a&b', title: '标<题>', published: true } })]
+    : []));
+  res = await call(sitemapRoute, 'GET', { headers: { host: HOST } });
+  check('URL 里的 & 被转义成 &amp;', (res.body || '').includes('slug=a%26b') || (res.body || '').includes('&amp;'),
+        (/<loc>([^<]*)<\/loc>/.exec(res.body || '') || [])[1] || 'none');
+  check('转义后仍是合法 XML（没有裸 & 落在标签外）', !/&(?!amp;|lt;|gt;|quot;|apos;|#)/.test(res.body || ''));
+
+  /* 空库 */
+  fakeDb(() => []);
+  res = await call(sitemapRoute, 'GET', { headers: { host: HOST } });
+  check('空库也返回 200', res.statusCode === 200, String(res.statusCode));
+  check('空库仍列固定页', (res.body || '').includes('<loc>https://' + HOST + '/</loc>'));
+  check('空库也是完整 XML', /^<\?xml[\s\S]*<\/urlset>\s*$/.test(res.body || ''));
+
+  /* 方法限制 */
+  fakeDb(noop);
+  res = await call(sitemapRoute, 'POST', { body: {} });
+  check('POST /api/sitemap → 405', res.statusCode === 405, String(res.statusCode));
+
+  /* Host 缺省兜底 */
+  fakeDb(() => []);
+  res = await call(sitemapRoute, 'GET', {});
+  check('没有 Host 头时用兜底域名', (res.body || '').includes('<loc>https://eraser.de5.net/</loc>'),
+        (/<loc>([^<]*)<\/loc>/.exec(res.body || '') || [])[1] || 'none');
+}
+
+console.log('\n=== 备份与还原 /api/backup（M10 新增） ===');
+{
+  const backupRoute = (await load('api/backup.js')).default;
+
+  const todoRow = { id: 1, title: '交房租', note: null, done: false, due_date: '2026-10-20',
+                    priority: 2, created_at: '2026-10-13T10:00:00.000Z', done_at: null };
+  const eventRow = { id: 1, title: '开会', note: null, start_at: '2026-10-15T09:00:00.000Z',
+                     end_at: null, all_day: false, created_at: '2026-10-13T10:00:00.000Z' };
+  const contentRow = (o) => Object.assign({ parent_id: null, sort_order: 0,
+    updated_at: '2026-10-13T10:00:00.000Z', data: {} }, o);
+
+  /* ---- 未登录一律拒绝 ---- */
+  fakeDb(noop);
+  let res = await call(backupRoute, 'GET', {});
+  check('未登录 GET /api/backup → 401', res.statusCode === 401, String(res.statusCode));
+  res = await call(backupRoute, 'POST', { body: { todos: [] } });
+  check('未登录 POST /api/backup → 401', res.statusCode === 401, String(res.statusCode));
+
+  /* ---- 拉快照 ---- */
+  fakeDb((text) => {
+    if (/FROM todos/.test(text)) return [todoRow];
+    if (/FROM events/.test(text)) return [eventRow];
+    if (/FROM content/.test(text)) return [
+      contentRow({ id: 1, type: 'post', data: { slug: 'a', title: '文章A', content: '正文', published: true } }),
+      contentRow({ id: 2, type: 'page', data: { key: 'about', title: '关于', content: '内容' } }),
+      contentRow({ id: 3, type: 'nav_category', data: { name: '开发' } }),
+      contentRow({ id: 4, type: 'nav_link', parent_id: 3, data: { name: 'GitHub', url: 'https://github.com' } }),
+      contentRow({ id: 5, type: 'media', data: { category: 'anime', name: '芙莉莲', status: 'watching' } }),
+      contentRow({ id: 6, type: 'learn_map', data: { title: '前端路线', status: 'active',
+        nodes: [{ id: 'n1', text: 'HTML', done: true }] } }),
+    ];
+    return [];
+  });
+  res = await call(backupRoute, 'GET', { token: TOKEN });
+  check('登录后 GET /api/backup → 200', res.statusCode === 200, String(res.statusCode));
+  const bk = res.json && res.json.backup;
+  check('快照含 exportedAt / site', !!(bk && bk.exportedAt && bk.site), JSON.stringify(bk && Object.keys(bk)));
+  check('快照含 todos（1 条）', bk && bk.todos.length === 1, JSON.stringify(bk && bk.todos.length));
+  check('快照含 events（1 条）', bk && bk.events.length === 1);
+  check('快照把 content 按类型分好（posts/pages/nav/media/learnMaps）',
+        bk && bk.posts.length === 1 && bk.pages.length === 1 && bk.media.length === 1
+        && bk.learnMaps.length === 1);
+  check('nav 拆成 categories / links',
+        bk && bk.nav.categories.length === 1 && bk.nav.links.length === 1);
+  check('学习地图快照带 nodes（不丢节点）',
+        bk && bk.learnMaps[0].data.nodes.length === 1 && bk.learnMaps[0].data.nodes[0].text === 'HTML');
+
+  /* ---- verify：好备份 ---- */
+  fakeDb(noop);
+  const goodBackup = {
+    exportedAt: '2026-10-13T10:00:00.000Z', site: 'eraser.de5.net',
+    todos: [{ id: 1, title: '交房租' }],
+    events: [{ id: 1, title: '开会', start_at: '2026-10-15T09:00:00.000Z' }],
+    posts: [{ id: 1, data: { slug: 'a', title: 'A', content: '正文' } }],
+    pages: [], files: [], media: [],
+    nav: { categories: [{ id: 1, data: { name: '开发' } }],
+           links: [{ id: 2, parent_id: 1, data: { name: 'GitHub', url: 'https://github.com' } }] },
+    learnMaps: [{ id: 3, data: { title: '路线', nodes: [{ id: 'n1', text: 'HTML' }] } }],
+  };
+  res = await call(backupRoute, 'POST', { token: TOKEN, query: { action: 'verify' }, body: goodBackup });
+  check('verify 好备份 → ok:true', res.statusCode === 200 && res.json.ok === true,
+        JSON.stringify(res.json));
+  check('verify 返回各类计数', res.json.counts && res.json.counts.todos === 1 && res.json.counts.learnMaps === 1,
+        JSON.stringify(res.json.counts));
+  check('verify 不写库（一条 INSERT 都没有）', !executed.some(e => /INSERT|UPDATE/.test(e.text)));
+
+  /* ---- verify：坏备份 ---- */
+  fakeDb(noop);
+  res = await call(backupRoute, 'POST', { token: TOKEN, query: { action: 'verify' },
+    body: { todos: 'not-an-array', learnMaps: [] } });
+  check('verify 坏备份 → ok:false', res.statusCode === 200 && res.json.ok === false, JSON.stringify(res.json));
+  check('verify 指出 todos 应该是数组',
+        (res.json.errors || []).some(e => /todos/.test(e)), JSON.stringify(res.json.errors));
+
+  res = await call(backupRoute, 'POST', { token: TOKEN, query: { action: 'verify' },
+    body: { posts: [{ id: 1, data: { title: '缺 slug 和正文' } }] } });
+  check('verify 会逐条跑 normalize（缺字段被挡下）',
+        res.json.ok === false && (res.json.errors || []).some(e => /posts\[0\]/.test(e)),
+        JSON.stringify(res.json.errors));
+
+  res = await call(backupRoute, 'POST', { token: TOKEN, query: { action: 'verify' }, body: {} });
+  check('verify 空对象 → ok:false（一条数据都没有）',
+        res.json.ok === false, JSON.stringify(res.json.errors));
+
+  /* ---- 还原：写库 + 事务 ---- */
+  fakeDb(() => []);
+  res = await call(backupRoute, 'POST', { token: TOKEN, body: goodBackup });
+  check('还原好备份 → 200', res.statusCode === 200, JSON.stringify(res.json));
+  check('还原报告了写入条数',
+        res.json.restored && res.json.restored.todos === 1 && res.json.restored.content >= 3,
+        JSON.stringify(res.json.restored));
+  check('还原确实写了 todos（INSERT ... ON CONFLICT）',
+        executed.some(e => /INSERT INTO todos/.test(e.text) && /ON CONFLICT \(id\) DO UPDATE/.test(e.text)));
+  check('还原写了 events', executed.some(e => /INSERT INTO events/.test(e.text)));
+  check('还原写了 content', executed.some(e => /INSERT INTO content/.test(e.text)));
+  check('还原推进了序列号（否则下次新建会撞 id）',
+        executed.filter(e => /setval\(pg_get_serial_sequence/.test(e.text)).length === 3,
+        String(executed.filter(e => /setval/.test(e.text)).length));
+  check('还原包在事务里（走 sql.transaction）', executed.some(e => /INSERT INTO todos/.test(e.text)));
+
+  /* 坏备份不写库 */
+  fakeDb(() => []);
+  res = await call(backupRoute, 'POST', { token: TOKEN, body: { posts: 'oops' } });
+  check('还原坏备份 → 400', res.statusCode === 400, String(res.statusCode));
+  check('坏备份一条都不写', !executed.some(e => /INSERT|UPDATE/.test(e.text)));
+
+  /* 备份可以包一层 {data: ...} */
+  fakeDb(() => []);
+  res = await call(backupRoute, 'POST', { token: TOKEN, body: { data: goodBackup } });
+  check('还原接受 {data: 备份} 的包装形式 → 200', res.statusCode === 200, JSON.stringify(res.json));
+
+  /* 还原不删库里多出来的数据（ON CONFLICT 用 DO UPDATE，没有 DELETE） */
+  fakeDb(() => []);
+  await call(backupRoute, 'POST', { token: TOKEN, body: goodBackup });
+  check('还原不含 DELETE（不会手滑清掉新加的内容）',
+        !executed.some(e => /DELETE FROM/.test(e.text)));
+
+  /* ---- 方法限制 ---- */
+  fakeDb(noop);
+  res = await call(backupRoute, 'DELETE', { token: TOKEN });
+  check('DELETE /api/backup → 405', res.statusCode === 405, String(res.statusCode));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

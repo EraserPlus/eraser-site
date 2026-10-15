@@ -9,6 +9,11 @@
 (function(){try{var t=localStorage.getItem("eraser.theme");if(t!=="light"&&t!=="dark"){t=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";}document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();
 </script>
 <link rel="stylesheet" href="style.css">
+<!-- PWA：可加到手机主屏；manifest / 图标 / 主题色，离线外壳见 sw.js -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="theme-color" content="#2563eb">
 <style>
 /* 本页只写 style.css 里没有的样式；导航栏、容器基础一律交给 style.css */
 :root{
