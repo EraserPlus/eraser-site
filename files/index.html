@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>文件仓库 - Eraser 的小站</title>
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<div class="navbar">
+  <span class="logo">🧩 Eraser 的小站</span>
+  <nav>
+    <a href="../index.html">首页</a>
+    <a href="../tools/index.html">工具箱</a>
+    <a href="index.html" class="active">文件仓库</a>
+    <a href="../blog/index.html">博客</a>
+    <a href="../nav/index.html">导航</a>
+    <a href="../about/index.html">关于</a>
+  </nav>
+</div>
+<div class="container">
+  <h1>📦 文件仓库</h1>
+  <p class="muted">把文件传进仓库的 <code>files/</code> 目录，然后在管理后台的「文件」标签加一条记录。</p>
+
+  <!-- 空状态：还没有文件、或接口不可用时显示，页面不会白屏 -->
+  <div id="list"></div>
+  <p class="muted" id="hint">还没有文件。去管理后台的「文件」标签加一条记录。</p>
+</div>
+
+<script>
+(function(){
+  var list = document.getElementById("list");
+  var hint = document.getElementById("hint");
+  if (!window.fetch) return;
+
+  fetch("/api/content?type=file", { headers: { Accept: "application/json" } })
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){
+      var items = (j && j.items) || [];
+      if (!items.length){ hint.style.display = ""; return; }   // 数据库里还没内容，保留静态兜底
+
+      list.innerHTML = "";
+      items.forEach(function(f){
+        var d = f.data;
+        var row = document.createElement("div");
+        row.className = "list-item";
+
+        var left = document.createElement("div");
+        var name = document.createElement("div");
+        name.className = "name";
+        name.textContent = d.name;
+        left.appendChild(name);
+
+        var desc = document.createElement("div");
+        desc.className = "desc";
+        desc.textContent = d.desc || "";
+        left.appendChild(desc);
+        row.appendChild(left);
+
+        var a = document.createElement("a");
+        a.href = d.url;
+        var external = /^https?:/i.test(d.url);
+        if (external){ a.target = "_blank"; a.rel = "noopener noreferrer"; }
+        else { a.setAttribute("download", ""); }
+        var b = document.createElement("button");
+        b.className = "ghost";
+        b.textContent = external ? "打开" : "下载";
+        a.appendChild(b);
+        row.appendChild(a);
+
+        list.appendChild(row);
+      });
+      hint.style.display = "none";
+    })
+    .catch(function(){ hint.style.display = ""; });   // 接口挂了就显示空状态提示
+})();
+</script>
+</body>
+</html>

@@ -36,6 +36,12 @@ const TYPES = {
     needsParent: false,
     fields: ['category', 'name', 'status', 'score', 'note', 'date', 'url', 'cover'],
   },
+  learn_map: {
+    public: true,
+    needsParent: false,
+    // 学习地图：一张地图内含若干节点（nodes 是内嵌数组，不占额外表）
+    fields: ['title', 'desc', 'status', 'nodes'],
+  },
 };
 
 export function knownType(type) {
@@ -89,6 +95,55 @@ function slug(v) {
   s = s.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5-]+/g, '-').replace(/^-+|-+$/g, '');
   if (!s) throw bad('短链接不能为空');
   return s.slice(0, 80);
+}
+
+/* ---------------- 学习地图的节点 ----------------
+   节点内嵌在地图的 data.nodes 里，每个节点结构固定：
+   { id, text, group, done, note }
+   - id   客户端生成的短标识（用于 AI 精确定位某个节点），必填、地图内唯一
+   - text 节点文字（要学的东西），必填
+   - group 分组名（如「基础」「进阶」），可空
+   - done 是否完成，布尔
+   - note 备注，可空
+*/
+const NODE_MAX = 500;        // 单张地图节点数上限
+const NODE_ID_MAX = 40;      // 节点 id 长度
+const GROUP_MAX = 40;        // 分组名长度
+
+function nodeId(v, idx) {
+  const s = typeof v === 'string' ? v.trim() : '';
+  if (!s) {
+    // id 缺失时按位置兜底生成，保证 AI 能定位；不因为旧数据没 id 就报错
+    return 'n' + (idx + 1);
+  }
+  if (s.length > NODE_ID_MAX) throw bad(`节点 id（第 ${idx + 1} 个）最多 ${NODE_ID_MAX} 个字符`);
+  // 只允许安全字符，避免注入到 URL / 选择器里出问题
+  const clean = s.replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!clean) throw bad(`节点 id（第 ${idx + 1} 个）只能用小写字母、数字、下划线或连字符`);
+  return clean;
+}
+
+function nodes(v) {
+  if (v == null) return [];
+  if (!Array.isArray(v)) throw bad('节点要是一个数组');
+  if (v.length > NODE_MAX) throw bad(`一张地图最多 ${NODE_MAX} 个节点，当前 ${v.length} 个`);
+  const seen = {};
+  const out = [];
+  v.forEach(function (raw, idx) {
+    const n = (raw && typeof raw === 'object') ? raw : {};
+    const id = nodeId(n.id, idx);
+    if (seen[id]) throw bad(`节点 id「${id}」重复了，同一张地图里不能重复`);
+    seen[id] = true;
+    const text = str(n.text, `第 ${idx + 1} 个节点的内容`, { max: 200 });
+    out.push({
+      id: id,
+      text: text,
+      group: str(n.group, `第 ${idx + 1} 个节点的分组`, { max: GROUP_MAX, required: false }),
+      done: !!n.done,
+      note: str(n.note, `第 ${idx + 1} 个节点的备注`, { max: 300, required: false }),
+    });
+  });
+  return out;
 }
 
 /* 校验并归一化 data，返回一个干净的、只含白名单字段的对象 */
@@ -146,6 +201,16 @@ export function normalize(type, raw) {
     out.date = str(d.date, '日期', { max: 20, required: false });
     out.url = str(d.url, '链接', { max: 2000, required: false });
     out.cover = str(d.cover, '封面图地址', { max: 2000, required: false });
+  } else if (type === 'learn_map') {
+    /* 学习地图：一张地图 + 内嵌节点 */
+    out.title = str(d.title, '地图标题', { max: 120 });
+    out.desc = str(d.desc, '地图说明', { max: 500, required: false });
+    const st = str(d.status, '状态', { max: 20, required: false }) || 'active';
+    if (st !== 'active' && st !== 'done' && st !== 'archived') {
+      throw bad('地图状态只能是 active（在学）/ done（学完）/ archived（归档）');
+    }
+    out.status = st;
+    out.nodes = nodes(d.nodes);
   }
 
   return out;

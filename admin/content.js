@@ -62,6 +62,18 @@
         { k: "url", l: "链接（可空）", t: "text", ph: "https://…（豆瓣 / B站 / bgm 页面）" },
         { k: "cover", l: "封面图链接（可空）", t: "text", ph: "https://…图片地址，留空则只显示文字" }
       ]
+    },
+    learn_map: {
+      name: "学习地图",
+      fields: [
+        { k: "title", l: "地图标题", t: "text", ph: "比如：前端入门路线", req: true },
+        { k: "desc", l: "地图说明（可空）", t: "text", ph: "一句话说明这张地图要学到哪" },
+        { k: "status", l: "状态", t: "select", req: true, opts: [
+            ["active", "在学"],
+            ["done", "学完"],
+            ["archived", "归档（不显示在列表，但数据还在）"]
+        ] }
+      ]
     }
   };
 
@@ -558,10 +570,359 @@
     openForm(item ? "编辑" + SCHEMA[type].name : "新增" + SCHEMA[type].name, form);
   }
 
-  var cache = { post: [], page: [], media: [] };
+  var cache = { post: [], page: [], media: [], learn_map: [] };
   function reload(type) {
     return api("content?type=" + type).then(function (j) { cache[type] = j.items || []; });
   }
+
+  /* ===== LEARN-NODES-START ===== */
+  /* 学习地图的节点编辑。
+     节点不是独立记录，而是内嵌在地图的 data.nodes 数组里，
+     所以这里不走通用 buildForm，而是自己画一份「一张地图 + 节点列表」的编辑面板。
+     要点：
+       - id 是节点在地图内的唯一标识，AI 靠它精确定位；这里自动生成，不让手填
+       - 上下移动 / 所在分组一起决定前台显示顺序，所以排序要能改
+       - 新增节点默认继承上一行的分组，连续加同一组的节点就不用反复输入
+     数据落库统一走 /api/learn（节点粒度的原子接口），避免整表覆盖写。 */
+
+  /* 组内顺序 = 数组顺序；分组名按首次出现排 */
+  function groupOf(nodes) {
+    var order = [], map = {};
+    nodes.forEach(function (n) {
+      var g = (n && n.group) || "";
+      if (!map[g]) { map[g] = []; order.push(g); }
+      map[g].push(n);
+    });
+    return order.map(function (g) { return { name: g, nodes: map[g] }; });
+  }
+
+  /* 生成一个地图内没被占用的节点 id */
+  function newNodeId(nodes) {
+    var used = {};
+    nodes.forEach(function (n) { if (n && n.id) used[String(n.id)] = true; });
+    var i = nodes.length + 1;
+    while (used["n" + i]) i++;
+    return "n" + i;
+  }
+
+  function nodeRow(node, nodes, idx, refresh) {
+    var row = el("div", "lmrow" + (node.done ? " done" : ""));
+    row.dataset.nid = node.id;
+
+    /* 左：拖动把手 + 完成勾选 */
+    var lead = el("div", "lmlead");
+    var grip = el("span", "lmgrip", "⠿");
+    grip.title = "拖动或点 ↑↓ 调整顺序";
+    lead.appendChild(grip);
+    var chk = el("input");
+    chk.type = "checkbox";
+    chk.checked = !!node.done;
+    chk.title = "标记完成";
+    chk.addEventListener("change", function () {
+      patchNode(refresh, node.id, { done: chk.checked }, function () { chk.checked = !chk.checked; });
+    });
+    lead.appendChild(chk);
+    row.appendChild(lead);
+
+    /* 中：文字 / 分组 / 备注，三行都是可直接编辑的输入框 */
+    var mid = el("div", "lmmid");
+    var t = el("input", "lmt");
+    t.type = "text";
+    t.value = node.text || "";
+    t.placeholder = "要学的东西";
+    t.title = "节点文字";
+    var g = el("input", "lmg");
+    g.type = "text";
+    g.value = node.group || "";
+    g.placeholder = "分组（可空）";
+    g.title = "分组名，同名的会归到一起";
+    var nt = el("input", "lmnt");
+    nt.type = "text";
+    nt.value = node.note || "";
+    nt.placeholder = "备注（可空）";
+    nt.title = "备注，前台显示在节点下方";
+
+    /* 失焦才保存，避免每敲一个字就打一次接口 */
+    t.addEventListener("blur", function () {
+      if (t.value.trim() === (node.text || "")) return;
+      patchNode(refresh, node.id, { text: t.value });
+    });
+    g.addEventListener("blur", function () {
+      if (g.value.trim() === (node.group || "")) return;
+      patchNode(refresh, node.id, { group: g.value });
+    });
+    nt.addEventListener("blur", function () {
+      if (nt.value.trim() === (node.note || "")) return;
+      patchNode(refresh, node.id, { note: nt.value });
+    });
+    /* 回车即保存并失焦，符合「敲完就走」的习惯 */
+    [t, g, nt].forEach(function (inp) {
+      inp.addEventListener("keydown", function (e) { if (e.key === "Enter") inp.blur(); });
+    });
+
+    mid.appendChild(t);
+    mid.appendChild(g);
+    mid.appendChild(nt);
+    row.appendChild(mid);
+
+    /* 右：上移 / 下移 / 插入下方 / 删除 */
+    var ops = el("div", "lmops");
+    var up = el("button", null, "↑");
+    up.type = "button"; up.title = "上移";
+    up.disabled = idx === 0;
+    up.addEventListener("click", function () { moveNode(refresh, nodes, idx, idx - 1); });
+    var dn = el("button", null, "↓");
+    dn.type = "button"; dn.title = "下移";
+    dn.disabled = idx === nodes.length - 1;
+    dn.addEventListener("click", function () { moveNode(refresh, nodes, idx, idx + 1); });
+    var add = el("button", null, "＋");
+    add.type = "button"; add.title = "在下面插一个（继承本行分组）";
+    add.addEventListener("click", function () { insertAfter(refresh, nodes, idx); });
+    var del = el("button", null, "✕");
+    del.type = "button"; del.title = "删掉这个节点";
+    del.addEventListener("click", function () {
+      if (!confirm("删掉「" + (node.text || "这个节点") + "」？")) return;
+      patchNode(refresh, null, null, null);   /* 占位，见下 */
+    });
+    /* 删除走独立分支：不用 nodeId 定位的 patch，而是 removeNode */
+    del.onclick = function () {
+      if (!confirm("删掉「" + (node.text || "这个节点") + "」？删了就找不回来了。")) return;
+      busy(del, true);
+      api("learn?action=removeNode", { method: "POST", body: { id: mapId, nodeId: node.id } })
+        .then(function () { say("app", "已删除"); return refresh(); })
+        .catch(function (e) { say("app", e.message, "err"); busy(del, false); });
+    };
+    ops.appendChild(up); ops.appendChild(dn); ops.appendChild(add); ops.appendChild(del);
+    row.appendChild(ops);
+    return row;
+  }
+
+  /* 统一改一个节点的某个字段；失败就回调（用于把复选框翻回去） */
+  function patchNode(refresh, nodeId, patch, onFail) {
+    return api("learn?action=updateNode", { method: "POST", body: { id: mapId, nodeId: nodeId, patch: patch } })
+      .then(function () { return refresh(); })
+      .catch(function (e) { say("app", e.message, "err"); if (onFail) onFail(); });
+  }
+
+  /* 把 nodes[i] 移到 i2，并整体写回（顺序就是前台显示顺序） */
+  function moveNode(refresh, nodes, i, i2) {
+    if (i2 < 0 || i2 >= nodes.length) return;
+    var copy = nodes.slice();
+    var moved = copy.splice(i, 1)[0];
+    copy.splice(i2, 0, moved);
+    api("learn?action=setNodes", { method: "POST", body: { id: mapId, nodes: copy } })
+      .then(function () { return refresh(); })
+      .catch(function (e) { say("app", e.message, "err"); });
+  }
+
+  /* 在第 i 行下面插一个空节点，默认继承它的分组 */
+  function insertAfter(refresh, nodes, i) {
+    var g = (nodes[i] && nodes[i].group) || "";
+    api("learn?action=addNode", { method: "POST", body: { id: mapId, node: { text: "新节点", group: g } } })
+      .then(function () { return refresh(); })
+      .catch(function (e) { say("app", e.message, "err"); });
+  }
+
+  function busy(btn, on) {
+    if (!btn) return;
+    btn.disabled = !!on;
+  }
+
+  /* 当前正在编辑哪张地图（给上面几个节点操作函数用） */
+  var mapId = null;
+
+  /* 渲染一张地图的编辑面板：地图信息 + 分组后的节点列表 */
+  function renderMapEditor(map, onBack) {
+    var wrap = el("div", "lmedit");
+    var nodes = (map.data && map.data.nodes) || [];
+    mapId = map.id;
+
+    /* 顶部：返回 + 标题 */
+    var bar = el("div", "cf-actions");
+    var back = el("button", "btn ghost sm", "← 返回地图列表");
+    back.type = "button";
+    back.addEventListener("click", onBack);
+    bar.appendChild(back);
+    wrap.appendChild(bar);
+
+    /* 地图信息 */
+    var info = el("div", "card");
+    var h = el("h2");
+    h.appendChild(el("span", null, "🗺️ " + (map.data.title || "(未命名地图)")));
+    h.appendChild(el("span", "cnt", nodes.length + " 个节点"));
+    info.appendChild(h);
+    if (map.data.desc) info.appendChild(el("p", "lmdsc", map.data.desc));
+
+    var infoOps = el("div", "cf-actions");
+    var eTitle = el("button", "btn ghost sm", "改标题 / 说明 / 状态");
+    eTitle.type = "button";
+    eTitle.addEventListener("click", function () { editMapInfo(map, onBack); });
+    infoOps.appendChild(eTitle);
+    info.appendChild(infoOps);
+    wrap.appendChild(info);
+
+    /* 节点区 */
+    var card = el("div", "card");
+    var nh = el("h2");
+    nh.appendChild(el("span", null, "📋 节点"));
+    nh.appendChild(el("span", "cnt", nodes.length));
+    card.appendChild(nh);
+
+    var hint = el("p", "hintline");
+    hint.textContent = "文字 / 分组 / 备注 直接改，点开别处就自动存。↑↓ 调顺序，＋ 在下面插一个，✕ 删掉。";
+    card.appendChild(hint);
+
+    if (!nodes.length) {
+      card.appendChild(el("div", "empty", "这张地图还没有节点。点下面的按钮加一个，或者让 AI 助手帮你拆。"));
+    } else {
+      var current = null;
+      nodes.forEach(function (n, i) {
+        var g = (n && n.group) || "";
+        if (g !== current) {
+          current = g;
+          var gh = el("div", "lmgrp-h", g || "未分组");
+          card.appendChild(gh);
+        }
+        card.appendChild(nodeRow(n, nodes, i, function () { return reloadEditor(onBack); }));
+      });
+    }
+
+    var addBar = el("div", "cf-actions");
+    var addNode = el("button", "btn", "＋ 新增节点");
+    addNode.type = "button";
+    addNode.addEventListener("click", function () {
+      var last = nodes.length ? (nodes[nodes.length - 1].group || "") : "";
+      api("learn?action=addNode", { method: "POST", body: { id: mapId, node: { text: "新节点", group: last } } })
+        .then(function () { return reloadEditor(onBack); })
+        .catch(function (e) { say("app", e.message, "err"); });
+    });
+    addBar.appendChild(addNode);
+    card.appendChild(addBar);
+    wrap.appendChild(card);
+
+    return wrap;
+  }
+
+  /* 重新读当前地图并重画编辑面板 */
+  var editorHost = null, editorBack = null;
+  function reloadEditor(onBack) {
+    editorBack = onBack || editorBack;
+    return api("learn?id=" + encodeURIComponent(mapId)).then(function (j) {
+      if (!editorHost || !j.item) return;
+      editorHost.innerHTML = "";
+      var fresh = { id: j.item.id, data: j.item.data || {} };
+      editorHost.appendChild(renderMapEditor(fresh, editorBack));
+    });
+  }
+
+  /* 改地图本身的信息，复用通用表单 + /api/learn 的 PATCH */
+  function editMapInfo(map, onBack) {
+    var form = buildForm("learn_map", function (data, unlock) {
+      api("learn", { method: "PATCH", body: { id: map.id, title: data.title, desc: data.desc, status: data.status } })
+        .then(function () { closeForm(); return reloadEditor(onBack); })
+        .then(function () { say("app", "已保存"); })
+        .catch(function (e) { say("app", e.message, "err"); unlock(); });
+    }, closeForm);
+    form.fill(map.data || null);
+    openForm("编辑学习地图", form);
+  }
+
+  /* 学习地图的主渲染：先列地图，点进去进编辑面板 */
+  function renderLearn(hostId) {
+    var host = $(hostId);
+    host.innerHTML = "";
+    editorHost = el("div");
+    mapId = null;
+
+    function listView() {
+      host.innerHTML = "";
+      host.appendChild(editorHost);
+      editorHost.innerHTML = "";
+      mapId = null;
+      return api("learn").then(function (j) {
+        var items = (j && j.items) || [];
+
+        var bar = el("div", "cf-actions");
+        var add = el("button", "btn", "＋ 新建学习地图");
+        add.type = "button";
+        add.addEventListener("click", function () { newMap(listView); });
+        bar.appendChild(add);
+        editorHost.appendChild(bar);
+
+        if (!items.length) {
+          var empty = el("div", "empty");
+          empty.appendChild(el("div", null, "还没有学习地图。"));
+          var tips = el("p", "hintline");
+          tips.textContent = "点上面的按钮新建一张，或者让 AI 助手通过 /api/learn 帮你建、帮你查漏补缺。";
+          empty.appendChild(tips);
+          editorHost.appendChild(empty);
+          return;
+        }
+
+        var card = el("div", "card");
+        items.forEach(function (m) {
+          var row = el("div", "item");
+          var main = el("div", "main");
+          main.appendChild(el("div", "t", m.title || "(未命名地图)"));
+          var sub = el("div", "sub");
+          var st = { active: "在学", done: "学完", archived: "归档" }[m.status] || m.status;
+          sub.appendChild(el("span", "pill", st));
+          var p = m.progress || { done: 0, total: 0 };
+          sub.appendChild(el("span", "pill", "完成 " + (p.done || 0) + " / " + (p.total || 0)));
+          if (p.percent != null) sub.appendChild(el("span", "pill", p.percent + "%"));
+          main.appendChild(sub);
+          if (m.desc) main.appendChild(el("div", "note", m.desc));
+          row.appendChild(main);
+
+          var ops = el("div", "ops");
+          var open = el("button", null, "✎");
+          open.title = "打开编辑节点";
+          open.addEventListener("click", function () { openMap(m.id, listView); });
+          var del = el("button", null, "✕");
+          del.title = "删掉整张地图";
+          del.addEventListener("click", function () {
+            if (!confirm("删掉整张「" + (m.title || "未命名地图") + "」？里面的节点会一起没。")) return;
+            api("learn?id=" + encodeURIComponent(m.id), { method: "DELETE" })
+              .then(function () { say("app", "已删除"); return listView(); })
+              .catch(function (e) { say("app", e.message, "err"); });
+          });
+          ops.appendChild(open); ops.appendChild(del);
+          row.appendChild(ops);
+          card.appendChild(row);
+        });
+        editorHost.appendChild(card);
+      });
+    }
+
+    return listView().catch(function (e) { say("app", e.message, "err"); });
+  }
+
+  /* 打开某张地图的编辑面板 */
+  function openMap(id, onBack) {
+    mapId = id;
+    return api("learn?id=" + encodeURIComponent(id)).then(function (j) {
+      if (!editorHost) return;
+      editorHost.innerHTML = "";
+      editorHost.appendChild(renderMapEditor({ id: j.item.id, data: j.item.data || {} }, onBack));
+      window.scrollTo(0, 0);
+    }).catch(function (e) { say("app", e.message, "err"); });
+  }
+
+  /* 新建地图 */
+  function newMap(onDone) {
+    var form = buildForm("learn_map", function (data, unlock) {
+      api("learn", { method: "POST", body: { title: data.title, desc: data.desc, status: data.status } })
+        .then(function (j) { closeForm(); return j; })
+        .then(function (j) {
+          say("app", "已新建，开始加节点吧");
+          return onDone().then(function () { return openMap(j.item.id, onDone); });
+        })
+        .catch(function (e) { say("app", e.message, "err"); unlock(); });
+    }, closeForm);
+    form.fill({ status: "active" });
+    openForm("新建学习地图", form);
+  }
+  /* ===== LEARN-NODES-END ===== */
 
   var RENDERERS = {
     nav: function () { return loadNav().then(renderNav); },
@@ -628,7 +989,8 @@
           note: function (i) { return i.data.note || ""; }
         });
       });
-    }
+    },
+    learn_map: function () { return renderLearn("learnHost"); }
   };
 
   function render(tab) {

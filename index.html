@@ -142,6 +142,7 @@ html[data-theme="dark"] .morebtn:hover{ background:var(--blue-l); }
     <a href="tools/index.html">工具箱</a>
     <a href="blog/index.html">博客</a>
     <a href="collect/index.html">追更</a>
+    <a href="learn/index.html">学习</a>
     <a href="nav/index.html">导航</a>
     <a href="about/index.html">关于</a>
   </nav>
@@ -149,11 +150,11 @@ html[data-theme="dark"] .morebtn:hover{ background:var(--blue-l); }
 
 <div class="container">
   <h1>全站搜索</h1>
-  <p class="sub">一次搜遍导航链接、博客文章、页面文字和追更</p>
+  <p class="sub">搜导航链接、博客文章、追更、学习地图的标题和摘要</p>
 
   <div class="searchwrap">
     <span class="ico">⌕</span>
-    <input id="q" type="text" placeholder="搜链接、文章、页面、追更……" autocomplete="off" spellcheck="false" autocapitalize="off">
+    <input id="q" type="text" placeholder="搜链接、文章标题、追更、学习地图……" autocomplete="off" spellcheck="false" autocapitalize="off">
     <kbd>Enter</kbd>
   </div>
 
@@ -290,16 +291,17 @@ function showIdle(){
   moreEl.textContent = ""; toggleHide(moreEl, true);
   tabsEl.textContent = ""; toggleHide(tabsEl, true);
   var empty = el("div", "empty");
-  empty.innerHTML = "输入关键词，回车开始搜索。<br>能搜：<b>导航链接</b>（名称/网址/说明/标签/关键词）、<b>博客文章</b>（标题/摘要/标签）、<b>页面文字</b>（关于页等）、<b>追更</b>（名称/备注/链接）。";
+  empty.innerHTML = "输入关键词，回车开始搜索。<br>能搜：<b>导航链接</b>（名称/网址/说明/标签/关键词）、<b>博客文章</b>（标题/摘要/标签）、<b>追更</b>（名称/备注/链接）、<b>学习地图</b>（标题/说明）。<br><span style=\"color:#94a3b8\">只搜标题和摘要，不搜正文——不然结果太乱。想按正文找，进文章里用 Ctrl+F。</span>";
   listEl.appendChild(empty);
   renderHist();
 }
 
 var GROUPS = [
-  { type: "nav_link", icon: "🔗", name: "导航链接" },
-  { type: "post",     icon: "✏️", name: "博客文章" },
-  { type: "media",    icon: "📺", name: "追更" },
-  { type: "page",     icon: "📄", name: "页面" }
+  { type: "nav_link",  icon: "🔗", name: "导航链接" },
+  { type: "post",      icon: "✏️", name: "博客文章" },
+  { type: "media",     icon: "📺", name: "追更" },
+  { type: "learn_map", icon: "🗺️", name: "学习地图" },
+  { type: "page",      icon: "📄", name: "页面" }
 ];
 
 function hit(it, terms){
@@ -405,10 +407,18 @@ function doSearch(q){
   if (!q){ showIdle(); return; }
   toggleHide(histEl, true);
   if (!window.fetch){ note("当前浏览器太老，不支持在线搜索", "err"); return; }
+  /* 一个字的词命中面太大，本地先拦掉，省一次请求 */
+  if (q.length < 2){
+    note("再打一个字吧，一个字搜出来的东西太多", "warn");
+    showIdle();
+    qEl.value = q;
+    return;
+  }
   fetch("/api/search?q=" + encodeURIComponent(q), { headers: { Accept: "application/json" } })
     .then(function(r){ return r.ok ? r.json() : null; })
     .then(function(j){
       if (!j){ note("搜索服务开小差了，稍后再试", "err"); return; }
+      if (j.tooShort){ note("再打一个字吧，一个字搜出来的东西太多", "warn"); return; }
       saveHist(q);
       showResults(j.q || q, j.results || []);
     })

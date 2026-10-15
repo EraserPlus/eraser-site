@@ -118,21 +118,24 @@ console.log('\n=== 功能点 ===');
   must.forEach(([name, re]) => check(`包含：${name}`, re.test(html)));
 }
 
-console.log('\n=== 内容管理（导航 / 博客 / 页面）===');
+console.log('\n=== 内容管理（导航 / 博客 / 页面 / 追更 / 学习）===');
 {
   const must = [
-    ['七个标签页', /data-tab="today"[\s\S]*data-tab="todos"[\s\S]*data-tab="events"[\s\S]*data-tab="nav"[\s\S]*data-tab="post"[\s\S]*data-tab="media"[\s\S]*data-tab="page"/],
+    ['八个标签页', /data-tab="today"[\s\S]*data-tab="todos"[\s\S]*data-tab="events"[\s\S]*data-tab="nav"[\s\S]*data-tab="post"[\s\S]*data-tab="media"[\s\S]*data-tab="learn"[\s\S]*data-tab="page"/],
     ['导航标签内容区', /id="tab-nav"[\s\S]*id="navHost"/],
     ['博客标签内容区', /id="tab-post"[\s\S]*id="postHost"/],
     ['追更标签内容区', /id="tab-media"[\s\S]*id="mediaHost"/],
+    ['学习标签内容区', /id="tab-learn"[\s\S]*id="learnHost"/],
     ['页面标签内容区', /id="tab-page"[\s\S]*id="pageHost"/],
     ['加载了 Markdown 渲染器', /<script src="\.\.\/md\.js"><\/script>/],
     ['加载了内容管理模块', /<script src="content\.js"><\/script>/],
     ['初始化时把 api 和 say 传进去', /ContentAdmin\.init\(\{\s*api:\s*api,\s*say:\s*say\s*\}\)/],
     ['切标签时调用内容渲染', /ContentAdmin\.render\(tab\)/],
-    ['标签栏可横向滚动（手机上有 7 个标签）', /\.tabs\{\s*overflow-x:auto/],
+    ['标签栏可横向滚动（手机上有 8 个标签）', /\.tabs\{\s*overflow-x:auto/],
     ['表单弹层样式', /\.cf-overlay\{/],
     ['Markdown 预览样式', /\.mdprev\{/],
+    ['学习地图：节点行样式', /\.lmrow\{/],
+    ['学习地图：分组小标题样式', /\.lmgrp-h\{/],
   ];
   must.forEach(([name, re]) => check(`包含：${name}`, re.test(html)));
 
@@ -141,7 +144,22 @@ console.log('\n=== 内容管理（导航 / 博客 / 页面）===');
   catch (e) { check('admin/content.js 语法正确', false, e.message); }
 
   const cMust = [
-    ['五种内容都有字段定义', /nav_category:[\s\S]*nav_link:[\s\S]*post:[\s\S]*page:[\s\S]*media:/],
+    ['六种内容都有字段定义', /nav_category:[\s\S]*nav_link:[\s\S]*post:[\s\S]*page:[\s\S]*media:[\s\S]*learn_map:/],
+    ['学习地图：有状态下拉框（在学/学完/归档）', /\{ k: "status", l: "状态", t: "select"[\s\S]*\["active"[\s\S]*\["done"[\s\S]*\["archived"/],
+    ['学习地图：走 /api/learn 而不是 /api/content', /api\("learn\?action=toggleNode"|api\("learn\?action=updateNode"/],
+    ['学习地图：节点文字可编辑', /var t = el\("input", "lmt"\)/],
+    ['学习地图：节点分组可编辑', /var g = el\("input", "lmg"\)/],
+    ['学习地图：节点备注可编辑', /var nt = el\("input", "lmnt"\)/],
+    ['学习地图：失焦自动保存（不逐字打接口）', /addEventListener\("blur", function \(\) \{[\s\S]{0,120}patchNode/],
+    ['学习地图：回车即保存', /if \(e\.key === "Enter"\) inp\.blur\(\)/],
+    ['学习地图：节点可上移下移', /function moveNode\(refresh, nodes, i, i2\)/],
+    ['学习地图：可在下面插一个（继承分组）', /function insertAfter\(refresh, nodes, i\)/],
+    ['学习地图：新增节点自动生成 id', /function newNodeId\(nodes\)/],
+    ['学习地图：分组小标题只在变化时出现', /if \(g !== current\)/],
+    ['学习地图：删除节点走 removeNode', /api\("learn\?action=removeNode"/],
+    ['学习地图：删除前二次确认', /删了就找不回来了/],
+    ['学习地图：编辑面板可返回列表', /← 返回地图列表/],
+    ['学习地图：列表显示进度', /"完成 " \+ \(p\.done \|\| 0\) \+ " \/ " \+ \(p\.total \|\| 0\)/],
     ['追更：栏目和状态用下拉框', /\{ k: "category", l: "栏目", t: "select"/],
     ['追更：状态四种齐全', /\["wish"[\s\S]*\["watching"[\s\S]*\["finished"[\s\S]*\["paused"/],
     ['追更：列表显示栏目 / 状态 / 评分', /category === "comic" \? "漫画" : "追番"/],
@@ -176,6 +194,8 @@ console.log('\n=== 内容管理（导航 / 博客 / 页面）===');
   check('content.js 的 innerHTML 只用于清空或 MD.render', risky.length === 0, risky.join(' | '));
   check('content.js 用 textContent 渲染列表内容',
         /el\("div", "t", opts\.title\(it\)\)/.test(cjs) && /function el\(tag, cls, text\)/.test(cjs));
+  /* 学习地图的节点文字必须走 value= 而不是 innerHTML */
+  check('学习地图节点文字走 input.value（防注入）', /t\.value = node\.text \|\| ""/.test(cjs));
 }
 
 console.log('\n=== 与全站一致性 ===');

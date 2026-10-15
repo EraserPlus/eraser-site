@@ -13,9 +13,9 @@ const read = (f) => fs.readFileSync(path.join(REPO, f), 'utf8');
 
 const PAGES = ['index.html', 'nav/index.html', 'blog/index.html', 'blog/post.html',
                'about/index.html', 'tools/index.html',
-               'collect/index.html'];
+               'collect/index.html', 'learn/index.html'];
 
-console.log('=== 所有页面（7 个）：结构与语法 ===');for (const f of PAGES) {
+console.log('=== 所有页面（8 个）：结构与语法 ===');for (const f of PAGES) {
   const html = read(f);
   const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
   let ok = true, err = '';
@@ -25,7 +25,7 @@ console.log('=== 所有页面（7 个）：结构与语法 ===');for (const f of
   check(`${f} 内联脚本语法正确（${scripts.length} 段）`, ok, err);
 }
 
-console.log('\n=== 所有页面（7 个）：零站外资源 ===');
+console.log('\n=== 所有页面（8 个）：零站外资源 ===');
 for (const f of PAGES) {
   const html = read(f);
   /* 只算「会被加载的资源」。普通的外链 <a href> 是内容，不是资源，不算 */
@@ -46,7 +46,7 @@ for (const f of PAGES) {
         unsafe.map(a => a[1]).join(', '));
 }
 
-console.log('\n=== 所有页面（7 个）：只请求同源接口 ===');
+console.log('\n=== 所有页面（8 个）：只请求同源接口 ===');
 for (const f of PAGES) {
   const html = read(f);
   const fetches = [...html.matchAll(/fetch\(\s*["'`]([^"'`]+)/g)].map(m => m[1]);
@@ -56,7 +56,7 @@ for (const f of PAGES) {
   check(`${f} 没有用其它网络 API`, other.length === 0, other.map(m => m[1]).join(', '));
 }
 
-console.log('\n=== 所有页面（7 个）：导航栏统一 ===');
+console.log('\n=== 所有页面（8 个）：导航栏统一 ===');
 for (const f of PAGES) {
   const html = read(f);
   check(`${f} 品牌名统一`, /<span class="logo">🧩 Eraser 的小站<\/span>/.test(html));
@@ -74,6 +74,7 @@ console.log('\n=== 静态兜底：接口挂了也不能白屏 ===');
     ['about/index.html', /id="article"/, '正文有静态内容'],
     ['index.html', /id="q"/, '搜索框'],
     ['collect/index.html', /id="hint-anime"/, '两个栏目有静态空状态'],
+    ['learn/index.html', /id="listEmpty"/, '地图列表有静态空状态'],
   ];
   for (const [f, re, what] of cases) {
     check(`${f} 保留${what}`, re.test(read(f)));
@@ -145,6 +146,12 @@ console.log('\n=== 全站搜索页（现为首页 /）===');
   check('按内容类型分区过滤（全部/各分区）', /state\.tab === "all"/.test(html) && /r\.type === state\.tab/.test(html));
   check('结果分批展示 + 剩余条数', /state\.shown/.test(html) && /加载更多（还剩/.test(html));
   check('模糊命中带「模糊」标记', /el\("span", "fz", "模糊"\)/.test(html));
+  /* M9 收窄搜索：正文不进搜索，一个字的词先拦掉 */
+  check('结果分组含学习地图', /type: "learn_map"/.test(html) && /name: "学习地图"/.test(html));
+  check('静态引导说明了「只搜标题和摘要」', /只搜标题和摘要，不搜正文/.test(html));
+  check('一个字的词本地先拦掉（提示再打一个字）', /q\.length < 2/.test(html) && /再打一个字吧/.test(html));
+  check('接口返回 tooShort 时也提示（双层保险）', /j\.tooShort/.test(html));
+  check('页面文字不再被宣传为可搜', !/页面文字<\/b>（关于页等）/.test(html));
 }
 
 console.log('\n=== 旧首页已下线（首页与搜索合并）===');
@@ -189,6 +196,23 @@ console.log('\n=== 追更页 ===');
   check('站外链接只放行 http(s)', /function safeUrl/.test(html));
   check('站外链接带 noopener', /noopener/.test(html));
   check('封面图加载失败自动隐藏', /img\.addEventListener\("error"/.test(html));
+}
+
+console.log('\n=== 学习地图页 ===');
+{
+  const html = read('learn/index.html');
+  check('列表 + 详情两个视图骨架', /id="viewList"/.test(html) && /id="viewDetail"/.test(html));
+  check('读的是 learn 接口', /\/api\/learn/.test(html));
+  check('有进度条（.lm-bar）', /lm-bar/.test(html));
+  check('按分组渲染节点', /function groupNodes/.test(html));
+  check('勾选完成走 toggleNode', /action=toggleNode/.test(html));
+  check('未登录时复选框禁用（避免点了没反应）', /chk\.disabled = !token\(\)/.test(html));
+  check('勾选失败会回滚', /chk\.checked = !chk\.checked/.test(html));
+  check('节点文字用 textContent 渲染（防注入）', /el\("div", null, n\.text/.test(html));
+  check('没有把节点数据塞进 innerHTML', !/innerHTML\s*=\s*[^"']*n\.text/.test(html));
+  check('进度用服务端返回的值（不在本地瞎算）', /paintDetailHead\(j\.progress\)/.test(html));
+  check('深链 ?id= 可直接打开某张地图', /URLSearchParams\(location\.search\)/.test(html));
+  check('令牌 key 与后台一致', /eraser\.admin\.token/.test(html));
 }
 
 console.log('\n=== 开发交接页（dev/，给接手的 AI）===');
