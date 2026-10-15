@@ -901,6 +901,195 @@ console.log('\n=== 全站搜索 /api/search ===');
   fakeDb(() => []);
   r = await call(searchRoute, 'GET', { query: { q: 'gi' } });
   check('关键词不足 3 字不触发模糊查询', r.statusCode === 200 && executed.length === 1, String(executed.length));
+
+  /* ---------- 收窄搜索范围（M9）：正文一律不搜，结果别乱 ---------- */
+  fakeDb(() => []);
+  r = await call(searchRoute, 'GET', { query: { q: 'x' } });
+  check('单字关键词不搜（tooShort 标记）', r.statusCode === 200 && r.json.tooShort === true,
+        JSON.stringify(r.json));
+
+  fakeDb(() => []);
+  r = await call(searchRoute, 'GET', { query: { q: 'x' } });
+  check('单字关键词一条 SQL 都不发', executed.length === 0, String(executed.length));
+
+  fakeDb(() => []);
+  r = await call(searchRoute, 'GET', { query: { q: '前端' } });
+  check('两字关键词正常搜（不是 tooShort）', r.json.tooShort === undefined, JSON.stringify(r.json));
+
+  /* 关键断言：SQL 里绝不能再出现内容正文 / 节点文字字段 */
+  fakeDb(() => []);
+  r = await call(searchRoute, 'GET', { query: { q: '关键词' } });
+  const sqlAll = executed.map(e => e.text).join('\n');
+  check('SQL 不搜博客正文（data->>\'content\' 不出现）', !/data->>'content'/.test(sqlAll),
+        sqlAll.slice(0, 300));
+  check('SQL 不搜学习地图的节点文字（nodes 不出现）', !/nodes/.test(sqlAll), sqlAll.slice(0, 300));
+  check('SQL 里 page 类型只搜标题', /type = 'page' AND \(\s*data->>'title' ILIKE/.test(sqlAll),
+        (sqlAll.match(/type = 'page'[\s\S]{0,90}/) || [''])[0]);
+  check('SQL 覆盖了学习地图的 title/desc', executed.some(e => /learn_map/.test(e.text) && /'desc'/.test(e.text)),
+        sqlAll.slice(0, 300));
+
+  /* 学习地图也能被搜到，且指向 /learn/?id= */
+  fakeDb(() => [
+    row({ id: 21, type: 'learn_map', data: { title: '学 Rust', desc: '系统学习', nodes: [{ id: 'n1', text: '所有权' }] } }),
+  ]);
+  r = await call(searchRoute, 'GET', { query: { q: 'Rust' } });
+  check('学习地图能被搜到', r.json.results.length === 1 && r.json.results[0].title === '学 Rust',
+        JSON.stringify(r.json.results));
+  check('学习地图指向 /learn/?id=', r.json.results[0].url === '/learn/?id=21', r.json.results[0].url);
+  check('学习地图的 desc 进摘要', r.json.results[0].desc === '系统学习', r.json.results[0].desc);
+
+  /* 节点文字不该被模糊匹配捞出来：只在 nodes 里出现的词不该命中 */
+  fakeDb((text) => /ILIKE/.test(text)
+    ? []
+    : [row({ id: 22, type: 'learn_map', data: { title: '学 Go', desc: '', nodes: [{ id: 'n1', text: 'goroutine 调度' }] } })]);
+  r = await call(searchRoute, 'GET', { query: { q: 'grutine' } });
+  check('节点文字不参与模糊匹配', r.json.results.length === 0, JSON.stringify(r.json.results));
+
+  /* 页面正文被搜到不算命中：假驱动不看 SQL 只回预设行，
+     所以这里断言 SQL 本身——page 分支只允许 title 参与 ILIKE。 */
+  fakeDb(() => []);
+  await call(searchRoute, 'GET', { query: { q: '部署' } });
+  const pageSql = (executed[0] && executed[0].text) || '';
+  const pageBranch = (pageSql.match(/type = 'page' AND \([\s\S]{0,120}?\)\)/) || [''])[0];
+  check('页面分支只搜标题、不搜正文', !!pageBranch && /title/.test(pageBranch) && !/content/.test(pageBranch),
+        pageBranch);
 }
+console.log('\n=== 学习地图 /api/learn（给 AI 的读写接口）===');
+{
+  const learnRoute = (await load('api/learn.js')).default;
+
+  /* 造一条地图记录（含节点） */
+  const mapRow = (id, data, over) => Object.assign({
+    id, type: 'learn_map', parent_id: null, sort_order: 0,
+    updated_at: '2026-10-15T00:00:00.000Z', data,
+  }, over || {});
+  const rustMap = {
+    title: '学 Rust', desc: '系统学习', status: 'active',
+    nodes: [
+      { id: 'n1', text: '所有权', group: '基础', done: true, note: null },
+      { id: 'n2', text: '生命周期', group: '基础', done: false, note: null },
+      { id: 'n3', text: '宏', group: '进阶', done: false, note: null },
+    ],
+  };
+
+  /* ---- 未登录一律 401 ---- */
+  fakeDb(noop);
+  for (const m of ['POST', 'PATCH', 'DELETE']) {
+    const res = await call(learnRoute, m, { body: {} });
+    check(`未登录 ${m} /api/learn → 401`, res.statusCode === 401, String(res.statusCode));
+  }
+  check('未登录时 GET 列表也不需要令牌（公开只读）', true);
+
+  /* ---- GET 列表：只回概览，不回 nodes ---- */
+  fakeDb(() => [mapRow(1, rustMap)]);
+  let res = await call(learnRoute, 'GET', {});
+  check('GET /api/learn 免登录 → 200', res.statusCode === 200, String(res.statusCode));
+  check('列表返回 items', Array.isArray(res.json.items) && res.json.items.length === 1);
+  check('列表项带进度', res.json.items[0].progress.total === 3 && res.json.items[0].progress.done === 1,
+        JSON.stringify(res.json.items[0].progress));
+  check('列表项不带 nodes（省流量）', res.json.items[0].nodes === undefined);
+  check('进度百分比正确（1/3≈33）', res.json.items[0].progress.percent === 33,
+        String(res.json.items[0].progress.percent));
+
+  /* ---- GET 单张：带 nodes + 分组明细 ---- */
+  fakeDb(() => [mapRow(1, rustMap)]);
+  res = await call(learnRoute, 'GET', { query: { id: '1' } });
+  check('GET ?id=1 → 200', res.statusCode === 200, String(res.statusCode));
+  check('单张返回 nodes', Array.isArray(res.json.item.data.nodes) && res.json.item.data.nodes.length === 3);
+  check('进度明细含分组', res.json.progress.groups.length === 2, JSON.stringify(res.json.progress.groups));
+  check('分组统计正确（基础 1/2）',
+        res.json.progress.groups[0].name === '基础' && res.json.progress.groups[0].done === 1 && res.json.progress.groups[0].total === 2,
+        JSON.stringify(res.json.progress.groups[0]));
+
+  /* ---- GET 不存在的 id → 404 ---- */
+  fakeDb(() => []);
+  res = await call(learnRoute, 'GET', { query: { id: '999' } });
+  check('GET 不存在的 id → 404', res.statusCode === 404, String(res.statusCode));
+
+  /* ---- POST 新建地图 ---- */
+  fakeDb(() => [mapRow(7, { title: '学 Go', desc: null, status: 'active', nodes: [] })]);
+  res = await call(learnRoute, 'POST', { token: TOKEN, body: { title: '学 Go' } });
+  check('POST 新建地图 → 200', res.statusCode === 200, String(res.statusCode));
+  check('新建写入 type=learn_map', executed.some(e => /INSERT INTO content/.test(e.text) && e.values.includes('learn_map')),
+        executed.map(e => e.text).join(' | '));
+  check('新建带初始 nodes（缺省空数组）', res.json.item.data.nodes.length === 0);
+
+  /* ---- POST 新建缺标题 → 400 ---- */
+  fakeDb(noop);
+  res = await call(learnRoute, 'POST', { token: TOKEN, body: {} });
+  check('新建缺标题 → 400', res.statusCode === 400, String(res.statusCode));
+
+  /* ---- toggleNode：勾选完成 ---- */
+  fakeDb((text) => /SELECT/.test(text) ? [mapRow(1, rustMap)] : [mapRow(1, { ...rustMap, nodes: rustMap.nodes })]);
+  res = await call(learnRoute, 'POST', { token: TOKEN, query: { action: 'toggleNode' }, body: { id: 1, nodeId: 'n2' } });
+  check('toggleNode → 200', res.statusCode === 200, String(res.statusCode));
+  const upd = executed.find(e => /UPDATE content/.test(e.text));
+  check('toggleNode 把 n2 置为完成', upd && /"id":"n2"[^}]*"done":true/.test(String(upd.values)),
+        upd ? String(upd.values).slice(0, 200) : 'no update');
+  check('toggleNode 只动目标节点（n1 仍完成、n3 仍未完）',
+        upd && /"id":"n1"[^}]*"done":true/.test(String(upd.values)) && /"id":"n3"[^}]*"done":false/.test(String(upd.values)));
+
+  /* ---- addNode：追加节点（自动生成 id）---- */
+  fakeDb((text) => /SELECT/.test(text) ? [mapRow(1, rustMap)] : [mapRow(1, rustMap)]);
+  res = await call(learnRoute, 'POST', { token: TOKEN, query: { action: 'addNode' }, body: { id: 1, node: { text: '异步', group: '进阶' } } });
+  check('addNode → 200', res.statusCode === 200, String(res.statusCode));
+  let upd2 = executed.find(e => /UPDATE content/.test(e.text));
+  check('addNode 自动分配未占用 id（n4）', upd2 && /"id":"n4"/.test(String(upd2.values)),
+        upd2 ? String(upd2.values).slice(0, 200) : 'no update');
+  check('addNode 默认未完成为 false', upd2 && /"id":"n4"[^}]*"done":false/.test(String(upd2.values)));
+
+  /* ---- updateNode：改文字 / 分组 ---- */
+  fakeDb((text) => /SELECT/.test(text) ? [mapRow(1, rustMap)] : [mapRow(1, rustMap)]);
+  res = await call(learnRoute, 'POST', { token: TOKEN, query: { action: 'updateNode' }, body: { id: 1, nodeId: 'n1', patch: { text: '所有权与借用' } } });
+  check('updateNode → 200', res.statusCode === 200, String(res.statusCode));
+  upd2 = executed.find(e => /UPDATE content/.test(e.text));
+  check('updateNode 改了文字', upd2 && /所有权与借用/.test(String(upd2.values)));
+
+  /* ---- removeNode：删节点 ---- */
+  fakeDb((text) => /SELECT/.test(text) ? [mapRow(1, rustMap)] : [mapRow(1, rustMap)]);
+  res = await call(learnRoute, 'POST', { token: TOKEN, query: { action: 'removeNode' }, body: { id: 1, nodeId: 'n3' } });
+  check('removeNode → 200', res.statusCode === 200, String(res.statusCode));
+  upd2 = executed.find(e => /UPDATE content/.test(e.text));
+  check('removeNode 后不再含 n3', upd2 && !/"id":"n3"/.test(String(upd2.values)),
+        upd2 ? String(upd2.values).slice(0, 200) : 'no update');
+  check('removeNode 返回被删的节点', res.json.removed && res.json.removed.id === 'n3', JSON.stringify(res.json.removed));
+
+  /* ---- nodeId 不存在 → 400 且给出现有 id 提示 ---- */
+  fakeDb((text) => /SELECT/.test(text) ? [mapRow(1, rustMap)] : [mapRow(1, rustMap)]);
+  res = await call(learnRoute, 'POST', { token: TOKEN, query: { action: 'toggleNode' }, body: { id: 1, nodeId: 'zzz' } });
+  check('nodeId 不存在 → 400', res.statusCode === 400, String(res.statusCode));
+  check('错误信息提示现有节点 id', /n1/.test(res.json.error || ''), res.json.error);
+
+  /* ---- 不认识的 action → 400 ---- */
+  fakeDb((text) => /SELECT/.test(text) ? [mapRow(1, rustMap)] : []);
+  res = await call(learnRoute, 'POST', { token: TOKEN, query: { action: 'explode' }, body: { id: 1 } });
+  check('未知 action → 400', res.statusCode === 400, String(res.statusCode));
+
+  /* ---- PATCH 合并语义：只改标题，nodes 原样保留 ---- */
+  fakeDb((text) => /SELECT/.test(text) ? [mapRow(1, rustMap)] : [mapRow(1, { ...rustMap, title: '新标题' })]);
+  res = await call(learnRoute, 'PATCH', { token: TOKEN, body: { id: 1, title: '新标题' } });
+  check('PATCH 改标题 → 200', res.statusCode === 200, String(res.statusCode));
+  upd2 = executed.find(e => /UPDATE content/.test(e.text));
+  check('PATCH 未传 nodes 时节点不丢', upd2 && /所有权/.test(String(upd2.values)) && /生命周期/.test(String(upd2.values)));
+
+  /* ---- setNodes：整表替换 ---- */
+  fakeDb((text) => /SELECT/.test(text) ? [mapRow(1, rustMap)] : [mapRow(1, rustMap)]);
+  res = await call(learnRoute, 'POST', { token: TOKEN, query: { action: 'setNodes' }, body: { id: 1, nodes: [{ id: 'a', text: '只剩一个' }] } });
+  check('setNodes → 200', res.statusCode === 200, String(res.statusCode));
+  upd2 = executed.find(e => /UPDATE content/.test(e.text));
+  check('setNodes 整体替换', upd2 && /只剩一个/.test(String(upd2.values)) && !/生命周期/.test(String(upd2.values)));
+
+  /* ---- DELETE 地图 ---- */
+  fakeDb((text) => /SELECT/.test(text) ? [mapRow(1, rustMap)] : []);
+  res = await call(learnRoute, 'DELETE', { token: TOKEN, query: { id: '1' } });
+  check('DELETE 地图 → 200', res.statusCode === 200, String(res.statusCode));
+  check('DELETE 只删 learn_map', executed.some(e => /DELETE FROM content/.test(e.text) && e.values.includes('learn_map')));
+
+  /* ---- 方法不支持 ---- */
+  fakeDb(noop);
+  res = await call(learnRoute, 'PUT', { token: TOKEN });
+  check('PUT /api/learn → 405', res.statusCode === 405, String(res.statusCode));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

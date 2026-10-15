@@ -26,6 +26,7 @@
     { ic: "🧰", name: "工具箱", href: "tools/index.html" },
     { ic: "📝", name: "博客", href: "blog/index.html" },
     { ic: "📺", name: "追更", href: "collect/index.html" },
+    { ic: "🗺️", name: "学习", href: "learn/index.html" },
     { ic: "🔗", name: "导航", href: "nav/index.html" },
     { ic: "📄", name: "关于", href: "about/index.html" },
     { ic: "🎛️", name: "开发交接", href: "dev/index.html" }

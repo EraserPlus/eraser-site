@@ -78,10 +78,10 @@ html[data-theme="dark"] .steps li::before { color: #0d1117; }
     <tr><th>代码仓库</th><td><a href="https://github.com/EraserPlus/eraser-site" rel="noopener">github.com/EraserPlus/eraser-site</a>（公开）+ 本机工作副本</td></tr>
     <tr><th>技术栈</th><td>纯静态 HTML/CSS/JS + Vercel Serverless Functions（Node ESM）+ Neon Postgres，<b>零构建</b></td></tr>
     <tr><th>托管</th><td>Vercel Hobby 免费档。push main → 自动部署，1~2 分钟生效</td></tr>
-    <tr><th>数据库</th><td>Neon Postgres，三张表：content（六种内容共用）/ todos / events。闲置约 5 分钟休眠，首次访问慢几秒属正常</td></tr>
-    <tr><th>后台</th><td><code>/admin/</code> 密码登录（站长持有），7 个标签：今天 / 待办 / 日程 / 导航 / 博客 / 追更 / 页面</td></tr>
-    <tr><th>测试</th><td>七套 1023 项，一条命令：<code>npm test</code>。提交前必须全绿</td></tr>
-    <tr><th>当前版本</th><td>main @ <code>49f922a</code> · 最近批次 M7 搜索增强（键盘选结果 / 搜索历史 / 分区 tab / 加载更多 / 模糊匹配，2026-10-14）</td></tr>
+    <tr><th>数据库</th><td>Neon Postgres，三张表：content（七种内容共用，新增类型不用建表）/ todos / events。闲置约 5 分钟休眠，首次访问慢几秒属正常</td></tr>
+    <tr><th>后台</th><td><code>/admin/</code> 密码登录（站长持有），8 个标签：今天 / 待办 / 日程 / 导航 / 博客 / 追更 / 学习 / 页面</td></tr>
+    <tr><th>测试</th><td>七套 1146 项，一条命令：<code>npm test</code>。提交前必须全绿</td></tr>
+    <tr><th>当前版本</th><td>main @ <code>49f922a</code>（M8）· 最近批次 <b>M9 学习地图 + 给 AI 的接口 + 收窄搜索</b>（2026-10-15，待合并）</td></tr>
   </table>
 
   <h2>2. 工作流程（六步，别跳步）</h2>
@@ -139,22 +139,46 @@ done < /tmp/main_tree.tsv</code></pre>
 
   <h2>5. 站点地图（改哪里的速查）</h2>
   <table>
-    <tr><th>前台页面</th><td><code>index.html</code> 首页（= 全站搜索：搜索框 + 分组结果，<code>/?q=</code> 可直接带词进搜索） / <code>tools/</code> 工具箱（数据驱动，加工具改 TOOLS 数组）/ <code>blog/</code> 博客（列表 + post.html 文章页）/ <code>collect/</code> 追更（追番 + 漫画留档）/ <code>nav/</code> 网址导航（links.js 静态兜底 + 后台数据）/ <code>about/</code> 关于</td></tr>
+    <tr><th>前台页面</th><td><code>index.html</code> 首页（= 全站搜索：搜索框 + 分组结果，<code>/?q=</code> 可直接带词进搜索） / <code>tools/</code> 工具箱（数据驱动，加工具改 TOOLS 数组）/ <code>blog/</code> 博客（列表 + post.html 文章页）/ <code>collect/</code> 追更（追番 + 漫画留档）/ <code>learn/</code> 学习地图（分组节点 + 勾选进度，<code>?id=</code> 深链）/ <code>nav/</code> 网址导航（links.js 静态兜底 + 后台数据）/ <code>about/</code> 关于</td></tr>
     <tr><th>前台公共</th><td><code>style.css</code> 全站样式（CSS 变量 + <code>html[data-theme="dark"]</code> 暗色 + 768px 断点）/ <code>md.js</code> Markdown 渲染（转义三铁律）/ <code>shell.js</code> 全站公共交互层（顶栏主题切换按钮 + <code>Ctrl/⌘+K</code> 命令面板 + 复制当前链接）</td></tr>
-    <tr><th>后台</th><td><code>admin/index.html</code>（单文件：登录 + 7 标签 + 导出备份）+ <code>admin/content.js</code>（内容表单与列表，SCHEMA 驱动）</td></tr>
-    <tr><th>接口 api/</th><td><code>auth.js</code> 登录 / <code>todos.js</code> 待办 / <code>events.js</code> 日程 / <code>content.js</code> 内容（六种类型 CRUD）/ <code>search.js</code> 搜索 / <code>rss.js</code> 博客订阅源 / <code>upload.js</code> 上传（Vercel Blob）/ <code>favicon.js</code> 图标代理；公共层在 <code>api/_lib/</code></td></tr>
-    <tr><th>内容类型</th><td>content 表六种：nav_category / nav_link / post / file（已下架，数据保留）/ page / <b>media（追更，M1 新增）</b>。类型定义与校验在 <code>api/_lib/content.js</code></td></tr>
+    <tr><th>后台</th><td><code>admin/index.html</code>（单文件：登录 + 8 标签 + 导出备份）+ <code>admin/content.js</code>（内容表单与列表，SCHEMA 驱动；学习地图的节点编辑器在 <code>LEARN-NODES</code> 标记段内）</td></tr>
+    <tr><th>接口 api/</th><td><code>auth.js</code> 登录 / <code>todos.js</code> 待办 / <code>events.js</code> 日程 / <code>content.js</code> 内容（六种类型 CRUD）/ <code>learn.js</code> <b>学习地图（给 AI 的节点粒度接口）</b> / <code>search.js</code> 搜索 / <code>rss.js</code> 博客订阅源 / <code>upload.js</code> 上传（Vercel Blob）/ <code>favicon.js</code> 图标代理；公共层在 <code>api/_lib/</code></td></tr>
+    <tr><th>内容类型</th><td>content 表七种：nav_category / nav_link / post / file（已下架，数据保留）/ page / media（追更，M1 新增）/ <b>learn_map（学习地图，M9 新增）</b>。类型定义与校验在 <code>api/_lib/content.js</code></td></tr>
     <tr><th>测试</th><td><code>tests/</code> 七套：api / content / api_routes / pages_audit / admin_audit / nav_test / nav_audit；假驱动 <code>tests/stubs/</code>；CI 在 <code>.github/workflows/ci.yml</code></td></tr>
   </table>
 
-  <h3>常见任务：加一个新内容板块（照 M1 抄）</h3>
+  <h3>AI 助手接学习地图（M9 给外部 AI 用的接口）</h3>
+  <p class="muted">站长要的是「我接上 API，它就能帮我管理学习地图、建图、查漏补缺」。接口刻意做成<b>节点粒度</b>——AI 勾一个节点不用把整张地图重发一遍。</p>
+  <table>
+    <tr><th>鉴权</th><td>先 <code>POST /api/auth</code> 用后台密码换 token，之后每个写操作带 <code>Authorization: Bearer &lt;token&gt;</code>。<code>GET</code> 全部免登录（前台页面要读）。</td></tr>
+    <tr><th>只读</th><td><code>GET /api/learn</code> 列全部地图（<b>含进度概览，不带 nodes</b>，省流量）；<code>GET /api/learn?id=123</code> 读一张地图（含节点 + 按分组的进度明细 <code>progress.groups</code>，查漏补缺就靠它）。</td></tr>
+    <tr><th>地图级</th><td><code>POST /api/learn</code> 新建（<code>{title, desc?, status?, nodes?}</code>）；<code>PATCH /api/learn</code> 改信息（<b>合并语义</b>：不传 <code>nodes</code> 就原样保留）；<code>DELETE /api/learn?id=123</code>。</td></tr>
+    <tr><th>节点级</th><td><code>POST /api/learn?action=addNode</code> <code>{id, node:{text, group?, note?}}</code>；<code>action=updateNode</code> <code>{id, nodeId, patch}</code>；<code>action=removeNode</code> <code>{id, nodeId}</code>；<code>action=toggleNode</code> <code>{id, nodeId}</code>；<code>action=setNodes</code> <code>{id, nodes:[…]}</code>（重排整表）。</td></tr>
+    <tr><th>节点结构</th><td><code>{ id, text, group, done, note }</code>。id 只允许 <code>[a-zA-Z0-9_-]</code>、地图内唯一；缺 id 时按位置兜底生成 <code>n1</code>/<code>n2</code>…；单图上限 500 节点。传错 nodeId 会 400 并<b>列出这张地图现有的 id</b>，方便 AI 自我纠正。</td></tr>
+    <tr><th>返回</th><td>写操作一律返回 <code>{ ok, item, progress }</code>，<code>progress</code> 含 <code>total / done / left / percent / groups[]</code>——AI 不必自己算进度。</td></tr>
+  </table>
+
+  <h3>常见任务：加一个新内容板块（照 M1 / M9 抄）</h3>
   <ol>
     <li><code>api/_lib/content.js</code>：TYPES 加条目 + normalize 加校验分支（字段白名单、枚举、长度）；</li>
+    <li>如果这个板块<b>需要给 AI 做细粒度操作</b>（像学习地图的节点），单开一个 <code>api/xxx.js</code> 接口，别硬塞进 <code>/api/content</code> 的整条覆盖写；</li>
     <li><code>admin/content.js</code>：SCHEMA 加字段定义 + RENDERERS 加列表渲染；<code>admin/index.html</code>：加 tab 按钮、section、TABS 数组；导出备份记得带上新类型；</li>
     <li>前台新页面：复制 <code>collect/index.html</code> 的模式（静态兜底 → fetch → 渲染），<b>并照抄 <code>&lt;head&gt;</code> 里的防闪主题脚本与页尾的 <code>&lt;script src="../shell.js"&gt;&lt;/script&gt;</code></b>（否则新页没有主题按钮和 <code>Ctrl+K</code>）；</li>
-    <li>全站导航栏同步加链接；<code>tests/pages_audit.mjs</code> 的 PAGES 数组加新页面；</li>
+    <li>全站导航栏同步加链接；<code>shell.js</code> 的 PAGES 数组加一条（命令面板才跳得到）；<code>tests/pages_audit.mjs</code> 的 PAGES 数组加新页面；</li>
+    <li>想让它进全站搜索：改 <code>api/search.js</code>（SQL 那段的类型清单 + <code>fieldsOf</code>）。<b>只加标题/摘要级字段，别加正文</b>；</li>
     <li>补测试（normalize 用例、接口用例、页面专项），<code>npm test</code> 全绿，走六步流程上线。</li>
   </ol>
+
+  <h3>全站搜索的取舍（M9 定的，别改回去）</h3>
+  <p class="muted">站长明确要求「搜索别太乱」。本站是索引型站点，<b>正文命中会把结果冲垮</b>——搜「Vercel」时十几篇文章只要正文提过就全冒出来。现在的规矩：</p>
+  <ul>
+    <li>搜的范围只有<b>标题 / 摘要 / 标签 / 关键词</b>级别的字段；</li>
+    <li>博客文章：<code>title / summary / tags</code>，<b>不含 <code>content</code></b>；</li>
+    <li>页面：只有 <code>title</code>，<b>不含 <code>content</code></b>；</li>
+    <li>学习地图：<code>title / desc</code>，<b>不含节点的 <code>text</code></b>（搜地图里的字是站长明令禁止的）；</li>
+    <li>关键词不足 2 个字符直接返回空并带 <code>tooShort</code>，前端提示「再打一个字」。</li>
+  </ul>
+  <p class="muted">回归测试里写死了这几条（<code>api_routes_test.mjs</code> 的「收窄搜索范围」段会断言 SQL 里不出现 <code>data->>'content'</code> 和 <code>nodes</code>）。要放宽必须先想清楚为什么。</p>
 
   <h2>6. 批次记录（每批做完回来加一行）</h2>
   <div class="timeline">
@@ -180,13 +204,16 @@ done < /tmp/main_tree.tsv</code></pre>
     <div class="row latest"><span class="no">M6</span><span class="what"><b>体验基座</b>：新增全站公共交互层 <code>shell.js</code>——顶栏手动主题切换（存 <code>eraser.theme</code>，各页 head 加防闪脚本）、<code>Ctrl/⌘+K</code> 命令面板（跳分区 / 搜关键词 / 切主题 / 复制链接 / 回顶部）、复制当前链接；暗色由 <code>@media</code> 统一改为 <code>html[data-theme="dark"]</code>；导航页的 Ctrl+K 收归 shell.js，避免重复绑定（PR #28）</span><span class="when">10-14</span></div>
     <div class="row latest"><span class="no">M7</span><span class="what"><b>搜索增强</b>：键盘选结果（↑↓ + Enter）/ 搜索历史 / 分区 tab / 加载更多 / 模糊匹配（PR #30）</span><span class="when">10-14</span></div>
     <div class="row latest"><span class="no">M8</span><span class="what"><b>修复上传 503</b>：原 Blob Store 为 <code>private</code> 模式，只注入 <code>BLOB_STORE_ID</code> 而无 <code>BLOB_READ_WRITE_TOKEN</code>，与 <code>api/upload.js</code> 的检查不匹配。改为新建 <code>public</code> Store <code>eraser-blob-public</code> 并连接项目，摘除旧连接；代码零改动，端到端实测上传 + 公开访问均通过（2026-10-15）</span><span class="when">10-15</span></div>
+    <div class="row latest"><span class="no">M9</span><span class="what"><b>学习地图 + 给 AI 的接口 + 收窄搜索</b>：新增 <code>learn_map</code> 内容类型（一张地图内嵌节点数组）+ 前台 <code>/learn/</code>（分组节点、勾选进度）+ 后台第 8 标签「学习」（节点文字/分组/备注就地编辑、↑↓ 排序、＋ 插入、✕ 删除，走失焦自动保存）；新增 <code>/api/learn</code> 按节点粒度的原子接口（addNode / updateNode / removeNode / toggleNode / setNodes），专供 AI 助手建图与<b>查漏补缺</b>；<b>收窄全站搜索</b>——不再搜博客正文与页面正文，学习地图只搜标题/说明、<b>不搜节点文字</b>，单字关键词直接拦掉</span><span class="when">10-15</span></div>
   </div>
 
   <h2>7. 当前待办 / 已知事项</h2>
   <ul>
+    <li><b>学习地图是 M9 新加的，欢迎继续打磨（2026-10-15）</b>：前台 <code>/learn/</code>、后台第 8 标签「学习」、接口 <code>/api/learn</code> 三件套已就位。已知可继续做的方向：节点拖拽排序（目前是 ↑↓ 按钮）、节点批量导入（现在只能一个一个加）、进度变化的历史曲线。站长说「做到最好」，所以别把它当一次性交付。</li>
     <li><b>上传功能已修好（M8，2026-10-15）</b>：项目现连 <code>eraser-blob-public</code>（<b>public</b> 模式），环境变量只有 <code>BLOB_READ_WRITE_TOKEN</code>，格式 <code>vercel_blob_rw_…</code>，指向新 Store。端到端实测通过（写入 → 公开 URL 200 可访问 → 删除）。<b>唯一遗留</b>：到后台任一条追更的「链接 / 封面图」点一次「上传」做 UI 层最终确认（需要站长登录）。旧的 private Store <code>eraser-blob</code> 已摘除连接、可留作归档或删除。</li>
     <li><b>上传容量提醒</b>：<code>api/upload.js</code> 上限 4MB（Hobby 函数请求体 4.5MB 留余量）。传更大的图请先压缩，或手填外部链接兜底。</li>
     <li><b>旧 <code>home</code> 页面标识已下线</b>：首页欢迎语随首页改版（M5）移除，已无任何页面渲染它；若后台「页面」里还留着 home 记录，可自行删除。</li>
+    <li><b>搜索范围已刻意收窄（M9）</b>：正文搜不到是<b>有意为之</b>，不是 bug。站长原话：「不要再让他直接搜索地图里的字」「博客文章里面的关键字都能搜出来那有点太乱了」。</li>
     <li>（可选后续）备用域名 eraser.888.moe 在 Vercel 添加后生效（配置记录见仓库 <code>domains.config.yaml</code>）。追更加更多分类暂缓（站长表示暂不需要）。</li>
   </ul>
 

@@ -132,6 +132,44 @@ console.log('\n=== media（追更）===');
   check('多传字段被丢掉', !('evil' in C.normalize('media', { ...base, evil: 1 })));
 }
 
+console.log('\n=== learn_map（学习地图）===');
+{
+  const base = { title: '学 Rust', nodes: [{ id: 'n1', text: '所有权' }] };
+  const r = C.normalize('learn_map', base);
+  check('learn_map 是已知类型', C.knownType('learn_map'));
+  check('正常通过', r.title === '学 Rust' && Array.isArray(r.nodes) && r.nodes.length === 1);
+  check('标题去首尾空格', C.normalize('learn_map', { ...base, title: '  x  ' }).title === 'x');
+  check('缺标题报错', code(() => C.normalize('learn_map', { nodes: [] })) === 'BAD_INPUT');
+  check('说明可空', r.desc === null);
+  check('状态默认 active', r.status === 'active');
+  check('三种状态都通过',
+        ['active', 'done', 'archived'].every(s => C.normalize('learn_map', { ...base, status: s }).status === s));
+  check('非法状态报错', code(() => C.normalize('learn_map', { ...base, status: 'zzz' })) === 'BAD_INPUT');
+  check('节点缺省为空数组', JSON.stringify(C.normalize('learn_map', { title: 't' }).nodes) === '[]');
+  check('nodes 不是数组报错', code(() => C.normalize('learn_map', { title: 't', nodes: 'x' })) === 'BAD_INPUT');
+
+  /* 节点字段 */
+  const full = C.normalize('learn_map', { title: 't', nodes: [
+    { id: 'a1', text: '所有权', group: '基础', done: true, note: '看第 4 章' },
+  ]}).nodes[0];
+  check('节点四个字段都保留',
+        full.id === 'a1' && full.text === '所有权' && full.group === '基础' && full.done === true && full.note === '看第 4 章');
+  check('节点 done 归一成布尔', C.normalize('learn_map', { title: 't', nodes: [{ id: 'a', text: 'x', done: 1 }] }).nodes[0].done === true);
+  check('节点 group/note 可空', C.normalize('learn_map', { title: 't', nodes: [{ id: 'a', text: 'x' }] }).nodes[0].group === null);
+  check('节点文本去空格', C.normalize('learn_map', { title: 't', nodes: [{ id: 'a', text: '  x  ' }] }).nodes[0].text === 'x');
+  check('节点缺文本报错', code(() => C.normalize('learn_map', { title: 't', nodes: [{ id: 'a' }] })) === 'BAD_INPUT');
+  check('节点 id 非法字符被清洗', C.normalize('learn_map', { title: 't', nodes: [{ id: 'a b!c', text: 'x' }] }).nodes[0].id === 'abc');
+  check('节点 id 全非法时报错', code(() => C.normalize('learn_map', { title: 't', nodes: [{ id: '!!!', text: 'x' }] })) === 'BAD_INPUT');
+  check('节点缺 id 按位置兜底', C.normalize('learn_map', { title: 't', nodes: [{ text: 'a' }, { text: 'b' }] }).nodes.map(n => n.id).join() === 'n1,n2');
+  check('节点 id 重复报错',
+        code(() => C.normalize('learn_map', { title: 't', nodes: [{ id: 'x', text: 'a' }, { id: 'x', text: 'b' }] })) === 'BAD_INPUT');
+  check('节点超上限报错',
+        code(() => C.normalize('learn_map', { title: 't', nodes: Array.from({ length: 501 }, (_, i) => ({ id: 'n' + i, text: 'x' })) })) === 'BAD_INPUT');
+  check('多传字段被丢掉', !('evil' in C.normalize('learn_map', { ...base, evil: 1 })));
+  check('节点里的多余字段也被丢掉',
+        !('evil' in C.normalize('learn_map', { title: 't', nodes: [{ id: 'a', text: 'x', evil: 1 }] }).nodes[0]));
+}
+
 console.log('\n=== 未知类型 ===');
 {
   check('normalize 未知类型报错', code(() => C.normalize('hack', {})) === 'BAD_INPUT');
