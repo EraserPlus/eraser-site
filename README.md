@@ -48,14 +48,13 @@ eraser-site/
 │       ├── lookup.js     AniList GraphQL 查询的纯逻辑：入参校验/关键词进 variables/打分换算/结果整形（可单测）
 │       └── content.js    七种内容类型（含追更 media、学习地图 learn_map）的归一化与校验，含批量导入预校验与逐条写入
 │
-├── api/lookup.js        GET /api/lookup：按名字查 AniList 带出封面/评分/话数/年份/链接（免 key，30 分钟进程内缓存）
 │
 ├── admin/                管理后台（独立单文件应用，自带样式）
 │   ├── index.html        后台全部界面与逻辑（9 个标签，含「一键接上 AI」「数据」备份，追更列表带搜索/筛选/排序/行内改状态）
 │   └── content.js        导航/博客/页面/追更/学习地图 内容管理模块（SCHEMA 驱动，含批量导入解析与按名字自动填充）
 │
 ├── tests/                十套测试 + 测试用假数据库驱动
-│   ├── api_test.mjs      令牌/密码/入参校验/favicon SSRF 与魔数识别/后台令牌与 AI 令牌互不通用（183 项）
+│   ├── api_test.mjs      令牌/密码/入参校验/favicon SSRF 与魔数识别/后台令牌与 AI 令牌互不通用（182 项）
 │   ├── content_test.mjs  七种内容类型归一化（含追更、学习地图）/ Markdown 渲染与安全（158 项）
 │   ├── api_routes_test.mjs 接口全流程：鉴权/CRUD/注入/限流/PATCH 合并语义/RSS/上传/favicon/追更/学习地图 gaps/sitemap/备份/批量导入（409 项）
 │   ├── pages_audit.mjs   8 个公开页面（含追更/交接页）：结构/零站外资源/静态兜底/注入防护/PWA/前台快捷录入（299 项）
@@ -134,7 +133,7 @@ eraser-site/
 npm test
 ```
 
-一条命令按顺序跑完十套测试，共 **1571 项**，全部通过即说明站点核心逻辑健康。
+一条命令按顺序跑完十套测试，共 **1570 项**，全部通过即说明站点核心逻辑健康。
 
 - **不需要真数据库 / 真 Blob**：`tests/stubs/` 里有手写的假 Neon 驱动（全局 `__FAKE_DB__` 预设 SQL 返回值）和假 @vercel/blob 驱动（全局 `__FAKE_BLOB__` 预设 put 返回值），只验证逻辑不连外部服务。
 - CI 里也是同一套路：`npm ci` 装回真包后，用假驱动覆盖 `node_modules/@neondatabase/serverless`，再 `npm test`。
@@ -294,14 +293,16 @@ body: { items: [ {type:"media", data:{...}}, ... ] }     一次最多 500 条
 
 设计要点（都是刻意的）：**先全量预校验**，坏条目永远不会造成「写了一半」；**个别失败只报那条**，不回滚已经写好的；**批内互相去重** `post.slug` / `page.key`（这种冲突查库看不出来）；超 500 条直接 400 并告诉你当前多少条。
 
-**`GET /api/lookup?q=名字&kind=anime|comic` —— 按名字自动填充**
+**`GET /api/content?action=lookup&q=名字&kind=anime|comic` —— 按名字自动填充**
+
+> ⚠️ **Vercel Hobby 档每个部署最多 12 个 Serverless Function**，`api/` 目录已经正好 12 个在上限上。加第 13 个 `.js` 会让**整个部署失败**（`npm test` 照过，只有 Vercel 那一步红）。新接口请并进现有路由用 `?action=xxx`（照 `api/learn.js` 抄），`api/_lib/` 下的文件不算函数、可以随便加。
 
 走 AniList GraphQL（免 key），返回候选列表，每条带 `name / altName / cover / score / year / episodes / note / url`，封面 CDN 可直接热链。30 分钟进程内缓存（上限 200 条），上游不通时返回 502 并给人话提示。
 
 | | 方法 / 路径 | 说明 |
 | --- | --- | --- |
 | 批量导入 | `POST /api/content?batch=1` | `{items:[…]}`，≤500 条，先全量预校验再写库 |
-| 按名字查 | `GET /api/lookup?q=Frieren` | 免登录读、写要令牌；返回候选（封面/评分/话数/年份/链接） |
+| 按名字查 | `GET /api/content?action=lookup&q=Frieren` | **需要登录**；返回候选（封面/评分/话数/年份/链接） |
 
 **上游选型的实测结论**：AniList 可用且能热链；Bangumi / TMDB / Jikan / 豆瓣图在本机沙箱全部不可达。AniList 对**中文标题基本返回 0 条**（英文名 / 罗马字 / 日文原名都正常），这是上游限制，已在 0 结果里直接提示。
 
@@ -331,9 +332,9 @@ T12 起密码生成器已下架（主人预留位置回头补内容），数组�
 
 | 套件 | 覆盖 | 项数 |
 | --- | --- | --- |
-| `tests/api_test.mjs` | 令牌签发/校验/过期/改密码失效、密码校验、safeEqual、requireAuth、后台令牌与 AI 令牌互不通用、配置自检、入参校验、favicon SSRF 防护与图片魔数识别、api/ 与 admin/ 源文件语法 | 183 |
+| `tests/api_test.mjs` | 令牌签发/校验/过期/改密码失效、密码校验、safeEqual、requireAuth、后台令牌与 AI 令牌互不通用、配置自检、入参校验、favicon SSRF 防护与图片魔数识别、api/ 与 admin/ 源文件语法 | 182 |
 | `tests/content_test.mjs` | 七种内容类型归一化（含追更 media、学习地图 learn_map）、Markdown 渲染 / 图片 / 安全性 / 边界、plain() 摘要 | 158 |
-| `tests/api_routes_test.mjs` | 接口全流程：未登录 401、CRUD、入参 400、404、405、优先级、SQL 注入、登录限流、缺配置 503、409 唯一性、级联删除、响应头、PATCH 合并语义、RSS 订阅源、文件上传、favicon 代理、追更、学习地图（节点粒度 action / 深链 / gaps 快照）、sitemap.xml、备份与还原、**批量导入（预校验零写入 / 上限 500 / 批内去重 / 个别失败）**、**/api/lookup（AniList 打桩全流程）** | 409 |
+| `tests/api_routes_test.mjs` | 接口全流程：未登录 401、CRUD、入参 400、404、405、优先级、SQL 注入、登录限流、缺配置 503、409 唯一性、级联删除、响应头、PATCH 合并语义、RSS 订阅源、文件上传、favicon 代理、追更、学习地图（节点粒度 action / 深链 / gaps 快照）、sitemap.xml、备份与还原、**批量导入（预校验零写入 / 上限 500 / 批内去重 / 个别失败）**、**按名字查（AniList 打桩全流程，挂在 /api/content 上）** | 409 |
 | `tests/pages_audit.mjs` | 8 个公开页面（含追更海报墙/学习地图/开发交接页）：内联脚本语法、零站外资源、同源 fetch、导航栏统一、静态兜底、Markdown 安全、PWA（manifest/图标/sw 策略）、各页功能点、**追更页「＋ 快速添加」（认令牌/静默隐藏/DOM 拼装）、交接页批次与套数同步** | 299 |
 | `tests/admin_audit.mjs` | 后台：结构、深浅色主题、隐私（noindex/零站外资源）、Bearer 令牌、XSS 防护、九个标签功能点（含追更表单、学习地图节点编辑、一键接上 AI、备份还原）、**追更列表搜索/筛选/排序、行内改状态、封面缩略图回落、批量导入弹层与失败上报、按名字自动填充**、Markdown 实时预览与草稿自动保存 | 211 |
 | `tests/outline_check.mjs` | 大纲解析（直接从 `learn/index.html` 抽函数来跑）：四种 Markdown 标记、缩进与 Tab 等价、空格缩进、三层嵌套、CRLF、空/坏输入 | 11 |
@@ -341,7 +342,7 @@ T12 起密码生成器已下架（主人预留位置回头补内容），数组�
 | `tests/lookup_test.mjs` | AniList 查询纯逻辑：空/超长入参、kind 归一化、perPage 夹取、**关键词只进 variables 不进查询串**、打分 0–100→0–10、name 取 native→romaji→english、episodes 回落 chapters、note 拼装、0 结果过滤 | 38 |
 | `tests/nav_test.cjs` | 导航核心逻辑：links.js 数据体检、hostOf/initialOf/hueOf、查询匹配、分类过滤（含侧栏 cat）、最近访问、标签收集、高亮区间、导入导出往返、真实数据全视图 | 145 |
 | `tests/nav_audit.cjs` | 导航静态审计：结构、零外部请求、DOM 接线、localStorage 键规范、功能点（含最近视图/密度切换/复制/回到顶部）、全站一致性 | 84 |
-| **合计** | | **1571** |
+| **合计** | | **1570** |
 
 > 注：`api_test.mjs` 的项数随 `api/` 与 `admin/` 下的 `.js` 文件数浮动（每个文件一条语法断言）。
 

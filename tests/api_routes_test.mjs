@@ -876,9 +876,10 @@ console.log('\n=== /api/favicon 图标代理 ===');
   }
 }
 
-console.log('\n=== 番剧自动填充 /api/lookup（AniList）===');
+console.log('\n=== 番剧自动填充 /api/content?action=lookup（AniList）===');
 {
-  const lookupRoute = (await load('api/lookup.js')).default;
+  /* 按名字查没有单独开路由（Vercel Hobby 上限 12 个函数），挂在 /api/content?action=lookup */
+  const lookupRoute = (await load('api/content.js')).default;
   const realFetch = globalThis.fetch;
   let calls = [];
   function stubFetch(fn) {
@@ -890,13 +891,13 @@ console.log('\n=== 番剧自动填充 /api/lookup（AniList）===');
   });
   try {
     /* 方法 / 鉴权 */
-    let r = await call(lookupRoute, 'POST', { query: { q: 'Frieren' } });
-    check('POST /api/lookup → 405', r.statusCode === 405, String(r.statusCode));
+    let r = await call(lookupRoute, 'POST', { query: { action: 'lookup', q: 'Frieren' } });
+    check('POST 按名字查 → 405（不落到建内容上）', r.statusCode === 405, String(r.statusCode));
 
-    r = await call(lookupRoute, 'GET', { query: { q: 'Frieren' } });
-    check('未登录 /api/lookup → 401', r.statusCode === 401, String(r.statusCode));
+    r = await call(lookupRoute, 'GET', { query: { action: 'lookup', q: 'Frieren' } });
+    check('未登录按名字查 → 401', r.statusCode === 401, String(r.statusCode));
 
-    r = await call(lookupRoute, 'GET', { token: TOKEN, query: {} });
+    r = await call(lookupRoute, 'GET', { token: TOKEN, query: { action: 'lookup' }});
     check('没带名字 → 400', r.statusCode === 400, String(r.statusCode));
 
     /* 正常查询 */
@@ -908,7 +909,7 @@ console.log('\n=== 番剧自动填充 /api/lookup（AniList）===');
       averageScore: 91, episodes: 28, startDate: { year: 2023 },
       siteUrl: 'https://anilist.co/anime/154587',
     }])));
-    r = await call(lookupRoute, 'GET', { token: TOKEN, query: { q: 'Frieren' } });
+    r = await call(lookupRoute, 'GET', { token: TOKEN, query: { action: 'lookup', q: 'Frieren'  }});
     check('查询成功 → 200', r.statusCode === 200, String(r.statusCode));
     check('返回 results 数组', Array.isArray(r.json.results) && r.json.results.length === 1);
     const hit = r.json.results[0];
@@ -925,32 +926,32 @@ console.log('\n=== 番剧自动填充 /api/lookup（AniList）===');
     /* 搜不到要给提示（中文名搜不到是已知情况） */
     calls = [];
     stubFetch(() => Promise.resolve(anilistJson([])));
-    r = await call(lookupRoute, 'GET', { token: TOKEN, query: { q: '葬送的芙莉莲' } });
+    r = await call(lookupRoute, 'GET', { token: TOKEN, query: { action: 'lookup', q: '葬送的芙莉莲'  }});
     check('搜不到 → 200 空结果 + 提示用英文名', r.statusCode === 200 && r.json.results.length === 0 && /英文名|原名/.test(r.json.hint || ''),
           r.json.hint);
 
     /* 上游挂了要兜底，不能把异常抛成 500 */
     stubFetch(() => Promise.reject(new Error('network down')));
-    r = await call(lookupRoute, 'GET', { token: TOKEN, query: { q: 'zzz-unique-' + Date.now() } });
+    r = await call(lookupRoute, 'GET', { token: TOKEN, query: { action: 'lookup', q: 'zzz-unique-' + Date.now()  }});
     check('连不上 AniList → 502 且给可读提示', r.statusCode === 502 && /稍后再试|手填/.test(r.json.error || ''), r.json.error);
 
     stubFetch(() => Promise.resolve({ ok: false, status: 503, json: async () => ({}) }));
-    r = await call(lookupRoute, 'GET', { token: TOKEN, query: { q: 'yyy-unique-' + Date.now() } });
+    r = await call(lookupRoute, 'GET', { token: TOKEN, query: { action: 'lookup', q: 'yyy-unique-' + Date.now()  }});
     check('AniList 返回错误码 → 502 不漏状态码细节', r.statusCode === 502, String(r.statusCode));
 
     /* 缓存命中不再打上游 */
     calls = [];
     stubFetch(() => Promise.resolve(anilistJson([{ id: 1, title: { native: '缓存番' }, averageScore: 80 }])));
-    await call(lookupRoute, 'GET', { token: TOKEN, query: { q: 'CacheTest' } });
+    await call(lookupRoute, 'GET', { token: TOKEN, query: { action: 'lookup', q: 'CacheTest'  }});
     const after1 = calls.length;
-    r = await call(lookupRoute, 'GET', { token: TOKEN, query: { q: 'CacheTest' } });
+    r = await call(lookupRoute, 'GET', { token: TOKEN, query: { action: 'lookup', q: 'CacheTest'  }});
     check('同名重复查走缓存不打上游', after1 === 1 && calls.length === 1 && r.json.cached === true,
           'calls=' + calls.length + ' cached=' + r.json.cached);
 
     /* manga 走 MANGA 类型 */
     calls = [];
     stubFetch(() => Promise.resolve(anilistJson([{ id: 2, title: { native: 'ベルセルク' }, averageScore: 92, chapters: 400, startDate: { year: 1989 } }])));
-    r = await call(lookupRoute, 'GET', { token: TOKEN, query: { kind: 'comic', q: 'Berserk' } });
+    r = await call(lookupRoute, 'GET', { token: TOKEN, query: { action: 'lookup', kind: 'comic', q: 'Berserk'  }});
     check('kind=comic 时按 MANGA 查', (() => {
       try { return /type:MANGA/.test(JSON.parse(calls[0].opt.body).query); } catch (e) { return false; }
     })());

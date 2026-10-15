@@ -1,14 +1,21 @@
 /* ===========================================================================
-   /api/content   站点内容：导航 / 博客 / 文件 / 页面
+   /api/content   站点内容：导航 / 博客 / 文件 / 页面 / 追更 / 学习地图
    ---------------------------------------------------------------------------
    GET    公开可读（前台页面要读），其余操作需要登录。
    ?type=nav 是特例：一次返回分类和链接，省得前台发两次请求。
+   ?action=lookup 是另一个特例：拿名字去 AniList 查，把封面/评分/话数/年份/链接
+          带回来，用于「按名字自动填充」。**需要登录**，且只认 GET。
+
+   注意：Vercel Hobby 档每个部署最多 12 个 Serverless Function，本目录已经在
+   上限上，所以「按名字查」没有单独开 api/lookup.js，而是并到这里——和
+   api/learn.js 的 ?action=xxx 是同一套写法。
    =========================================================================== */
 
 import { db, ensureSchema } from './_lib/db.js';
 import { requireAuth } from './_lib/token.js';
 import { ok, send, fail, readJson, needId } from './_lib/http.js';
 import { normalize, knownType, needsParent } from './_lib/content.js';
+import { normalizeQuery, normalizeKind, buildQuery, shapeResponse } from './_lib/lookup.js';
 
 /* jsonb 正常会被驱动解析成对象，但这里防一手 */
 function asObj(v) {
@@ -185,13 +192,108 @@ async function createMany(sql, list) {
   };
 }
 
+/* ---------------------------------------------------------------------------
+   按名字查 AniList（GET /api/content?action=lookup&q=名字&kind=anime|comic）
+   ---------------------------------------------------------------------------
+   纯逻辑（入参校验 / 打分换算 / 结果整形）都在 _lib/lookup.js，可单测；
+   这里只负责鉴权、进程内缓存、发请求和错误兜底。
+   为什么走服务端代理：AniList 是跨域接口，也不该把第三方地址散在页面里；
+   走这里还能统一做超时和错误兜底，并且挡住「把本站当免费代理白嫖」。
+   中文名在 AniList 上基本搜不到（上游限制），0 结果时会直接给提示。
+   --------------------------------------------------------------------------- */
+const ANILIST = 'https://graphql.anilist.co';
+const TIMEOUT_MS = 8000;
+const CACHE = new Map();          /* 函数实例内存，冷启动清空 */
+const CACHE_MAX = 200;
+const CACHE_TTL = 30 * 60 * 1000; /* 30 分钟 */
+
+function cacheKey(kind, q) {
+  return kind + '::' + q.toLowerCase();
+}
+function cacheGet(k) {
+  const hit = CACHE.get(k);
+  if (hit && hit.exp > Date.now()) return hit.value;
+  if (hit) CACHE.delete(k);
+  return null;
+}
+function cacheSet(k, value) {
+  if (CACHE.size >= CACHE_MAX) CACHE.delete(CACHE.keys().next().value);
+  CACHE.set(k, { value: value, exp: Date.now() + CACHE_TTL });
+}
+
+async function lookupMedia(res, query) {
+  let q, kind;
+  try {
+    q = normalizeQuery(query && query.q);
+    kind = normalizeKind(query && query.kind);
+  } catch (e) {
+    return send(res, 400, { error: e.message });
+  }
+
+  const key = cacheKey(kind, q);
+  const cached = cacheGet(key);
+  if (cached) return ok(res, { ok: true, q: q, kind: kind, results: cached, cached: true });
+
+  let r;
+  try {
+    r = await fetch(ANILIST, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'User-Agent': 'eraser-site/1.0 (+https://eraser.de5.net)',
+      },
+      body: JSON.stringify(buildQuery(kind, q)),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  } catch (e) {
+    return send(res, 502, {
+      error: '连不上番剧资料库（AniList）。可能是网络问题，稍后再试，或直接手填。',
+    });
+  }
+
+  if (!r.ok) {
+    return send(res, 502, {
+      error: '番剧资料库返回了 ' + r.status + '，稍后再试，或直接手填。',
+    });
+  }
+
+  let json;
+  try {
+    json = await r.json();
+  } catch (e) {
+    return send(res, 502, { error: '番剧资料库返回的内容看不懂，稍后再试。' });
+  }
+
+  /* AniList 用 GraphQL 的 errors 数组报告问题（比如查询语法不对） */
+  if (json && Array.isArray(json.errors) && json.errors.length) {
+    return send(res, 502, { error: '资料库查询出错，稍后再试。' });
+  }
+
+  const results = shapeResponse(json, 6);
+  cacheSet(key, results);
+  return ok(res, {
+    ok: true,
+    q: q,
+    kind: kind,
+    results: results,
+    hint: results.length ? null : '没找到。AniList 用英文名或日文原名最准，中文名往往搜不到。',
+  });
+}
+
 export default async function handler(req, res) {
   try {
     await ensureSchema();
     const sql = db();
 
-    /* ---------------- 读取：公开 ---------------- */
+    /* ---------------- 读取 ---------------- */
     if (req.method === 'GET') {
+      /* 按名字查外部资料库：需要登录（前台批量补字段用），单独鉴权、不走下面公开读取 */
+      if (req.query && req.query.action === 'lookup') {
+        requireAuth(req);
+        return await lookupMedia(res, req.query);
+      }
+
       const t = pickType(req);
 
       if (t === 'nav') {
@@ -211,6 +313,12 @@ export default async function handler(req, res) {
       const rows = await sql`
         SELECT * FROM content WHERE type = ${t} ORDER BY sort_order ASC, id ASC`;
       return ok(res, { ok: true, items: rows.map(shape) });
+    }
+
+    /* 按名字查只认 GET。其它方法在这里明确挡掉，
+       否则会掉到下面被当成「建一条内容」，报一个莫名其妙的 400。 */
+    if (req.query && req.query.action === 'lookup') {
+      return send(res, 405, { error: '按名字查询只支持 GET' });
     }
 
     /* ---------------- 以下都需要登录 ---------------- */

@@ -1098,7 +1098,7 @@
       bGo.disabled = true;
       out.innerHTML = "";
       out.appendChild(el("div", "hintline", "查询中…"));
-      api("lookup?q=" + encodeURIComponent(q) + "&kind=" + encodeURIComponent(kind.value))
+      api("content?action=lookup&q=" + encodeURIComponent(q) + "&kind=" + encodeURIComponent(kind.value))
         .then(function (j) {
           out.innerHTML = "";
           if (!j.results || !j.results.length) {

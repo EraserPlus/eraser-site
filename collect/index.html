@@ -640,7 +640,7 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
       fillBtn.disabled = true;
       setMsg("查询中…");
       var t = getToken();
-      fetch("/api/lookup?q=" + encodeURIComponent(q) + "&kind=" + encodeURIComponent(catSel.value), {
+      fetch("/api/content?action=lookup&q=" + encodeURIComponent(q) + "&kind=" + encodeURIComponent(catSel.value), {
         headers: { Authorization: "Bearer " + t, Accept: "application/json" },
       })
         .then(function (r) { return r.ok ? r.json() : {}; })

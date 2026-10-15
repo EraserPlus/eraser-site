@@ -356,7 +356,8 @@ console.log('\n=== 追更：批量导入 + 列表工具 + 自动填充（M12）=
   check('列表行渲染 mediaRow 存在', /function mediaRow\(/.test(cjs));
 
   check('批量提交走 ?batch=1', /api\("content\?batch=1"/.test(cjs));
-  check('自动填充调 /api/lookup', /api\("lookup\?q="/.test(cjs));
+  check('自动填充调按名字查接口（挂在 /api/content 上，没有单独开路由）',
+        /api\("content\?action=lookup&q="/.test(cjs));
   check('填充时区分 anime / comic', /kind=" \+ encodeURIComponent\(kind\.value\)/.test(cjs));
 
   check('有搜索框', /"minput"/.test(cjs) && /搜名字/.test(cjs));

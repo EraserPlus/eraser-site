@@ -5,7 +5,8 @@
    这里只做两件事：
      1. 拼查询语句 + 校验用户输入（纯函数，好测）
      2. 把 AniList 的返回归一化成站点自己的字段形状
-   真正的网络请求在 api/lookup.js 里，方便单独 mock。
+   真正的网络请求在 api/content.js 的 lookupMedia() 里（?action=lookup），
+   方便测试时把 globalThis.fetch 换掉单独 mock。
    =========================================================================== */
 
 /* AniList 的 averageScore 是 0-100 的整数，站点评分是 0-10 一位小数 */
