@@ -80,7 +80,7 @@ html[data-theme="dark"] .steps li::before { color: #0d1117; }
     <tr><th>托管</th><td>Vercel Hobby 免费档。push main → 自动部署，1~2 分钟生效</td></tr>
     <tr><th>数据库</th><td>Neon Postgres，四张表：content（七种内容共用，新增类型不用建表）/ todos / events / meta（键值小仓库，存 AI 令牌世代号等）</td></tr>
     <tr><th>后台</th><td><code>/admin/</code> 密码登录（站长持有），9 个标签：今天 / 待办 / 日程 / 导航 / 博客 / 追更 / 学习 / 页面 / 数据</td></tr>
-    <tr><th>测试</th><td>八套 1406 项，一条命令：<code>npm test</code>。提交前必须全绿</td></tr>
+    <tr><th>测试</th><td>八套 1431 项，一条命令：<code>npm test</code>。提交前必须全绿</td></tr>
     <tr><th>当前版本</th><td>main @ <code>78de1ea</code> · 最近批次 <b>M10 主线C 工程底座 + 主线A AI 闭环</b>（PR #34 / #35，2026-10-15）</td></tr>
   </table>
 
@@ -217,6 +217,7 @@ done < /tmp/main_tree.tsv</code></pre>
     <div class="row latest"><span class="no">M9</span><span class="what"><b>学习地图 + 给 AI 的接口 + 收窄搜索</b>：新增 <code>learn_map</code> 内容类型（一张地图内嵌节点数组）+ 前台 <code>/learn/</code>（分组节点、勾选进度）+ 后台第 8 标签「学习」（节点文字/分组/备注就地编辑、↑↓ 排序、＋ 插入、✕ 删除，走失焦自动保存）；新增 <code>/api/learn</code> 按节点粒度的原子接口（addNode / updateNode / removeNode / toggleNode / setNodes），专供 AI 助手建图与<b>查漏补缺</b>；<b>收窄全站搜索</b>——不再搜博客正文与页面正文，学习地图只搜标题/说明、<b>不搜节点文字</b>，单字关键词直接拦掉（PR #32）</span><span class="when">10-15</span></div>
     <div class="row latest"><span class="no">M10c</span><span class="what"><b>工程底座（主线C）</b>：① <code>robots.txt</code> + 动态 <code>/sitemap.xml</code>（<code>api/sitemap.js</code>，读 content 表出全部页面/文章/地图）；② <b>PWA 可安装</b>——<code>manifest.webmanifest</code> + SVG 图标（<code>icon.svg</code> / <code>icon-maskable.svg</code>）+ <code>sw.js</code>（HTML 网络优先带缓存兜底、静态资源缓存优先后台更新、接口不缓存、离线兜底页），8 个公开页 <code>&lt;head&gt;</code> 全加了 manifest/icon/theme-color；③ <b>键盘 <code>g</code> 前缀跳转</b>（<code>g</code> 然后 <code>h/t/b/c/l/n/a/d</code>，<code>shell.js</code>）；④ <b>自动备份 + 一键还原</b>——<code>api/backup.js</code> 全量导出 / 校验 / 按 id 合并还原（<b>永不 DELETE</b>），后台新增第 9 标签「数据」（PR #34）</span><span class="when">10-15</span></div>
     <div class="row latest"><span class="no">M10a</span><span class="what"><b>AI 闭环（主线A）</b>：① <b>AI 专用长效令牌</b>——365 天、独立签名密钥、带世代号，与 30 天后台令牌互不通用，一键吊销不影响站长的登录（<code>api/_lib/token.js</code>）；② <b>后台「一键接上 AI」面板</b>——生成令牌 / 复制可直接贴给 AI 的配置 / 展开完整说明书 / 吊销（<code>api/ai.js</code> + 后台「学习」标签）；③ <b>查漏补缺快照</b> <code>?gaps=1</code>——直接给「哪组从没动过 / 哪组落后 / 建议先补哪几个」；④ <b>重做 <code>/learn/</code> 交互页（仿 MapFlow）</b>——列表可搜可汇总、分组可折叠带进度条、节点就地改文字/改分组、<b>拖动排序</b>（同组内）、加删节点、<b>一键复制给 AI 的指令</b>、未登录只读保护；⑤ <b>大纲导入成图</b>——粘 Markdown/缩进列表，实时预览，一次建好整张图（PR #35）</span><span class="when">10-15</span></div>
+    <div class="row latest"><span class="no">M11</span><span class="what"><b>追更页改海报墙（仿 dudulu.moe，配色沿用全站蓝）</b>：<code>/collect/</code> 从单列列表重做为海报墙——<b>3:4.1 竖版封面网格</b>（手机 2 列 / 560px 3 列 / 760px 5 列）、右上角状态角标（在追/搁置/已看）、左上角评分角标、<b>底部渐变压名</b>、悬停封面放大 1.05；<b>没封面自动渐变兜底 + 首字</b>；顶部 5 格统计条 + 状态筛选条（<b>纯前端即时过滤、不打接口</b>，带计数、零结果不显示按钮）；已看完/已读完折进可展开的「收纳栏」；手机端筛选条横向滚动不挤行。修掉一个真实暗色 bug：<code>style.css</code> 有全局 <code>html[data-theme="dark"] button{color:#0d1117}</code>（权重 0,1,2）会把筛选按钮刷成近黑色，选择器提权到 <code>.mg-filters .mg-filters button</code> 并补暗色专用覆盖（PR 待合）</span><span class="when">10-16</span></div>
   </div>
 
   <h2>7. 当前待办 / 已知事项</h2>

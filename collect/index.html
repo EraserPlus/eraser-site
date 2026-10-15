@@ -14,48 +14,167 @@
 <link rel="apple-touch-icon" href="../icon.svg">
 <meta name="theme-color" content="#2563eb">
 <style>
-/* 追更页专属样式：栏目 / 记录卡 / 状态徽章 / 收纳栏 */
-.mg-sec { margin-top: 30px; }
-.mg-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
-.mg-head h2 { margin: 0; font-size: 18px; }
-.mg-head .cnt { color: var(--muted); font-size: 13px; }
-.mg-card {
+/* ===== 追更页：海报墙（参考 dudulu.moe 的版式，配色沿用全站蓝） ===== */
+
+/* 页头 */
+.mg-top { margin-top: 4px; }
+.mg-top h1 { margin-bottom: 6px; }
+
+/* 顶部统计条 */
+.mg-stats { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.mg-stat {
   background: var(--card); border: 1px solid var(--line); border-radius: 10px;
-  padding: 12px 16px; margin-bottom: 10px;
-  display: flex; align-items: center; gap: 14px;
+  padding: 10px 16px; min-width: 84px;
 }
-.mg-card .cover { width: 44px; height: 60px; object-fit: cover; border-radius: 6px; flex-shrink: 0; background: var(--sunk); }
-.mg-card .body { flex: 1; min-width: 0; }
-.mg-card .nm { font-weight: 600; font-size: 15px; word-break: break-word; }
-.mg-card .nm a { color: inherit; }
-.mg-card .nm a:hover { color: var(--blue); }
-.mg-card .sub { color: var(--muted); font-size: 13px; margin-top: 3px; word-break: break-word; }
-.mg-card .right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-.mg-score { color: #9a6700; font-size: 13px; white-space: nowrap; }
-.badge { font-size: 12px; padding: 2px 10px; border-radius: 999px; white-space: nowrap; }
-.badge-wish { background: rgba(110,119,129,.14); color: #6e7781; }
-.badge-watching { background: rgba(37,99,235,.12); color: #2563eb; }
-.badge-finished { background: rgba(26,127,55,.12); color: #1a7f37; }
-.badge-paused { background: rgba(154,103,0,.14); color: #9a6700; }
-html[data-theme="dark"] .badge-wish { background: rgba(139,148,158,.16); color: #8b949e; }
-html[data-theme="dark"] .badge-watching { background: rgba(96,165,250,.16); color: #60a5fa; }
-html[data-theme="dark"] .badge-finished { background: rgba(63,185,80,.16); color: #3fb950; }
-html[data-theme="dark"] .badge-paused { background: rgba(210,153,34,.16); color: #d29922; }
-html[data-theme="dark"] .mg-score { color: #d29922; }
+.mg-stat b { display: block; font-size: 20px; line-height: 1.25; color: var(--blue); }
+.mg-stat span { font-size: 12px; color: var(--muted); }
+/* 带 «» 的次要统计（搁置/已看完）稍淡一档，但暗色下 --ink4(#8b949e) 偏灰，
+   提亮到 --ink2 保证能看清数字本身 */
+.mg-stat.mute b { color: var(--ink4); }
+html[data-theme="dark"] .mg-stat.mute b { color: var(--ink2); }
+
+/* 状态筛选 */
+.mg-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+@media (max-width: 480px) {
+  /* 手机上按钮多时允许横滑，不挤成两行 */
+  .mg-filters { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+  .mg-filters::-webkit-scrollbar { display: none; }
+}
+/* 注意：style.css 里有一条全局 `html[data-theme="dark"] button { color:#0d1117 }`
+   （给品牌蓝按钮配深色文字用），它的权重是 (0,1,2)，比单个 `.mg-filters button` (0,1,1) 高。
+   所以这里必须写成 `.mg-filters .mg-filters button` (0,2,1) 才压得住，
+   否则暗色下筛选按钮会被刷成近黑色、贴在深色卡片上看不见。 */
+.mg-filters .mg-filters button {
+  border: 1px solid var(--line); background: var(--card); color: var(--ink2);
+  border-radius: 8px; padding: 6px 13px; font-size: 13px; font-family: inherit;
+  cursor: pointer; white-space: nowrap; transition: background .15s, color .15s, border-color .15s;
+}
+.mg-filters .mg-filters button:hover { background: var(--sunk); color: var(--ink); }
+.mg-filters .mg-filters button.on {
+  background: var(--blue); border-color: var(--blue);
+  color: #fff; font-weight: 600; box-shadow: 0 1px 6px rgba(37,99,235,.28);
+}
+.mg-filters .mg-filters button .n { opacity: .72; font-size: 11.5px; margin-left: 4px; }
+
+/* 区块 */
+.mg-sec { margin-top: 30px; }
+.mg-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.mg-head h2 { margin: 0; font-size: 17px; display: flex; align-items: center; gap: 8px; }
+.mg-head h2 .dot { width: 4px; height: 15px; border-radius: 2px; background: var(--blue); display: inline-block; }
+.mg-head .cnt { color: var(--muted); font-size: 13px; white-space: nowrap; }
+
+/* ===== 海报网格 ===== */
+.mg-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+@media (min-width: 560px) { .mg-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; } }
+@media (min-width: 760px) { .mg-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+
+/* 单张海报：3 : 4.1 竖版 */
+.mg-item {
+  position: relative; display: block; width: 100%;
+  aspect-ratio: 3 / 4.1;
+  overflow: hidden; border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--sunk);
+  color: inherit; text-decoration: none;
+  /* 老浏览器不认 aspect-ratio 时用 padding 撑出比例（保证不会塌） */
+  min-height: 0;
+}
+@supports not (aspect-ratio: 3 / 4.1) {
+  .mg-item::before { content: ""; display: block; padding-top: 136.7%; }
+}
+.mg-item:hover { text-decoration: none; border-color: var(--blue); }
+.mg-item img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  transition: transform .3s ease;
+}
+.mg-item:hover img { transform: scale(1.05); }
+
+/* 没封面时的兜底：渐变底 + 首字 */
+.mg-fallback {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 30px; font-weight: 700; color: #fff;
+  background: linear-gradient(140deg, var(--blue) 0%, var(--blue-d) 100%);
+  opacity: .88;
+}
+.mg-fallback.g1 { background: linear-gradient(140deg, #4f7cf7, #2f52c9); }
+.mg-fallback.g2 { background: linear-gradient(140deg, #5aa9e6, #2b7bbd); }
+.mg-fallback.g3 { background: linear-gradient(140deg, #7b8ff5, #4a56c9); }
+.mg-fallback.g4 { background: linear-gradient(140deg, #3f8fbf, #1f5f8a); }
+html[data-theme="dark"] .mg-fallback { opacity: .72; }
+
+/* 右上角状态角标 */
+.mg-tag {
+  position: absolute; top: 6px; right: 6px; z-index: 2;
+  border-radius: 4px; padding: 2px 7px;
+  font-size: 10.5px; font-weight: 700; line-height: 1.5;
+  color: #fff; letter-spacing: .2px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.22);
+}
+.mg-tag.t-watching { background: var(--blue); }
+.mg-tag.t-wish    { background: #8b949e; }
+.mg-tag.t-paused  { background: #c08a2e; }
+.mg-tag.t-finished{ background: #2f9e56; }
+html[data-theme="dark"] .mg-tag.t-wish { background: #6b7480; }
+
+/* 左上角评分 */
+.mg-rate {
+  position: absolute; top: 6px; left: 6px; z-index: 2;
+  border-radius: 4px; padding: 2px 7px;
+  font-size: 10.5px; font-weight: 700; line-height: 1.5;
+  background: rgba(0,0,0,.58); color: #ffd76e;
+  backdrop-filter: blur(2px);
+}
+
+/* 底部渐变压名字 */
+.mg-mask {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+  padding: 22px 8px 7px;
+  background: linear-gradient(to top, rgba(0,0,0,.82) 12%, rgba(0,0,0,.45) 55%, rgba(0,0,0,0) 100%);
+}
+.mg-mask .nm {
+  color: #fff; font-size: 12.5px; font-weight: 600; line-height: 1.35;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; word-break: break-word;
+}
+.mg-mask .sub {
+  color: rgba(255,255,255,.74); font-size: 11px; margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* 收纳栏（已看完 / 已读完） */
 .mg-fold {
   display: flex; align-items: center; justify-content: space-between;
-  color: var(--muted); font-size: 13px; cursor: pointer;
-  padding: 9px 14px; border: 1px dashed var(--line2); border-radius: 10px;
-  user-select: none; margin-bottom: 10px;
+  color: var(--ink4); font-size: 13px; cursor: pointer;
+  padding: 10px 14px; border: 1px dashed var(--line2); border-radius: 10px;
+  user-select: none; margin-bottom: 14px; background: var(--card);
 }
 .mg-fold:hover { border-color: var(--blue); color: var(--blue); }
-.mg-fold .tri { display: inline-block; transition: transform .15s; margin-right: 8px; }
+/* 暗色下收纳栏别太灰，否则像被禁用了 */
+html[data-theme="dark"] .mg-fold { color: var(--ink3); }
+.mg-fold .tri { display: inline-block; transition: transform .18s; margin-right: 8px; font-size: 11px; }
 .mg-fold.open .tri { transform: rotate(90deg); }
-.mg-done .mg-card { opacity: .78; }
-@media (max-width: 560px) {
-  .mg-card { flex-wrap: wrap; }
-  .mg-card .right { width: 100%; justify-content: flex-end; }
+.mg-fold .n { color: var(--muted); font-size: 12.5px; }
+.mg-fold.open .n { color: var(--blue); }
+.mg-fold-wrap { margin-top: 4px; }
+.mg-fold-wrap .mg-grid { opacity: .82; }
+.mg-fold-wrap .mg-item:hover { opacity: 1; }
+
+/* 空状态 */
+.mg-empty {
+  border: 1px dashed var(--line2); border-radius: 12px;
+  padding: 30px 20px; text-align: center; color: var(--muted);
+  font-size: 14px; background: var(--card);
 }
+.mg-empty b { color: var(--ink2); }
+
+/* 小提示行 */
+.mg-tip { font-size: 12.5px; color: var(--muted); margin-top: 12px; }
 </style>
 </head>
 <body>
@@ -72,35 +191,64 @@ html[data-theme="dark"] .mg-score { color: #d29922; }
   </nav>
 </div>
 <div class="container">
-  <h1>追更</h1>
-  <p class="muted">追番、漫画，看过的都留档在这。</p>
+  <div class="mg-top">
+    <h1>追更</h1>
+    <p class="muted">追番、漫画，看过的都留档在这。</p>
+  </div>
+
+  <!-- 顶部统计（有数据后才显示） -->
+  <div class="mg-stats" id="mgStats" style="display:none"></div>
+
+  <!-- 状态筛选（有数据后才显示） -->
+  <div class="mg-filters" id="mgFilters" style="display:none"></div>
 
   <section class="mg-sec">
-    <div class="mg-head"><h2>追番</h2><span class="cnt" id="cnt-anime"></span></div>
+    <div class="mg-head">
+      <h2><span class="dot"></span>追番</h2>
+      <span class="cnt" id="cnt-anime"></span>
+    </div>
+    <!-- 数据库里还没内容时保留这段静态兜底，别删 -->
     <p class="muted" id="hint-anime">还没有记录。去管理后台的「追更」标签加第一条。</p>
-    <div id="list-anime"></div>
-    <div class="mg-fold" id="fold-anime" style="display:none"><span><span class="tri">▸</span><span id="foldtxt-anime"></span></span><span id="foldcnt-anime"></span></div>
-    <div class="mg-done" id="done-anime" style="display:none"></div>
+    <div class="mg-grid" id="list-anime"></div>
+    <div id="foldWrap-anime"></div>
   </section>
 
   <section class="mg-sec">
-    <div class="mg-head"><h2>漫画</h2><span class="cnt" id="cnt-comic"></span></div>
+    <div class="mg-head">
+      <h2><span class="dot"></span>漫画</h2>
+      <span class="cnt" id="cnt-comic"></span>
+    </div>
     <p class="muted" id="hint-comic">还没有记录。去管理后台的「追更」标签加第一条。</p>
-    <div id="list-comic"></div>
-    <div class="mg-fold" id="fold-comic" style="display:none"><span><span class="tri">▸</span><span id="foldtxt-comic"></span></span><span id="foldcnt-comic"></span></div>
-    <div class="mg-done" id="done-comic" style="display:none"></div>
+    <div class="mg-grid" id="list-comic"></div>
+    <div id="foldWrap-comic"></div>
   </section>
 </div>
 
 <script>
-/* 追更：追番 / 漫画的留档。
-   先静态兜底（上面的空状态）→ 再读接口渲染 → 失败保持静态，永不白屏；
-   数据库里还没内容，保留静态兜底。 */
+/* ===========================================================================
+   追更：追番 / 漫画的留档（海报墙版式）
+   ---------------------------------------------------------------------------
+   先静态兜底（上面的空状态）→ 再读接口渲染 → 失败保持静态，永不白屏。
+   要点：
+     - 卡片是 3:4.1 竖版海报，走 CSS Grid（2 / 3 / 5 列），名字压在底部黑色渐变上
+     - 没封面图用「渐变底 + 名称首字」兜底，不会开天窗
+     - 顶部统计 + 状态筛选是纯前端过滤（数据一次读完，切换即时生效）
+     - 全部内容走 textContent / setAttribute，绝不拼 innerHTML
+     - 已看完 / 已读完 收进折叠栏，默认收起
+   =========================================================================== */
 (function () {
+  "use strict";
+
   var LABEL = {
     anime: { wish: "想看", watching: "在看", finished: "看完", paused: "搁置", done: "已看完" },
     comic: { wish: "想读", watching: "在读", finished: "读完", paused: "搁置", done: "已读完" }
   };
+  /* 筛选顺序：在追的排前面，已完成的最后 */
+  var STATUS_ORDER = ["watching", "wish", "paused", "finished"];
+
+  var allItems = [];        /* 接口返回的原始列表 */
+  var filter = "all";       /* 当前状态筛选 */
+
   function $(id) { return document.getElementById(id); }
   function el(tag, cls, text) {
     var e = document.createElement(tag);
@@ -112,56 +260,71 @@ html[data-theme="dark"] .mg-score { color: #d29922; }
     u = String(u == null ? "" : u);
     return /^https?:\/\//i.test(u) ? u : "";
   }
+  function firstChar(s) {
+    s = String(s == null ? "" : s).trim();
+    return s ? s.slice(0, 1) : "?";
+  }
 
+  /* 一张海报 */
   function makeCard(it, lab) {
     var d = it.data || {};
-    var card = el("div", "mg-card");
-
+    var status = lab[d.status] ? d.status : "wish";
+    var link = safeUrl(d.url);
     var cover = safeUrl(d.cover);
+
+    /* 有链接 → <a>；没链接 → <div>（保持同样的样子，但不可点） */
+    var card = link ? el("a", "mg-item") : el("div", "mg-item");
+    if (link) {
+      card.href = link;
+      card.target = "_blank";
+      card.rel = "noopener noreferrer";
+    }
+
     if (cover) {
-      var img = el("img", "cover");
+      var img = el("img");
       img.src = cover;
       img.alt = "";
       img.loading = "lazy";
-      img.addEventListener("error", function () { if (img.parentNode) img.parentNode.removeChild(img); });
+      /* 图挂了就换成渐变兜底，不让卡片空着 */
+      img.addEventListener("error", function () {
+        if (!img.parentNode) return;
+        img.parentNode.removeChild(img);
+        card.insertBefore(makeFallback(d.name, it.id), card.firstChild);
+      });
       card.appendChild(img);
-    }
-
-    var body = el("div", "body");
-    var nm = el("div", "nm");
-    var link = safeUrl(d.url);
-    if (link) {
-      var a = el("a", null, d.name || "");
-      a.href = link;
-      a.target = "_blank";
-      a.rel = "noopener noreferrer";
-      nm.appendChild(a);
     } else {
-      nm.textContent = d.name || "";
+      card.appendChild(makeFallback(d.name, it.id));
     }
-    body.appendChild(nm);
 
-    var bits = [];
-    if (d.note) bits.push(d.note);
-    if (d.date) bits.push(d.date);
-    if (bits.length) body.appendChild(el("div", "sub", bits.join(" · ")));
-    card.appendChild(body);
-
-    var right = el("div", "right");
+    /* 左上角评分 */
     if (d.score != null && d.score !== "") {
-      right.appendChild(el("span", "mg-score", "★ " + Number(d.score).toFixed(1)));
+      card.appendChild(el("span", "mg-rate", "★ " + Number(d.score).toFixed(1)));
     }
-    right.appendChild(el("span", "badge badge-" + (lab[d.status] ? d.status : "wish"), lab[d.status] || ""));
-    card.appendChild(right);
+    /* 右上角状态 */
+    card.appendChild(el("span", "mg-tag t-" + status, lab[d.status] || ""));
+
+    /* 底部渐变压名字 */
+    var mask = el("div", "mg-mask");
+    mask.appendChild(el("div", "nm", d.name || "(未命名)"));
+    if (d.note) mask.appendChild(el("div", "sub", d.note));
+    card.appendChild(mask);
 
     return card;
   }
 
+  /* 渐变兜底块：按 id 取一个固定的配色，同一部作品每次进来颜色一样 */
+  function makeFallback(name, id) {
+    var gi = (Number(id) || 0) % 4;
+    var f = el("div", "mg-fallback" + (gi ? " g" + gi : ""));
+    f.appendChild(document.createTextNode(firstChar(name)));
+    return f;
+  }
+
+  /* 渲染一个栏目（anime / comic） */
   function renderSection(key, items) {
     var lab = LABEL[key];
     var list = $("list-" + key), hint = $("hint-" + key);
-    var fold = $("fold-" + key), foldtxt = $("foldtxt-" + key), foldcnt = $("foldcnt-" + key);
-    var doneBox = $("done-" + key), cnt = $("cnt-" + key);
+    var foldWrap = $("foldWrap-" + key), cnt = $("cnt-" + key);
 
     /* 新的排前面 */
     items = items.slice().sort(function (a, b) {
@@ -177,37 +340,116 @@ html[data-theme="dark"] .mg-score { color: #d29922; }
     cnt.textContent = items.length ? "共 " + items.length + " 部" : "";
 
     list.innerHTML = "";
-    doneBox.innerHTML = "";
+    foldWrap.innerHTML = "";
     hint.style.display = items.length ? "none" : "";   // 数据库里还没内容，保留静态兜底
 
     active.forEach(function (it) { list.appendChild(makeCard(it, lab)); });
     if (!active.length && items.length) {
-      list.appendChild(el("p", "muted", "当前没有在追的，都收在下面的收纳栏里。"));
+      var p = el("p", "muted");
+      p.style.gridColumn = "1 / -1";
+      p.textContent = "当前没有在追的，都收在下面的收纳栏里。";
+      list.appendChild(p);
     }
 
-    if (done.length) {
-      fold.style.display = "";
-      foldtxt.textContent = lab.done;
-      foldcnt.textContent = done.length + " 部";
-      done.forEach(function (it) { doneBox.appendChild(makeCard(it, lab)); });
-      if (!fold.dataset.bound) {
-        fold.dataset.bound = "1";
-        fold.addEventListener("click", function () {
-          fold.classList.toggle("open");
-          doneBox.style.display = fold.classList.contains("open") ? "" : "none";
-        });
-      }
-    } else {
-      fold.style.display = "none";
-      doneBox.style.display = "none";
+    if (!done.length) return;
+
+    /* 收纳栏：折叠头 + 展开后的同款海报墙 */
+    var wrap = el("div", "mg-fold-wrap");
+    var fold = el("div", "mg-fold");
+    var left = el("span");
+    left.appendChild(el("span", "tri", "▸"));
+    left.appendChild(el("span", null, lab.done));
+    fold.appendChild(left);
+    fold.appendChild(el("span", "n", done.length + " 部 · 点击展开"));
+    var grid = el("div", "mg-grid");
+    grid.style.display = "none";
+    done.forEach(function (it) { grid.appendChild(makeCard(it, lab)); });
+
+    fold.addEventListener("click", function () {
+      var open = fold.classList.toggle("open");
+      grid.style.display = open ? "" : "none";
+      fold.querySelector(".n").textContent = done.length + " 部 · " + (open ? "点击收起" : "点击展开");
+    });
+
+    wrap.appendChild(fold);
+    wrap.appendChild(grid);
+    foldWrap.appendChild(wrap);
+  }
+
+  /* 顶部统计：总部数 / 在追 / 想看 / 已看完 */
+  function renderStats(items) {
+    var box = $("mgStats");
+    if (!items.length) { box.style.display = "none"; return; }
+    box.style.display = "";
+    box.innerHTML = "";
+
+    var n = { watching: 0, wish: 0, paused: 0, finished: 0 };
+    items.forEach(function (it) {
+      var s = it.data && it.data.status;
+      if (n[s] != null) n[s]++;
+    });
+
+    function cell(val, label, mute) {
+      var c = el("div", "mg-stat" + (mute ? " mute" : ""));
+      c.appendChild(el("b", null, String(val)));
+      c.appendChild(el("span", null, label));
+      return c;
     }
+    box.appendChild(cell(items.length, "全部留档"));
+    box.appendChild(cell(n.watching, "在追"));
+    box.appendChild(cell(n.wish, "想看 / 想读", true));
+    box.appendChild(cell(n.paused, "搁置", true));
+    box.appendChild(cell(n.finished, "已看完 · 已读完", true));
+  }
+
+  /* 状态筛选条 */
+  function renderFilters(items) {
+    var box = $("mgFilters");
+    if (!items.length) { box.style.display = "none"; return; }
+
+    var counts = { all: items.length, wish: 0, watching: 0, paused: 0, finished: 0 };
+    items.forEach(function (it) {
+      var s = it.data && it.data.status;
+      if (counts[s] != null) counts[s]++;
+    });
+
+    var defs = [["all", "全部"]].concat(STATUS_ORDER.map(function (s) {
+      return [s, { wish: "想看 / 想读", watching: "在追", paused: "搁置", finished: "已看完" }[s]];
+    }));
+
+    box.style.display = "";
+    box.innerHTML = "";
+    defs.forEach(function (pair) {
+      var key = pair[0], labelText = pair[1];
+      if (key !== "all" && !counts[key]) return;   /* 没这个状态的就不显示这个按钮 */
+      var b = el("button", filter === key ? "on" : "");
+      b.type = "button";
+      b.appendChild(document.createTextNode(labelText));
+      var num = el("span", "n", String(counts[key]));
+      b.appendChild(num);
+      b.addEventListener("click", function () {
+        filter = key;
+        apply(allItems);
+      });
+      box.appendChild(b);
+    });
+  }
+
+  /* 当前筛选下该栏目要显示的条目 */
+  function filtered(items, key) {
+    return items.filter(function (it) {
+      if (!it.data || it.data.category !== key) return false;
+      if (filter !== "all" && it.data.status !== filter) return false;
+      return true;
+    });
   }
 
   function apply(items) {
+    allItems = items;
+    renderStats(items);
+    renderFilters(items);
     ["anime", "comic"].forEach(function (key) {
-      renderSection(key, items.filter(function (it) {
-        return it.data && it.data.category === key;
-      }));
+      renderSection(key, filtered(items, key));
     });
   }
 

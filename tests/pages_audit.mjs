@@ -192,10 +192,34 @@ console.log('\n=== 追更页 ===');
   check('读的是 media 内容类型', /content\?type=media/.test(html));
   check('看完的自动进收纳栏（按状态分流）', /status === "finished"/.test(html));
   check('收纳栏默认收起、点击展开', /fold\.classList\.toggle\("open"\)/.test(html));
-  check('名称用 textContent 渲染（防注入）', /nm\.textContent = d\.name/.test(html));
+  check('名称用 textContent 渲染（防注入）', /el\("div", "nm", d\.name/.test(html));
   check('站外链接只放行 http(s)', /function safeUrl/.test(html));
   check('站外链接带 noopener', /noopener/.test(html));
-  check('封面图加载失败自动隐藏', /img\.addEventListener\("error"/.test(html));
+  check('封面图加载失败有兜底（不空着）', /img\.addEventListener\("error"/.test(html) && /makeFallback/.test(html));
+
+  // M11：仿 dudulu.moe 的海报墙改造
+  check('海报网格（CSS Grid，不是单列列表）', /\.mg-grid\s*\{[\s\S]{0,140}?display: grid/.test(html));
+  check('海报 3:4.1 竖版比例', /aspect-ratio:\s*3\s*\/\s*4\.1/.test(html));
+  check('响应式列数（2 / 3 / 5 列）', /repeat\(2, minmax/.test(html) && /repeat\(3, minmax/.test(html) && /repeat\(5, minmax/.test(html));
+  check('悬停海报放大', /\.mg-item:hover img\s*\{\s*transform:\s*scale\(1\.05\)/.test(html));
+  check('右上角状态角标', /mg-tag t-/.test(html));
+  check('左上角评分角标', /"mg-rate"/.test(html));
+  check('底部渐变压名字', /"mg-mask"/.test(html) && /linear-gradient\(to top/.test(html));
+  check('没封面时渐变兜底 + 首字', /function makeFallback/.test(html) && /function firstChar/.test(html));
+  check('顶部统计条', /id="mgStats"/.test(html) && /function renderStats/.test(html));
+  check('状态筛选条（纯前端过滤）', /id="mgFilters"/.test(html) && /function renderFilters/.test(html));
+  check('筛选切换即时重渲染，不打接口', /filter = key;\s*\n\s*apply\(allItems\)/.test(html));
+  check('筛选按钮带计数', /el\("span", "n", String\(counts\[key\]\)\)/.test(html));
+  check('没内容时不显示空筛选按钮', /if \(key !== "all" && !counts\[key\]\) return/.test(html));
+  check('主色沿用全站蓝（没有硬搬粉色）', !/#ff5c7c/.test(html) && /var\(--blue\)/.test(html));
+  check('深浅色都处理了兜底块透明度', /html\[data-theme="dark"\] \.mg-fallback/.test(html));
+  check(
+    '筛选按钮权重压过全局暗色 button 规则（否则暗色下看不见）',
+    /\.mg-filters \.mg-filters button \{/.test(html) &&
+      !/^\s*\.mg-filters button \{/m.test(html)
+  );
+  check('暗色下收纳栏/次要统计不糊成禁用色', /html\[data-theme="dark"\] \.mg-fold/.test(html) && /html\[data-theme="dark"\] \.mg-stat\.mute b/.test(html));
+  check('没有把数据拼进 innerHTML', !/innerHTML\s*=\s*[^"';]*d\.(name|note|cover|url)/.test(html));
 }
 
 console.log('\n=== 学习地图页 ===');
