@@ -81,7 +81,7 @@ html[data-theme="dark"] .steps li::before { color: #0d1117; }
     <tr><th>数据库</th><td>Neon Postgres，三张表：content（七种内容共用，新增类型不用建表）/ todos / events。闲置约 5 分钟休眠，首次访问慢几秒属正常</td></tr>
     <tr><th>后台</th><td><code>/admin/</code> 密码登录（站长持有），8 个标签：今天 / 待办 / 日程 / 导航 / 博客 / 追更 / 学习 / 页面</td></tr>
     <tr><th>测试</th><td>七套 1146 项，一条命令：<code>npm test</code>。提交前必须全绿</td></tr>
-    <tr><th>当前版本</th><td>main @ <code>49f922a</code>（M8）· 最近批次 <b>M9 学习地图 + 给 AI 的接口 + 收窄搜索</b>（2026-10-15，待合并）</td></tr>
+    <tr><th>当前版本</th><td>main @ <code>ec7ec4d</code> · 最近批次 <b>M9 学习地图 + 给 AI 的节点接口 + 收窄搜索</b>（PR #32，2026-10-15）</td></tr>
   </table>
 
   <h2>2. 工作流程（六步，别跳步）</h2>
@@ -204,7 +204,7 @@ done < /tmp/main_tree.tsv</code></pre>
     <div class="row latest"><span class="no">M6</span><span class="what"><b>体验基座</b>：新增全站公共交互层 <code>shell.js</code>——顶栏手动主题切换（存 <code>eraser.theme</code>，各页 head 加防闪脚本）、<code>Ctrl/⌘+K</code> 命令面板（跳分区 / 搜关键词 / 切主题 / 复制链接 / 回顶部）、复制当前链接；暗色由 <code>@media</code> 统一改为 <code>html[data-theme="dark"]</code>；导航页的 Ctrl+K 收归 shell.js，避免重复绑定（PR #28）</span><span class="when">10-14</span></div>
     <div class="row latest"><span class="no">M7</span><span class="what"><b>搜索增强</b>：键盘选结果（↑↓ + Enter）/ 搜索历史 / 分区 tab / 加载更多 / 模糊匹配（PR #30）</span><span class="when">10-14</span></div>
     <div class="row latest"><span class="no">M8</span><span class="what"><b>修复上传 503</b>：原 Blob Store 为 <code>private</code> 模式，只注入 <code>BLOB_STORE_ID</code> 而无 <code>BLOB_READ_WRITE_TOKEN</code>，与 <code>api/upload.js</code> 的检查不匹配。改为新建 <code>public</code> Store <code>eraser-blob-public</code> 并连接项目，摘除旧连接；代码零改动，端到端实测上传 + 公开访问均通过（2026-10-15）</span><span class="when">10-15</span></div>
-    <div class="row latest"><span class="no">M9</span><span class="what"><b>学习地图 + 给 AI 的接口 + 收窄搜索</b>：新增 <code>learn_map</code> 内容类型（一张地图内嵌节点数组）+ 前台 <code>/learn/</code>（分组节点、勾选进度）+ 后台第 8 标签「学习」（节点文字/分组/备注就地编辑、↑↓ 排序、＋ 插入、✕ 删除，走失焦自动保存）；新增 <code>/api/learn</code> 按节点粒度的原子接口（addNode / updateNode / removeNode / toggleNode / setNodes），专供 AI 助手建图与<b>查漏补缺</b>；<b>收窄全站搜索</b>——不再搜博客正文与页面正文，学习地图只搜标题/说明、<b>不搜节点文字</b>，单字关键词直接拦掉</span><span class="when">10-15</span></div>
+    <div class="row latest"><span class="no">M9</span><span class="what"><b>学习地图 + 给 AI 的接口 + 收窄搜索</b>：新增 <code>learn_map</code> 内容类型（一张地图内嵌节点数组）+ 前台 <code>/learn/</code>（分组节点、勾选进度）+ 后台第 8 标签「学习」（节点文字/分组/备注就地编辑、↑↓ 排序、＋ 插入、✕ 删除，走失焦自动保存）；新增 <code>/api/learn</code> 按节点粒度的原子接口（addNode / updateNode / removeNode / toggleNode / setNodes），专供 AI 助手建图与<b>查漏补缺</b>；<b>收窄全站搜索</b>——不再搜博客正文与页面正文，学习地图只搜标题/说明、<b>不搜节点文字</b>，单字关键词直接拦掉（PR #32）</span><span class="when">10-15</span></div>
   </div>
 
   <h2>7. 当前待办 / 已知事项</h2>
