@@ -18,6 +18,7 @@ export function fail(res, err) {
   if (code === 'UNAUTHORIZED') return bad(res, err.message, 401);
   if (code === 'LOCKED') return bad(res, err.message, 429);
   if (code === 'NO_DATABASE' || code === 'NO_PASSWORD') return bad(res, err.message, 503);
+  if (code === 'DUP') return bad(res, err.message, 409);
   if (code === 'BAD_INPUT') return bad(res, err.message, 400);
   console.error('[api]', err);
   return bad(res, '服务器出错了，请稍后再试', 500);

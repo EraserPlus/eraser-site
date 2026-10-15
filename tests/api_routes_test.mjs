@@ -533,6 +533,78 @@ console.log('\n=== 内容接口 /api/content ===');
   const all = executed.map(e => e.text).join('\n');
   check('内容接口也没有 SQL 拼接', !/DROP TABLE/i.test(all), all.slice(0, 120));
   check('恶意内容作为参数传入', executed.some(e => (e.values || []).some(v => String(v).includes('DROP TABLE'))));
+
+  /* ==================== 批量导入 ?batch=1（M12） ==================== */
+  const media = (name, extra) => Object.assign({ category: 'anime', name: name, status: 'watching' }, extra || {});
+
+  /* 未登录不能批量写 */
+  fakeDb(noop);
+  res = await call(contentRoute, 'POST', { query: { batch: '1' }, body: { items: [] } });
+  check('未登录批量导入 → 401', res.statusCode === 401, String(res.statusCode));
+
+  /* 空数组 / 不是数组 */
+  fakeDb(noop);
+  res = await call(contentRoute, 'POST', { token: TOKEN, query: { batch: '1' }, body: { items: [] } });
+  check('批量导入 items 为空 → 400', res.statusCode === 400, String(res.statusCode));
+  res = await call(contentRoute, 'POST', { token: TOKEN, query: { batch: '1' }, body: { items: 'nope' } });
+  check('批量导入 items 不是数组 → 400', res.statusCode === 400, String(res.statusCode));
+
+  /* 正常批量：3 条追更 */
+  fakeDb((t) => /INSERT INTO content/.test(t) ? [row({ id: 7, type: 'media', data: { name: 'x' } })] : []);
+  res = await call(contentRoute, 'POST', { token: TOKEN, query: { batch: '1' }, body: {
+    items: [
+      { type: 'media', data: media('芙莉莲') },
+      { type: 'media', data: media('迷宫饭', { category: 'comic' }) },
+      { type: 'media', data: media('关于地球的运动', { status: 'wish' }) },
+    ],
+  } });
+  check('批量导入 3 条 → 200', res.statusCode === 200, String(res.statusCode));
+  check('返回 total/created/failed', res.json.total === 3 && res.json.created === 3 && res.json.failed === 0,
+        JSON.stringify({ t: res.json.total, c: res.json.created, f: res.json.failed }));
+  check('逐条结果里每条都 ok', Array.isArray(res.json.items) && res.json.items.length === 3 && res.json.items.every(i => i.ok));
+  check('批量确实执行了 3 次 INSERT', executed.filter(e => /INSERT INTO content/.test(e.text)).length === 3,
+        String(executed.filter(e => /INSERT INTO content/.test(e.text)).length));
+
+  /* 预校验失败要整批不写（关键安全属性） */
+  fakeDb((t) => /INSERT INTO content/.test(t) ? [row({ id: 7 })] : []);
+  res = await call(contentRoute, 'POST', { token: TOKEN, query: { batch: '1' }, body: {
+    items: [
+      { type: 'media', data: media('好的') },
+      { type: 'media', data: { category: 'book', name: '栏目不对', status: 'wish' } },
+    ],
+  } });
+  check('有一条不合法 → 整批 400', res.statusCode === 400, String(res.statusCode));
+  check('整批 400 时一条都没写进库', executed.filter(e => /INSERT INTO content/.test(e.text)).length === 0,
+        String(executed.filter(e => /INSERT INTO content/.test(e.text)).length));
+  check('错误信息点出是第几条不对', /第\s*2\s*条/.test(res.json.error || ''), res.json.error);
+
+  /* 超上限 */
+  fakeDb(noop);
+  res = await call(contentRoute, 'POST', { token: TOKEN, query: { batch: '1' }, body: {
+    items: Array.from({ length: 501 }, () => ({ type: 'media', data: media('x') })),
+  } });
+  check('超过 500 条上限 → 400', res.statusCode === 400, String(res.statusCode));
+  check('错误信息说明上限', /500/.test(res.json.error || ''), res.json.error);
+
+  /* 同一批里 slug 重复要在批内挡住（库里还没有，查不出来） */
+  fakeDb((t) => /INSERT INTO content/.test(t) ? [row({ id: 7, type: 'post' })] : []);
+  res = await call(contentRoute, 'POST', { token: TOKEN, query: { batch: '1' }, body: {
+    items: [
+      { type: 'post', data: { slug: 'same', title: 'a', content: 'c' } },
+      { type: 'post', data: { slug: 'same', title: 'b', content: 'c' } },
+    ],
+  } });
+  check('同批 slug 重复：第一条成功、第二条失败', res.statusCode === 200 && res.json.created === 1 && res.json.failed === 1,
+        JSON.stringify({ c: res.json.created, f: res.json.failed }));
+  check('失败那条给了说明', /重复/.test(res.json.items[1].error || ''), res.json.items[1].error);
+
+  /* 批量接口也得防注入 */
+  fakeDb((t) => /INSERT INTO content/.test(t) ? [row({ id: 7 })] : []);
+  await call(contentRoute, 'POST', { token: TOKEN, query: { batch: '1' }, body: {
+    items: [{ type: 'media', data: media("'; DROP TABLE content; --") }],
+  } });
+  const batchSql = executed.map(e => e.text).join('\n');
+  check('批量接口没有 SQL 拼接', !/DROP TABLE/i.test(batchSql), batchSql.slice(0, 120));
 }
 
 console.log('\n=== 文件上传 /api/upload（Vercel Blob）===');
@@ -799,6 +871,90 @@ console.log('\n=== /api/favicon 图标代理 ===');
     stubFetch(() => notFound);
     r = await call(faviconRoute, 'GET', { query: { url: 'https://nothing.test/' } });
     check('抓不到 → 404', r.statusCode === 404, String(r.statusCode));
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+}
+
+console.log('\n=== 番剧自动填充 /api/lookup（AniList）===');
+{
+  const lookupRoute = (await load('api/lookup.js')).default;
+  const realFetch = globalThis.fetch;
+  let calls = [];
+  function stubFetch(fn) {
+    globalThis.fetch = (u, o) => { calls.push({ url: String(u), opt: o }); return fn(u, o); };
+  }
+  const anilistJson = (media) => ({
+    ok: true, status: 200,
+    json: async () => ({ data: { Page: { media: media } } }),
+  });
+  try {
+    /* 方法 / 鉴权 */
+    let r = await call(lookupRoute, 'POST', { query: { q: 'Frieren' } });
+    check('POST /api/lookup → 405', r.statusCode === 405, String(r.statusCode));
+
+    r = await call(lookupRoute, 'GET', { query: { q: 'Frieren' } });
+    check('未登录 /api/lookup → 401', r.statusCode === 401, String(r.statusCode));
+
+    r = await call(lookupRoute, 'GET', { token: TOKEN, query: {} });
+    check('没带名字 → 400', r.statusCode === 400, String(r.statusCode));
+
+    /* 正常查询 */
+    calls = [];
+    stubFetch(() => Promise.resolve(anilistJson([{
+      id: 154587,
+      title: { native: '葬送のフリーレン', romaji: 'Sousou no Frieren' },
+      coverImage: { large: 'https://s4.anilist.co/x.jpg' },
+      averageScore: 91, episodes: 28, startDate: { year: 2023 },
+      siteUrl: 'https://anilist.co/anime/154587',
+    }])));
+    r = await call(lookupRoute, 'GET', { token: TOKEN, query: { q: 'Frieren' } });
+    check('查询成功 → 200', r.statusCode === 200, String(r.statusCode));
+    check('返回 results 数组', Array.isArray(r.json.results) && r.json.results.length === 1);
+    const hit = r.json.results[0];
+    check('名称取日文原名', hit.name === '葬送のフリーレン', hit.name);
+    check('评分从 0-100 换算成 0-10', hit.score === 9.1, String(hit.score));
+    check('封面地址带回来了', hit.cover === 'https://s4.anilist.co/x.jpg');
+    check('话数带回来了', hit.episodes === 28, String(hit.episodes));
+    check('请求发给了 AniList', calls.length === 1 && /graphql\.anilist\.co/.test(calls[0].url), calls[0] && calls[0].url);
+    check('查询词走 variables（不拼进 query 串）', (() => {
+      try { const b = JSON.parse(calls[0].opt.body); return b.variables.q === 'Frieren' && !b.query.includes('Frieren'); }
+      catch (e) { return false; }
+    })());
+
+    /* 搜不到要给提示（中文名搜不到是已知情况） */
+    calls = [];
+    stubFetch(() => Promise.resolve(anilistJson([])));
+    r = await call(lookupRoute, 'GET', { token: TOKEN, query: { q: '葬送的芙莉莲' } });
+    check('搜不到 → 200 空结果 + 提示用英文名', r.statusCode === 200 && r.json.results.length === 0 && /英文名|原名/.test(r.json.hint || ''),
+          r.json.hint);
+
+    /* 上游挂了要兜底，不能把异常抛成 500 */
+    stubFetch(() => Promise.reject(new Error('network down')));
+    r = await call(lookupRoute, 'GET', { token: TOKEN, query: { q: 'zzz-unique-' + Date.now() } });
+    check('连不上 AniList → 502 且给可读提示', r.statusCode === 502 && /稍后再试|手填/.test(r.json.error || ''), r.json.error);
+
+    stubFetch(() => Promise.resolve({ ok: false, status: 503, json: async () => ({}) }));
+    r = await call(lookupRoute, 'GET', { token: TOKEN, query: { q: 'yyy-unique-' + Date.now() } });
+    check('AniList 返回错误码 → 502 不漏状态码细节', r.statusCode === 502, String(r.statusCode));
+
+    /* 缓存命中不再打上游 */
+    calls = [];
+    stubFetch(() => Promise.resolve(anilistJson([{ id: 1, title: { native: '缓存番' }, averageScore: 80 }])));
+    await call(lookupRoute, 'GET', { token: TOKEN, query: { q: 'CacheTest' } });
+    const after1 = calls.length;
+    r = await call(lookupRoute, 'GET', { token: TOKEN, query: { q: 'CacheTest' } });
+    check('同名重复查走缓存不打上游', after1 === 1 && calls.length === 1 && r.json.cached === true,
+          'calls=' + calls.length + ' cached=' + r.json.cached);
+
+    /* manga 走 MANGA 类型 */
+    calls = [];
+    stubFetch(() => Promise.resolve(anilistJson([{ id: 2, title: { native: 'ベルセルク' }, averageScore: 92, chapters: 400, startDate: { year: 1989 } }])));
+    r = await call(lookupRoute, 'GET', { token: TOKEN, query: { kind: 'comic', q: 'Berserk' } });
+    check('kind=comic 时按 MANGA 查', (() => {
+      try { return /type:MANGA/.test(JSON.parse(calls[0].opt.body).query); } catch (e) { return false; }
+    })());
+    check('漫画用 chapters 当话数', r.json.results[0].episodes === 400, String(r.json.results[0].episodes));
   } finally {
     globalThis.fetch = realFetch;
   }
@@ -1089,6 +1245,200 @@ console.log('\n=== 学习地图 /api/learn（给 AI 的读写接口）===');
   fakeDb(noop);
   res = await call(learnRoute, 'PUT', { token: TOKEN });
   check('PUT /api/learn → 405', res.statusCode === 405, String(res.statusCode));
+}
+
+console.log('\n=== 查漏补缺快照 ?gaps=1（M10 新增，给 AI 用） ===');
+{
+  const learnRoute = (await load('api/learn.js')).default;
+  const mapRow = (id, data) => ({
+    id, type: 'learn_map', parent_id: null, sort_order: 0,
+    updated_at: '2026-10-15T00:00:00.000Z', data,
+  });
+  const map = {
+    title: '前端入门', desc: '', status: 'active',
+    nodes: [
+      { id: 'n1', text: 'HTML 基础', group: '基础', done: true, note: null },
+      { id: 'n2', text: 'CSS 布局', group: '基础', done: false, note: '重点' },
+      { id: 'n3', text: '变量与类型', group: 'JavaScript', done: false, note: null },
+      { id: 'n4', text: '函数', group: 'JavaScript', done: false, note: null },
+      { id: 'n5', text: 'Promise', group: '异步', done: false, note: null },
+      { id: 'n6', text: 'async/await', group: '异步', done: false, note: null },
+    ],
+  };
+
+  /* ---- 单张地图的查漏补缺 ---- */
+  fakeDb((text) => (/SELECT/.test(text) ? [mapRow(1, map)] : []));
+  let res = await call(learnRoute, 'GET', { query: { id: '1', gaps: '1' } });
+  check('GET ?id=1&gaps=1 → 200', res.statusCode === 200, String(res.statusCode));
+  const gap = res.json.gap;
+  check('快照带 progress（不用 AI 自己算）',
+        gap && gap.progress.total === 6 && gap.progress.done === 1 && gap.progress.left === 5,
+        JSON.stringify(gap && gap.progress));
+  check('未开始的组被标出（JavaScript / 异步）',
+        gap.untouchedGroups.length === 2
+        && gap.untouchedGroups.indexOf('JavaScript') >= 0
+        && gap.untouchedGroups.indexOf('异步') >= 0,
+        JSON.stringify(gap.untouchedGroups));
+  check('进行中的组被标出（基础 1/2）',
+        gap.stalledGroups.length === 1 && gap.stalledGroups[0] === '基础',
+        JSON.stringify(gap.stalledGroups));
+  check('每组带 state 与待办清单',
+        gap.groups.every(g => g.state && Array.isArray(g.pending)));
+  check('未开始的组排最前（最该补）',
+        gap.groups[0].state === 'not_started', JSON.stringify(gap.groups.map(g => [g.name, g.state])));
+  check('待办项带 nodeId 与原因', gap.suggest.length > 0
+        && gap.suggest.every(s => s.nodeId && s.group && s.reason), JSON.stringify(gap.suggest));
+  check('建议优先补「这组还没开始」的',
+        gap.suggest.some(s => s.reason === '这组还没开始'), JSON.stringify(gap.suggest.map(s => s.reason)));
+  check('已完成组不计入待办（基础组只剩 n2）',
+        gap.groups.find(g => g.name === '基础').pending.length === 1
+        && gap.groups.find(g => g.name === '基础').pending[0].id === 'n2');
+  check('查漏补缺不需要令牌（公开只读）', true);
+
+  /* ---- 全部地图的查漏补缺 ---- */
+  const map2 = { title: '学完的图', desc: '', status: 'active',
+    nodes: [{ id: 'a1', text: '唯一一项', group: '全部', done: true, note: null }] };
+  const map3 = { title: '归档的图', desc: '', status: 'archived',
+    nodes: [{ id: 'b1', text: '归档项', group: '归档组', done: false, note: null }] };
+  fakeDb((text) => (/SELECT/.test(text) ? [mapRow(1, map), mapRow(2, map2), mapRow(3, map3)] : []));
+  res = await call(learnRoute, 'GET', { query: { gaps: '1' } });
+  check('GET ?gaps=1（全部）→ 200', res.statusCode === 200, String(res.statusCode));
+  check('归档地图被排除在查漏补缺之外',
+        res.json.maps.length === 2 && !res.json.maps.some(m => m.title === '归档的图'),
+        JSON.stringify(res.json.maps.map(m => m.title)));
+  check('汇总了全站待补总数（5 项）', res.json.totalLeft === 5, String(res.json.totalLeft));
+  check('给出「最该先补」的地图排序（百分比低的在前）',
+        res.json.needFirst.length === 1 && res.json.needFirst[0].title === '前端入门',
+        JSON.stringify(res.json.needFirst.map(m => [m.title, m.percent])));
+  check('needFirst 带未开始的分组信息',
+        res.json.needFirst[0].untouched.length === 2, JSON.stringify(res.json.needFirst[0].untouched));
+
+  /* ---- 全部完成的图不出现在 needFirst ---- */
+  fakeDb((text) => (/SELECT/.test(text) ? [mapRow(2, map2)] : []));
+  res = await call(learnRoute, 'GET', { query: { gaps: '1' } });
+  check('全部完成的图不进「最该先补」', res.json.needFirst.length === 0, JSON.stringify(res.json.needFirst));
+  check('全部完成时 totalLeft 为 0', res.json.totalLeft === 0, String(res.json.totalLeft));
+}
+
+console.log('\n=== AI 长效令牌能调学习接口 + 吊销后立刻失效（M10） ===');
+{
+  const learnRoute = (await load('api/learn.js')).default;
+  const aiRoute = (await load('api/ai.js')).default;
+
+  const mapRow = (id, data) => ({
+    id, type: 'learn_map', parent_id: null, sort_order: 0,
+    updated_at: '2026-10-15T00:00:00.000Z', data,
+  });
+  const map = { title: '路线', desc: '', status: 'active',
+    nodes: [{ id: 'n1', text: '第一项', group: '基础', done: false, note: null }] };
+
+  /* ---- AI 令牌可调写接口 ---- */
+  const aiTok = T.issueAiToken(undefined, 0).token;
+  /* UPDATE ... RETURNING * 也要回一条，否则 saveNodes 拿不到行 */
+  const aiDb = (epoch) => (text) => {
+    if (/FROM meta/.test(text)) return [{ value: String(epoch) }];   /* 当前世代 */
+    if (/SELECT \* FROM content WHERE id/.test(text)) return [mapRow(1, map)];
+    if (/UPDATE content/.test(text)) return [mapRow(1, map)];
+    if (/INSERT INTO content/.test(text)) return [mapRow(2, map)];
+    if (/SELECT/.test(text)) return [mapRow(1, map)];
+    return [];
+  };
+
+  fakeDb(aiDb(0));
+  let res = await call(learnRoute, 'POST', { token: aiTok, query: { action: 'toggleNode' }, body: { id: 1, nodeId: 'n1' } });
+  check('AI 令牌能调 toggleNode → 200', res.statusCode === 200, JSON.stringify(res.json));
+  check('toggleNode 真的翻成了 done=true',
+        executed.some(e => /UPDATE content/.test(e.text) && /"done":true/.test(String(e.values))),
+        String(executed.filter(e => /UPDATE/.test(e.text)).map(e => e.values)));
+  res = await call(learnRoute, 'POST', { token: aiTok, body: { title: 'AI 建的图' } });
+  check('AI 令牌能新建地图 → 200', res.statusCode === 200, String(res.statusCode));
+
+  /* ---- 世代对不上（已吊销）→ 401 ---- */
+  fakeDb(aiDb(1));   /* 世代被 +1 = 吊销 */
+  res = await call(learnRoute, 'POST', { token: aiTok, query: { action: 'toggleNode' }, body: { id: 1, nodeId: 'n1' } });
+  check('吊销后 AI 令牌 → 401', res.statusCode === 401, String(res.statusCode));
+  check('吊销后不再写库', !executed.some(e => /UPDATE content/.test(e.text)));
+
+  /* ---- 后台令牌不受吊销影响 ---- */
+  fakeDb(aiDb(1));
+  res = await call(learnRoute, 'POST', { token: TOKEN, query: { action: 'toggleNode' }, body: { id: 1, nodeId: 'n1' } });
+  check('吊销 AI 令牌后，后台登录令牌照常用 → 200', res.statusCode === 200, String(res.statusCode));
+
+  /* ---- /api/ai：AI 令牌不能管理自己，后台令牌可以 ---- */
+  fakeDb((text) => (/FROM meta/.test(text) ? [{ value: '0' }] : []));
+  res = await call(aiRoute, 'GET', { token: aiTok });
+  check('AI 令牌访问 /api/ai → 401（不能给自己续命）', res.statusCode === 401, String(res.statusCode));
+  res = await call(aiRoute, 'GET', { token: TOKEN });
+  check('后台令牌访问 /api/ai → 200', res.statusCode === 200, String(res.statusCode));
+  check('返回里有 epoch 与 baseUrl',
+        res.json && res.json.epoch !== undefined && /^https?:\/\//.test(res.json.baseUrl || ''),
+        JSON.stringify(res.json));
+}
+
+console.log('\n=== /api/ai 接入信息与令牌管理（M10） ===');
+{
+  const aiRoute = (await load('api/ai.js')).default;
+
+  /* ---- 未登录一律 401 ---- */
+  fakeDb(noop);
+  for (const m of ['GET', 'POST', 'DELETE']) {
+    const r = await call(aiRoute, m, { body: {} });
+    check(`未登录 ${m} /api/ai → 401`, r.statusCode === 401, String(r.statusCode));
+  }
+
+  /* ---- 发令牌 ---- */
+  fakeDb((text) => (/FROM meta/.test(text) ? [{ value: '0' }] : []));
+  let res = await call(aiRoute, 'POST', { token: TOKEN });
+  check('后台登录后 POST /api/ai → 200', res.statusCode === 200, JSON.stringify(res.json));
+  check('返回一条 AI 令牌', typeof res.json.token === 'string' && res.json.token.split('.').length === 2,
+        String(res.json.token));
+  check('返回令牌有效期（天）', res.json.ttlDays >= 300, String(res.json.ttlDays));
+  check('返回当前世代 epoch', res.json.epoch === 0, String(res.json.epoch));
+  check('发令牌写进了 meta（记住明文与时间）',
+        executed.some(e => /INSERT INTO meta/.test(e.text) && String(e.values).includes('ai_last_token')),
+        JSON.stringify(executed.filter(e => /INSERT INTO meta/.test(e.text)).map(e => e.values)));
+
+  /* ---- 发出来的令牌真的能用 ---- */
+  const issued = res.json.token;
+  check('发出来的 AI 令牌能被校验通过', T.verifyToken(issued, Date.now(), { epoch: 0 }) !== null);
+
+  /* ---- 读状态 ---- */
+  fakeDb((text) => {
+    if (/FROM meta/.test(text)) return [{ value: '2' }];      /* ai_epoch=2 */
+    return [];
+  });
+  res = await call(aiRoute, 'GET', { token: TOKEN });
+  check('GET /api/ai → 200', res.statusCode === 200);
+  check('读回来的 epoch 与库里一致', res.json.epoch === 2, String(res.json.epoch));
+
+  /* ---- guide ---- */
+  fakeDb((text) => (/FROM meta/.test(text) ? [{ value: '0' }] : []));
+  res = await call(aiRoute, 'GET', { token: TOKEN, query: { guide: '1' } });
+  check('?guide=1 → 200', res.statusCode === 200);
+  const g = res.json.guide || '';
+  check('说明书里有全部读写接口',
+        /api\/learn/.test(g) && /toggleNode/.test(g) && /addNode/.test(g) && /setNodes/.test(g));
+  check('说明书里带了鉴权写法', /Authorization: Bearer/.test(g));
+  check('说明书里带了节点结构说明', /"id"/.test(g) && /"text"/.test(g) && /"group"/.test(g));
+  check('说明书里带站点地址', g.includes(res.json.baseUrl), res.json.baseUrl);
+  check('说明书提到查漏补缺', /gaps=1/.test(g));
+  check('说明书是 Markdown', /^# /.test(g));
+
+  /* ---- 吊销 ---- */
+  fakeDb((text) => (/FROM meta/.test(text) ? [{ value: '3' }] : []));
+  res = await call(aiRoute, 'DELETE', { token: TOKEN });
+  check('DELETE /api/ai → 200（吊销）', res.statusCode === 200, JSON.stringify(res.json));
+  check('吊销后世代 +1（3 → 4）', res.json.epoch === 4, String(res.json.epoch));
+  check('吊销写回了 meta',
+        executed.some(e => /INSERT INTO meta/.test(e.text) && String(e.values).includes('ai_epoch')),
+        JSON.stringify(executed.filter(e => /INSERT INTO meta/.test(e.text)).map(e => e.values)));
+  check('吊销清掉了存着的令牌明文',
+        executed.some(e => /INSERT INTO meta/.test(e.text) && String(e.values).includes('ai_last_token')));
+
+  /* ---- 方法限制 ---- */
+  fakeDb(noop);
+  res = await call(aiRoute, 'PUT', { token: TOKEN });
+  check('PUT /api/ai → 405', res.statusCode === 405, String(res.statusCode));
 }
 
 console.log('\n=== 站点地图 /api/sitemap（公开免登录，M10 新增） ===');

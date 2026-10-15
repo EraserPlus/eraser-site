@@ -220,6 +220,16 @@ console.log('\n=== 追更页 ===');
   );
   check('暗色下收纳栏/次要统计不糊成禁用色', /html\[data-theme="dark"\] \.mg-fold/.test(html) && /html\[data-theme="dark"\] \.mg-stat\.mute b/.test(html));
   check('没有把数据拼进 innerHTML', !/innerHTML\s*=\s*[^"';]*d\.(name|note|cover|url)/.test(html));
+
+  /* --- 前台快速添加（M12）：登录后才出现，访客看不到 --- */
+  check('有「快速添加」按钮（默认隐藏）', /id="mgAdd"/.test(html) && /style="display:none"/.test(html));
+  check('读的是后台同一把令牌钥匙', /eraser\.admin\.token/.test(html));
+  check('没令牌就不显示按钮（静默）', /if \(!getToken\(\)\) return;/.test(html));
+  check('按钮绑定在数据到手之后（不闪一下）', /setupQuickAdd\(\);\s*\/\* 数据到手后/.test(html));
+  check('快速添加弹层用 DOM API 构建', /function openQuickAdd/.test(html) && /document\.createElement\("select"\)/.test(html));
+  check('提交走需登录的 content 接口并带令牌', /Authorization: "Bearer " \+ t/.test(html) && /apiPost\("content"/.test(html));
+  check('前台也能按名字补全（调 lookup）', /\/api\/lookup\?q=/.test(html));
+  check('快速添加也做了转义（不拼 innerHTML）', !/innerHTML\s*=\s*[^"';]*(name|note|cover)/.test(html));
 }
 
 console.log('\n=== 学习地图页 ===');
@@ -279,7 +289,10 @@ console.log('\n=== 开发交接页（dev/，给接手的 AI）===');
   check('M10 主线C 批次记录在', /M10c/.test(html) && /sitemap/.test(html) && /sw\.js/.test(html));
   check('M10 主线A 批次记录在', /M10a/.test(html) && /一键接上 AI/.test(html) && /gaps=1/.test(html));
   check('两种令牌的说明在', /eraser-ai-token-v1::/.test(html) && /eraser-admin-token-v1::/.test(html));
-  check('测试套数已更新为八套', /八套/.test(html) && /outline_check/.test(html));
+  check('M11 海报墙批次记录在', /M11/.test(html) && /dudulu/.test(html) && /mg-filters \.mg-filters button/.test(html));
+  check('M12 批量导入批次记录在', /M12/.test(html) && /batch=1/.test(html) && /api\/lookup/.test(html) && /eraser\.admin\.token/.test(html));
+  check('追更数据上游取舍写进了交接页', /AniList/.test(html) && /中文名搜不到/.test(html) && /api\.bgm\.tv/.test(html));
+  check('测试套数已更新为十套', /十套/.test(html) && /outline_check/.test(html) && /media_import_test/.test(html) && /lookup_test/.test(html));
   check('后台标签数已更新为 9', /9 个标签/.test(html) || /9 标签/.test(html));
   check('本机坑位补充了 BOM / PowerShell / gh PR 退出码', /BOM/.test(html) && /PowerShell/.test(html) && /SIGTERM/.test(html));
   check('待办里写明 M10 主线B 搁置原因', /主线 B/.test(html) && /(0 篇|博客 0)/.test(html));

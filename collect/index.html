@@ -20,6 +20,51 @@
 .mg-top { margin-top: 4px; }
 .mg-top h1 { margin-bottom: 6px; }
 
+/* 快速添加（只在登录后出现） */
+.mg-add {
+  margin-top: 10px; border: 1px solid var(--blue); background: var(--blue); color: #fff;
+  border-radius: 9px; padding: 7px 15px; font-size: 13px; font-family: inherit;
+  cursor: pointer; font-weight: 600;
+}
+.mg-add:hover { filter: brightness(1.06); }
+
+/* 快速添加弹层 */
+.mg-modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 200;
+            display: flex; align-items: center; justify-content: center; padding: 16px; }
+.mg-modal .panel { background: var(--bg); border: 1px solid var(--line); border-radius: 14px;
+                   width: 100%; max-width: 480px; max-height: 92vh; overflow-y: auto;
+                   padding: 18px; box-shadow: 0 18px 50px rgba(0,0,0,.24); }
+.mg-modal h3 { margin: 0 0 4px; font-size: 16px; }
+.mg-modal .mhint { font-size: 12.5px; color: var(--muted); margin: 0 0 14px; }
+.mg-modal label { display: block; font-size: 12.5px; color: var(--ink3); margin: 10px 0 4px; }
+.mg-modal input, .mg-modal select {
+  width: 100%; box-sizing: border-box; padding: 8px 11px; font-size: 13.5px; font-family: inherit;
+  border: 1px solid var(--line2); border-radius: 9px; background: var(--card); color: var(--ink);
+}
+.mg-modal input:focus, .mg-modal select:focus {
+  outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-l);
+}
+.mg-modal .two { display: flex; gap: 10px; }
+.mg-modal .two > div { flex: 1; min-width: 0; }
+.mg-modal .acts { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+.mg-modal .acts button {
+  border: 1px solid var(--line2); background: var(--card); color: var(--ink2);
+  border-radius: 9px; padding: 8px 16px; font-size: 13.5px; font-family: inherit; cursor: pointer;
+}
+.mg-modal .acts button.primary { background: var(--blue); border-color: var(--blue); color: #fff; font-weight: 600; }
+.mg-modal .acts button:disabled { opacity: .5; cursor: not-allowed; }
+.mg-modal .mmsg { font-size: 12.5px; margin-top: 10px; min-height: 16px; }
+.mg-modal .mmsg.err { color: var(--red); }
+.mg-modal .mmsg.ok { color: var(--green); }
+.mg-modal .mfill { display: flex; gap: 8px; align-items: flex-end; }
+.mg-modal .mfill > div { flex: 1; min-width: 0; }
+.mg-modal .mfill button {
+  border: 1px solid var(--line2); background: var(--card); color: var(--ink2);
+  border-radius: 9px; padding: 8px 12px; font-size: 13px; font-family: inherit; cursor: pointer;
+  white-space: nowrap;
+}
+.mg-modal .mfill button:hover { border-color: var(--blue); color: var(--blue); }
+
 /* 顶部统计条 */
 .mg-stats { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
 .mg-stat {
@@ -194,6 +239,9 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
   <div class="mg-top">
     <h1>追更</h1>
     <p class="muted">追番、漫画，看过的都留档在这。</p>
+    <!-- 只有在本机登录过后台才会出现（读 localStorage 里的后台令牌）。
+         没登录的访客看不到这个按钮，也不会发任何请求。 -->
+    <button class="mg-add" id="mgAdd" type="button" style="display:none">＋ 快速添加</button>
   </div>
 
   <!-- 顶部统计（有数据后才显示） -->
@@ -453,10 +501,224 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
     });
   }
 
+  /* ==================== 快速添加（前台就地新增，免进后台） ====================
+     原则：
+       - 不在公开页放登录框（本站单人自用，不需要对外登录入口）
+       - 只在「本机已经登录过后台」时才显示按钮（读 localStorage 里的后台令牌）
+       - 没令牌就完全静默，连按钮都不渲染，更不发请求
+       - 全部用 DOM API + textContent，不拼 innerHTML
+     令牌键与 admin 保持一致（键名 eraser.admin.token，同源才能读到）。 */
+  var TOKEN_KEY = "eraser.admin.token";
+
+  function getToken() {
+    try { return localStorage.getItem(TOKEN_KEY) || ""; } catch (e) { return ""; }
+  }
+
+  function apiPost(path, body) {
+    var t = getToken();
+    return fetch("/api/" + path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + t },
+      body: JSON.stringify(body),
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        if (!r.ok) throw new Error((j && j.error) || ("请求失败（" + r.status + "）"));
+        return j;
+      });
+    });
+  }
+
+  function closeModal(overlay) {
+    if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    document.body.style.overflow = "";
+  }
+
+  /* 弹出一个快速添加表单 */
+  function openQuickAdd() {
+    var overlay = el("div", "mg-modal");
+    var panel = el("div", "panel");
+
+    panel.appendChild(el("h3", null, "＋ 快速添加"));
+    panel.appendChild(el("p", "mhint", "填个名字就行，其余都可以留空。想自动带出封面/评分，可先点「按名字补全」。"));
+
+    var f = {};
+
+    /* 名字 + 补全按钮 */
+    var nameLab = el("label", null, "名字（必填）");
+    panel.appendChild(nameLab);
+    var fillRow = el("div", "mfill");
+    var nameWrap = el("div");
+    var nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.placeholder = "比如：葬送的芙莉莲";
+    nameWrap.appendChild(nameInput);
+    fillRow.appendChild(nameWrap);
+    var fillBtn = el("button", null, "✨ 按名字补全");
+    fillBtn.type = "button";
+    fillRow.appendChild(fillBtn);
+    panel.appendChild(fillRow);
+    f.name = nameInput;
+
+    var msg = el("div", "mmsg");
+    panel.appendChild(msg);
+
+    /* 栏目 + 状态 */
+    var two1 = el("div", "two");
+    var cWrap = el("div");
+    cWrap.appendChild(el("label", null, "栏目"));
+    var catSel = document.createElement("select");
+    [["anime", "追番"], ["comic", "漫画"]].forEach(function (o) {
+      var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; catSel.appendChild(op);
+    });
+    cWrap.appendChild(catSel);
+    two1.appendChild(cWrap);
+
+    var sWrap = el("div");
+    sWrap.appendChild(el("label", null, "状态"));
+    var stSel = document.createElement("select");
+    [["watching", "在看"], ["wish", "想看"], ["paused", "搁置"], ["finished", "看完"]].forEach(function (o) {
+      var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; stSel.appendChild(op);
+    });
+    sWrap.appendChild(stSel);
+    two1.appendChild(sWrap);
+    panel.appendChild(two1);
+
+    /* 评分 + 日期 */
+    var two2 = el("div", "two");
+    var scWrap = el("div");
+    scWrap.appendChild(el("label", null, "评分（0-10，可空）"));
+    var scInput = document.createElement("input");
+    scInput.type = "text"; scInput.placeholder = "比如：9.1";
+    scWrap.appendChild(scInput);
+    two2.appendChild(scWrap);
+
+    var dWrap = el("div");
+    dWrap.appendChild(el("label", null, "日期（可空）"));
+    var dInput = document.createElement("input");
+    dInput.type = "text"; dInput.placeholder = "2026-10-16";
+    dWrap.appendChild(dInput);
+    two2.appendChild(dWrap);
+    panel.appendChild(two2);
+
+    /* 备注 */
+    panel.appendChild(el("label", null, "备注（可空）"));
+    var noteInput = document.createElement("input");
+    noteInput.type = "text"; noteInput.placeholder = "比如：周五更新 · 看到第 8 话";
+    panel.appendChild(noteInput);
+
+    /* 链接 + 封面 */
+    panel.appendChild(el("label", null, "链接（可空）"));
+    var urlInput = document.createElement("input");
+    urlInput.type = "text"; urlInput.placeholder = "https://…";
+    panel.appendChild(urlInput);
+
+    panel.appendChild(el("label", null, "封面图链接（可空）"));
+    var covInput = document.createElement("input");
+    covInput.type = "text"; covInput.placeholder = "https://…图片地址";
+    panel.appendChild(covInput);
+
+    /* 操作 */
+    var acts = el("div", "acts");
+    var bCancel = el("button", null, "取消");
+    bCancel.type = "button";
+    bCancel.addEventListener("click", function () { closeModal(overlay); });
+    var bSave = el("button", "primary", "保存");
+    bSave.type = "button";
+    acts.appendChild(bCancel);
+    acts.appendChild(bSave);
+    panel.appendChild(acts);
+
+    function setMsg(text, kind) {
+      msg.textContent = text || "";
+      msg.className = "mmsg" + (kind ? " " + kind : "");
+    }
+
+    /* 按名字补全：查 AniList，取第一条回填 */
+    fillBtn.addEventListener("click", function () {
+      var q = nameInput.value.trim();
+      if (!q) { nameInput.focus(); return; }
+      fillBtn.disabled = true;
+      setMsg("查询中…");
+      var t = getToken();
+      fetch("/api/lookup?q=" + encodeURIComponent(q) + "&kind=" + encodeURIComponent(catSel.value), {
+        headers: { Authorization: "Bearer " + t, Accept: "application/json" },
+      })
+        .then(function (r) { return r.ok ? r.json() : {}; })
+        .then(function (j) {
+          var hit = j && j.results && j.results[0];
+          if (!hit) { setMsg(j && j.hint ? j.hint : "没找到，直接手填也行。", "err"); return; }
+          if (hit.name) nameInput.value = hit.name;
+          if (hit.score != null) scInput.value = String(hit.score);
+          if (hit.note) noteInput.value = hit.note;
+          if (hit.url) urlInput.value = hit.url;
+          if (hit.cover) covInput.value = hit.cover;
+          setMsg("已填好：" + hit.name, "ok");
+        })
+        .catch(function () { setMsg("补全失败，直接手填也行。", "err"); })
+        .then(function () { fillBtn.disabled = false; });
+    });
+
+    bSave.addEventListener("click", function () {
+      var name = nameInput.value.trim();
+      if (!name) { setMsg("名字不能空", "err"); nameInput.focus(); return; }
+      bSave.disabled = true;
+      setMsg("保存中…");
+      apiPost("content", {
+        type: "media",
+        data: {
+          category: catSel.value,
+          name: name,
+          status: stSel.value,
+          score: scInput.value.trim(),
+          note: noteInput.value.trim(),
+          date: dInput.value.trim(),
+          url: urlInput.value.trim(),
+          cover: covInput.value.trim(),
+        },
+      })
+        .then(function () {
+          setMsg("已添加", "ok");
+          closeModal(overlay);
+          reloadMedia();
+        })
+        .catch(function (e) {
+          bSave.disabled = false;
+          setMsg(e.message || "保存失败", "err");
+        });
+    });
+
+    overlay.appendChild(panel);
+    overlay.addEventListener("click", function (e) { if (e.target === overlay) closeModal(overlay); });
+    document.body.appendChild(overlay);
+    document.body.style.overflow = "hidden";
+    nameInput.focus();
+  }
+
+  /* 重新拉一次数据并重绘（新增后用） */
+  function reloadMedia() {
+    if (!window.fetch) return;
+    fetch("/api/content?type=media", { headers: { Accept: "application/json" } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { apply((j && j.items) || []); })
+      .catch(function () {});
+  }
+
+  /* 有令牌才显示「快速添加」按钮 */
+  function setupQuickAdd() {
+    if (!getToken()) return;
+    var btn = $("mgAdd");
+    if (!btn) return;
+    btn.style.display = "";
+    btn.addEventListener("click", openQuickAdd);
+  }
+
   if (!window.fetch) return;
   fetch("/api/content?type=media", { headers: { Accept: "application/json" } })
     .then(function (r) { return r.ok ? r.json() : null; })
-    .then(function (j) { apply((j && j.items) || []); })
+    .then(function (j) {
+      apply((j && j.items) || []);
+      setupQuickAdd();   /* 数据到手后再决定是否显示按钮，避免闪一下 */
+    })
     .catch(function () { /* 接口挂了：保持静态空状态，不白屏 */ });
 })();
 </script>

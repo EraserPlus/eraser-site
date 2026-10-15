@@ -80,7 +80,7 @@ html[data-theme="dark"] .steps li::before { color: #0d1117; }
     <tr><th>托管</th><td>Vercel Hobby 免费档。push main → 自动部署，1~2 分钟生效</td></tr>
     <tr><th>数据库</th><td>Neon Postgres，四张表：content（七种内容共用，新增类型不用建表）/ todos / events / meta（键值小仓库，存 AI 令牌世代号等）</td></tr>
     <tr><th>后台</th><td><code>/admin/</code> 密码登录（站长持有），9 个标签：今天 / 待办 / 日程 / 导航 / 博客 / 追更 / 学习 / 页面 / 数据</td></tr>
-    <tr><th>测试</th><td>八套 1431 项，一条命令：<code>npm test</code>。提交前必须全绿</td></tr>
+    <tr><th>测试</th><td>十套 1571 项，一条命令：<code>npm test</code>。提交前必须全绿</td></tr>
     <tr><th>当前版本</th><td>main @ <code>78de1ea</code> · 最近批次 <b>M10 主线C 工程底座 + 主线A AI 闭环</b>（PR #34 / #35，2026-10-15）</td></tr>
   </table>
 
@@ -88,7 +88,7 @@ html[data-theme="dark"] .steps li::before { color: #0d1117; }
   <ol class="steps">
     <li><b>对齐</b> —— 找到本机工作副本（在 C 盘 WorkBuddy AI 目录下搜索 <code>.repo/eraser-site</code>，找不到就问站长）。<b>不要乱 git reset</b>：本机 clone 的 HEAD 停在远古分支，<code>git status</code> 大多是无意义的噪音；可靠做法是「blob 逐一比对」（见第 3 节末尾的附注）。</li>
     <li><b>改动</b> —— 小步改，遵守「红线与约定」。数据库 schema 能不动就不动（content 表 jsonb 存字段，加内容类型无需建表）。</li>
-    <li><b>测试</b> —— <code>npm test</code> 七套全绿。新功能必须带新测试，不绿不提交。</li>
+    <li><b>测试</b> —— <code>npm test</code> 十套全绿。新功能必须带新测试，不绿不提交。</li>
     <li><b>推送</b> —— 本机 <code>git push</code> 直连不通，用仓库里的脚本走 GitHub API 推送（见下方「环境特殊性」）。推送后创建 PR。</li>
     <li><b>上线</b> —— 等 PR 的 CI 和 Vercel 检查全绿 → 合并 → 等 1~2 分钟 → 线上实测（curl 状态码 + 浏览器/无头 Chrome 看真页面）。</li>
     <li><b>收尾</b> —— 回来更新本页：批次记录加一行、当前版本号、当前待办。这是硬性规矩，不是可选项。</li>
@@ -144,7 +144,7 @@ done < /tmp/main_tree.tsv</code></pre>
     <tr><th>后台</th><td><code>admin/index.html</code>（单文件：登录 + <b>9 标签</b> + 导出备份 + <b>「一键接上 AI」面板</b>）+ <code>admin/content.js</code>（内容表单与列表，SCHEMA 驱动；学习地图的节点编辑器在 <code>LEARN-NODES</code> 标记段内）</td></tr>
     <tr><th>接口 api/</th><td><code>auth.js</code> 登录 / <code>todos.js</code> 待办 / <code>events.js</code> 日程 / <code>content.js</code> 内容（六种类型 CRUD）/ <code>learn.js</code> <b>学习地图（给 AI 的节点粒度接口 + <code>?gaps=1</code> 查漏补缺快照）</b> / <code>ai.js</code> <b>AI 长效令牌与接入说明书（M10 主线A）</b> / <code>backup.js</code> 全量备份与还原（M10 主线C）/ <code>sitemap.js</code> 动态站点地图 / <code>search.js</code> 搜索 / <code>rss.js</code> 博客订阅源 / <code>upload.js</code> 上传（Vercel Blob）/ <code>favicon.js</code> 图标代理；公共层在 <code>api/_lib/</code></td></tr>
     <tr><th>内容类型</th><td>content 表七种：nav_category / nav_link / post / file（已下架，数据保留）/ page / media（追更，M1 新增）/ <b>learn_map（学习地图，M9 新增）</b>。类型定义与校验在 <code>api/_lib/content.js</code></td></tr>
-    <tr><th>测试</th><td><code>tests/</code> 八套：api / content / api_routes / pages_audit / admin_audit / <b>outline_check（M10 新增）</b> / nav_test / nav_audit；假驱动 <code>tests/stubs/</code>；CI 在 <code>.github/workflows/ci.yml</code></td></tr>
+    <tr><th>测试</th><td><code>tests/</code> 十套：api / content / api_routes / pages_audit / admin_audit / <b>outline_check（M10 新增）</b> / <b>media_import_test + lookup_test（M12 新增）</b> / nav_test / nav_audit；假驱动 <code>tests/stubs/</code>；CI 在 <code>.github/workflows/ci.yml</code></td></tr>
   </table>
 
   <h3>给 AI 用的一套闭环（M10 主线A，站长目前最想要的东西）</h3>
@@ -190,6 +190,15 @@ done < /tmp/main_tree.tsv</code></pre>
   </ul>
   <p class="muted">回归测试里写死了这几条（<code>api_routes_test.mjs</code> 的「收窄搜索范围」段会断言 SQL 里不出现 <code>data->>'content'</code> 和 <code>nodes</code>）。要放宽必须先想清楚为什么。</p>
 
+  <h3>追更数据从哪来（M12 定的，换源前先读这段）</h3>
+  <p class="muted">站长问过「dudulu / MapFlow 的图和评分是哪来的」。结论：<b>都是人记 + 脚本补，图片靠外链 CDN</b>。本站照抄这个模式，但只挑<b>能通、能热链、不要 key</b>的上游。实测结果：</p>
+  <table>
+    <tr><th>AniList（已采用）</th><td>GraphQL <code>graphql.anilist.co</code>，<b>免 key</b>；封面 CDN <code>s4.anilist.co</code> 直接返回 <code>image/png/jpg</code>、不校验 Referer，<b>可以热链</b>；<code>averageScore</code> 是 0–100 整数（要 ÷10 留一位）；anime 用 <code>episodes</code>、manga 用 <code>chapters</code>。</td></tr>
+    <tr><th>中文名搜不到</th><td>AniList 对<b>中文标题基本返回 0 条</b>，英文名 / 罗马字 / 日文原名都正常。这是上游限制、不是本站 bug，已在 <code>/api/lookup</code> 的 0 结果里直接提示「用英文名或日文原名最准」。</td></tr>
+    <tr><th>已排除的上游</th><td><code>api.bgm.tv</code>（Bangumi）、<code>api.themoviedb.org</code>（TMDB）、<code>api.jikan.moe</code>（Jikan）、<code>img9.doubanio.com</code>（豆瓣图）<b>在本机沙箱全部不可达</b>（HTTP 000 / 418）。要换源必须先确认部署环境能出去网。</td></tr>
+    <tr><th>批量导入契约</th><td><code>POST /api/content?batch=1</code>，body <code>{items:[…]}</code>，一次 ≤500 条。<b>先全量预校验再写库</b>：任何一条不合法 → 整批 400、<b>一条都不写</b>，错误里点名「第 N 条：原因」；预检全过后逐条 insert（个别失败只报那条，不回滚全批）；批内 slug / page.key 会互相去重（查库看不出来的那种）。</td></tr>
+  </table>
+
   <h2>6. 批次记录（每批做完回来加一行）</h2>
   <div class="timeline">
     <div class="row"><span class="no">T01</span><span class="what">工程基建：测试进仓库 + CI + .gitattributes + vercel.json + README 重写</span><span class="when">10-13</span></div>
@@ -217,7 +226,8 @@ done < /tmp/main_tree.tsv</code></pre>
     <div class="row latest"><span class="no">M9</span><span class="what"><b>学习地图 + 给 AI 的接口 + 收窄搜索</b>：新增 <code>learn_map</code> 内容类型（一张地图内嵌节点数组）+ 前台 <code>/learn/</code>（分组节点、勾选进度）+ 后台第 8 标签「学习」（节点文字/分组/备注就地编辑、↑↓ 排序、＋ 插入、✕ 删除，走失焦自动保存）；新增 <code>/api/learn</code> 按节点粒度的原子接口（addNode / updateNode / removeNode / toggleNode / setNodes），专供 AI 助手建图与<b>查漏补缺</b>；<b>收窄全站搜索</b>——不再搜博客正文与页面正文，学习地图只搜标题/说明、<b>不搜节点文字</b>，单字关键词直接拦掉（PR #32）</span><span class="when">10-15</span></div>
     <div class="row latest"><span class="no">M10c</span><span class="what"><b>工程底座（主线C）</b>：① <code>robots.txt</code> + 动态 <code>/sitemap.xml</code>（<code>api/sitemap.js</code>，读 content 表出全部页面/文章/地图）；② <b>PWA 可安装</b>——<code>manifest.webmanifest</code> + SVG 图标（<code>icon.svg</code> / <code>icon-maskable.svg</code>）+ <code>sw.js</code>（HTML 网络优先带缓存兜底、静态资源缓存优先后台更新、接口不缓存、离线兜底页），8 个公开页 <code>&lt;head&gt;</code> 全加了 manifest/icon/theme-color；③ <b>键盘 <code>g</code> 前缀跳转</b>（<code>g</code> 然后 <code>h/t/b/c/l/n/a/d</code>，<code>shell.js</code>）；④ <b>自动备份 + 一键还原</b>——<code>api/backup.js</code> 全量导出 / 校验 / 按 id 合并还原（<b>永不 DELETE</b>），后台新增第 9 标签「数据」（PR #34）</span><span class="when">10-15</span></div>
     <div class="row latest"><span class="no">M10a</span><span class="what"><b>AI 闭环（主线A）</b>：① <b>AI 专用长效令牌</b>——365 天、独立签名密钥、带世代号，与 30 天后台令牌互不通用，一键吊销不影响站长的登录（<code>api/_lib/token.js</code>）；② <b>后台「一键接上 AI」面板</b>——生成令牌 / 复制可直接贴给 AI 的配置 / 展开完整说明书 / 吊销（<code>api/ai.js</code> + 后台「学习」标签）；③ <b>查漏补缺快照</b> <code>?gaps=1</code>——直接给「哪组从没动过 / 哪组落后 / 建议先补哪几个」；④ <b>重做 <code>/learn/</code> 交互页（仿 MapFlow）</b>——列表可搜可汇总、分组可折叠带进度条、节点就地改文字/改分组、<b>拖动排序</b>（同组内）、加删节点、<b>一键复制给 AI 的指令</b>、未登录只读保护；⑤ <b>大纲导入成图</b>——粘 Markdown/缩进列表，实时预览，一次建好整张图（PR #35）</span><span class="when">10-15</span></div>
-    <div class="row latest"><span class="no">M11</span><span class="what"><b>追更页改海报墙（仿 dudulu.moe，配色沿用全站蓝）</b>：<code>/collect/</code> 从单列列表重做为海报墙——<b>3:4.1 竖版封面网格</b>（手机 2 列 / 560px 3 列 / 760px 5 列）、右上角状态角标（在追/搁置/已看）、左上角评分角标、<b>底部渐变压名</b>、悬停封面放大 1.05；<b>没封面自动渐变兜底 + 首字</b>；顶部 5 格统计条 + 状态筛选条（<b>纯前端即时过滤、不打接口</b>，带计数、零结果不显示按钮）；已看完/已读完折进可展开的「收纳栏」；手机端筛选条横向滚动不挤行。修掉一个真实暗色 bug：<code>style.css</code> 有全局 <code>html[data-theme="dark"] button{color:#0d1117}</code>（权重 0,1,2）会把筛选按钮刷成近黑色，选择器提权到 <code>.mg-filters .mg-filters button</code> 并补暗色专用覆盖（PR 待合）</span><span class="when">10-16</span></div>
+    <div class="row latest"><span class="no">M11</span><span class="what"><b>追更页改海报墙（仿 dudulu.moe，配色沿用全站蓝）</b>：<code>/collect/</code> 从单列列表重做为海报墙——<b>3:4.1 竖版封面网格</b>（手机 2 列 / 560px 3 列 / 760px 5 列）、右上角状态角标（在追/搁置/已看）、左上角评分角标、<b>底部渐变压名</b>、悬停封面放大 1.05；<b>没封面自动渐变兜底 + 首字</b>；顶部 5 格统计条 + 状态筛选条（<b>纯前端即时过滤、不打接口</b>，带计数、零结果不显示按钮）；已看完/已读完折进可展开的「收纳栏」；手机端筛选条横向滚动不挤行。修掉一个真实暗色 bug：<code>style.css</code> 有全局 <code>html[data-theme="dark"] button{color:#0d1117}</code>（权重 0,1,2）会把筛选按钮刷成近黑色，选择器提权到 <code>.mg-filters .mg-filters button</code> 并补暗色专用覆盖（PR #37）</span><span class="when">10-16</span></div>
+    <div class="row latest"><span class="no">M12</span><span class="what"><b>录入大提速（三条一起做）</b>——起因是线上只有 1 条追更、每次进后台都要翻列表，<b>问题在「录入口」不在页面</b>。① <b>批量导入 + 智能填充</b>：新增 <code>POST /api/content?batch=1</code>（一次最多 500 条，<b>先全量预校验再写库</b>，一条不合法整批 400 且零写入，批内 slug/key 去重，个别失败只报那条不回滚全批）；新增 <code>GET /api/lookup</code> 走 AniList GraphQL（免 key、可热链封面）自动带出<b>封面 / 评分 / 话数 / 年份 / 链接</b>，30 分钟进程内缓存，中文名搜不到时给提示。② <b>后台追更列表可用性</b>：搜索框 + 栏目 / 状态 / 排序三个下拉（纯前端即时过滤）、<b>行内直接改状态</b>（点胶囊即可，不用开表单）、封面缩略图（加载失败回落首字渐变）、导出 TSV。③ <b>前台快捷录入</b>：<code>/collect/</code> 页顶多了「＋ 快速添加」按钮（<b>认 <code>eraser.admin.token</code>，没令牌就整段不渲染</b>，同源共用后台登录态），弹层内可先「按名字补全」再保存，<b>DOM API + textContent</b> 拼装，不碰 innerHTML。中文名搜不到是上游限制，已内置提示（PR 待合，合并后回填）</span><span class="when">10-16</span></div>
   </div>
 
   <h2>7. 当前待办 / 已知事项</h2>
