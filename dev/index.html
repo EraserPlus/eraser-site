@@ -80,8 +80,8 @@ html[data-theme="dark"] .steps li::before { color: #0d1117; }
     <tr><th>托管</th><td>Vercel Hobby 免费档。push main → 自动部署，1~2 分钟生效</td></tr>
     <tr><th>数据库</th><td>Neon Postgres，三张表：content（六种内容共用）/ todos / events。闲置约 5 分钟休眠，首次访问慢几秒属正常</td></tr>
     <tr><th>后台</th><td><code>/admin/</code> 密码登录（站长持有），7 个标签：今天 / 待办 / 日程 / 导航 / 博客 / 追更 / 页面</td></tr>
-    <tr><th>测试</th><td>七套 1008 项，一条命令：<code>npm test</code>。提交前必须全绿</td></tr>
-    <tr><th>当前版本</th><td>main @ <code>20fc693</code> · 最近批次 M6 体验基座（手动主题切换 + Ctrl+K 命令面板，2026-10-14）</td></tr>
+    <tr><th>测试</th><td>七套 1023 项，一条命令：<code>npm test</code>。提交前必须全绿</td></tr>
+    <tr><th>当前版本</th><td>main @ <code>49f922a</code> · 最近批次 M7 搜索增强（键盘选结果 / 搜索历史 / 分区 tab / 加载更多 / 模糊匹配，2026-10-14）</td></tr>
   </table>
 
   <h2>2. 工作流程（六步，别跳步）</h2>
@@ -178,14 +178,26 @@ done < /tmp/main_tree.tsv</code></pre>
     <div class="row latest"><span class="no">M4</span><span class="what"><b>追更接入全站搜索</b>（media 按名称 / 备注 / 链接检索，没填链接回落追更页）；<b>上传按钮可达化</b>：由不可达的 file 类型改挂到追更的「链接 / 封面图」（PR #24）</span><span class="when">10-14</span></div>
     <div class="row latest"><span class="no">M5</span><span class="what"><b>首页并入全站搜索</b>：删掉独立 <code>search/</code>，根路径 <code>/</code> 整页改成搜索（原首页欢迎语 / 五卡片丢弃）；全站导航去掉重复的「首页」，「搜索」指向 <code>/</code>；后台页面标识只留 about（PR #26）</span><span class="when">10-14</span></div>
     <div class="row latest"><span class="no">M6</span><span class="what"><b>体验基座</b>：新增全站公共交互层 <code>shell.js</code>——顶栏手动主题切换（存 <code>eraser.theme</code>，各页 head 加防闪脚本）、<code>Ctrl/⌘+K</code> 命令面板（跳分区 / 搜关键词 / 切主题 / 复制链接 / 回顶部）、复制当前链接；暗色由 <code>@media</code> 统一改为 <code>html[data-theme="dark"]</code>；导航页的 Ctrl+K 收归 shell.js，避免重复绑定（PR #28）</span><span class="when">10-14</span></div>
+    <div class="row latest"><span class="no">M7</span><span class="what"><b>搜索增强</b>：键盘选结果（↑↓ + Enter）/ 搜索历史 / 分区 tab / 加载更多 / 模糊匹配（PR #30）</span><span class="when">10-14</span></div>
+    <div class="row latest"><span class="no">M8</span><span class="what"><b>修复上传 503</b>：原 Blob Store 为 <code>private</code> 模式，只注入 <code>BLOB_STORE_ID</code> 而无 <code>BLOB_READ_WRITE_TOKEN</code>，与 <code>api/upload.js</code> 的检查不匹配。改为新建 <code>public</code> Store <code>eraser-blob-public</code> 并连接项目，摘除旧连接；代码零改动，端到端实测上传 + 公开访问均通过（2026-10-15）</span><span class="when">10-15</span></div>
   </div>
 
   <h2>7. 当前待办 / 已知事项</h2>
   <ul>
-    <li><b>Vercel Blob 连接确认</b>：上传按钮现挂在<b>追更表单的「链接 / 封面图」</b>（文件仓库下架后原入口已不可达）。后台上传依赖 <code>BLOB_READ_WRITE_TOKEN</code>，未连接时点上传会提示 503（可手填链接兜底）。需要站长在 Vercel 控制台连一次 Blob Store，再到后台任一条追更的「链接 / 封面图」点一次「上传」验证。</li>
+    <li><b>上传功能已修好（M8，2026-10-15）</b>：项目现连 <code>eraser-blob-public</code>（<b>public</b> 模式），环境变量只有 <code>BLOB_READ_WRITE_TOKEN</code>，格式 <code>vercel_blob_rw_…</code>，指向新 Store。端到端实测通过（写入 → 公开 URL 200 可访问 → 删除）。<b>唯一遗留</b>：到后台任一条追更的「链接 / 封面图」点一次「上传」做 UI 层最终确认（需要站长登录）。旧的 private Store <code>eraser-blob</code> 已摘除连接、可留作归档或删除。</li>
+    <li><b>上传容量提醒</b>：<code>api/upload.js</code> 上限 4MB（Hobby 函数请求体 4.5MB 留余量）。传更大的图请先压缩，或手填外部链接兜底。</li>
     <li><b>旧 <code>home</code> 页面标识已下线</b>：首页欢迎语随首页改版（M5）移除，已无任何页面渲染它；若后台「页面」里还留着 home 记录，可自行删除。</li>
     <li>（可选后续）备用域名 eraser.888.moe 在 Vercel 添加后生效（配置记录见仓库 <code>domains.config.yaml</code>）。追更加更多分类暂缓（站长表示暂不需要）。</li>
   </ul>
+
+  <h2>7.1 Vercel 项目速查（本机可直接用 REST API 操作）</h2>
+  <table>
+    <tr><th>Team</th><td><code>eraser1</code>（slug）· id <code>team_LGB8iiGAEVQUBFuIk3rZuFda</code> · 账号 eraserplus</td></tr>
+    <tr><th>Project</th><td><code>eraser</code> · id <code>prj_QcVfJpVORoAC9vEa2YS3Em66zOC2</code></td></tr>
+    <tr><th>Blob Store</th><td><code>eraser-blob-public</code> · id <code>store_RlUolUXB8Cxfxh9G</code> · access public · region iad1</td></tr>
+    <tr><th>注意</th><td>本机 <code>vercel</code> CLI 的 Node fetch 出不去（<code>fetch failed</code>），但 <b>curl 可用</b>——操作 Vercel 请直接用 <code>curl</code> 打 <code>api.vercel.com</code>，别走 CLI。凭据用 <code>Authorization: Bearer &lt;token&gt;</code>。</td></tr>
+    <tr><th>常用端点</th><td>列 Store：<code>GET /v1/storage/stores?teamId=…</code>；建 public Store：<code>POST /v1/storage/stores/blob?teamId=…</code> body <code>{"name","access":"public","region":"iad1"}</code>；连接项目：<code>POST /v1/storage/stores/&lt;store&gt;/connections</code>；摘连接：<code>DELETE …/connections/&lt;connId&gt;</code>；重新部署：<code>POST /v13/deployments?teamId=…&amp;forceNew=1</code></td></tr>
+  </table>
 
   <h2>8. 给下一个 AI 的指令（可直接复制给站长）</h2>
   <div class="callout blue">
