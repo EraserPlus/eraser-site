@@ -187,7 +187,7 @@ console.log('\n=== 内容管理（导航 / 博客 / 页面 / 追更 / 学习）=
     ['学习地图：列表显示进度', /"完成 " \+ \(p\.done \|\| 0\) \+ " \/ " \+ \(p\.total \|\| 0\)/],
     ['追更：栏目和状态用下拉框', /\{ k: "category", l: "栏目", t: "select"/],
     ['追更：状态四种齐全', /\["wish"[\s\S]*\["watching"[\s\S]*\["finished"[\s\S]*\["paused"/],
-    ['追更：列表显示栏目 / 状态 / 评分', /category === "comic" \? "漫画" : "追番"/],
+    ['追更：列表显示栏目 / 状态 / 评分', /function mediaCatLabel\(c\) \{ return c === "comic" \? "漫画" : "追番"; \}/],
     ['追更的链接与封面带上传按钮（可达）', /\{ file: \["url"\], media: \["url", "cover"\] \}/],
     ['下拉框有选项（select 构建）', /var sel = el\("select"\)/],
     ['链接表单带搜索关键词字段', /\{ k: "keywords", l: "搜索关键词/],
@@ -342,6 +342,42 @@ console.log('\n=== 一键接上 AI 面板（M10）===');
   check('说明书提到 toggleNode 打卡', /toggleNode/.test(html));
   check('说明书提到 addNode', /addNode/.test(html));
   check('说明书带 Authorization 请求头写法', /Authorization:\s*Bearer/.test(html));
+}
+
+console.log('\n=== 追更：批量导入 + 列表工具 + 自动填充（M12）===');
+{
+  const cjs = fs.readFileSync(path.join(REPO, 'admin', 'content.js'), 'utf8');
+
+  check('追更区有「批量导入」按钮', /📥\s*批量导入/.test(cjs));
+  check('追更区有「按名字自动填充」按钮', /✨\s*按名字自动填充/.test(cjs));
+  check('批量导入弹层函数存在', /function openImport\(/.test(cjs));
+  check('按名字填充弹层函数存在', /function openLookup\(/.test(cjs));
+  check('列表渲染函数 renderMedia 存在', /function renderMedia\(/.test(cjs));
+  check('列表行渲染 mediaRow 存在', /function mediaRow\(/.test(cjs));
+
+  check('批量提交走 ?batch=1', /api\("content\?batch=1"/.test(cjs));
+  check('自动填充调按名字查接口（挂在 /api/content 上，没有单独开路由）',
+        /api\("content\?action=lookup&q="/.test(cjs));
+  check('填充时区分 anime / comic', /kind=" \+ encodeURIComponent\(kind\.value\)/.test(cjs));
+
+  check('有搜索框', /"minput"/.test(cjs) && /搜名字/.test(cjs));
+  check('有栏目筛选', /全部栏目/.test(cjs) && /"comic", "漫画"/.test(cjs));
+  check('有状态筛选', /全部状态/.test(cjs) && /"finished", "看完"/.test(cjs));
+  check('有排序选项', /按评分高/.test(cjs) && /按状态分组/.test(cjs));
+  check('筛选状态存在 mediaView', /var mediaView = \{/.test(cjs));
+  check('搜索是本地过滤（不打接口）', /function mediaFiltered\(\)/.test(cjs));
+
+  check('行内有状态切换按钮', /"stbtn"/.test(cjs));
+  check('行内改状态调 update 而不是开表单', /update\(it\.id, \{ status: o\[0\] \}/.test(cjs));
+  check('封面有缩略图（加载失败有兜底）', /"mthumb"/.test(cjs) && /addEventListener\("error"/.test(cjs));
+
+  check('导入前先预览', /function runParse\(/.test(cjs) && /解析出 /.test(cjs));
+  check('导入结果逐条报成败', /失败 " \+ j\.failed/.test(cjs));
+  check('导出 TSV', /function exportMedia\(/.test(cjs) && /text\/tab-separated-values/.test(cjs));
+
+  check('导入解析逻辑挂到 ContentAdmin 供测试', /parseImport: parseImport/.test(cjs));
+  check('CSV 解析保留负号（-3 会被判越界丢弃，不翻成正数）', /raw\.match\(\/-\?\\d\+/.test(cjs));
+  check('admin/index.html 有新 UI 的样式', /\.mtools/.test(html) && /\.mthumb/.test(html) && /\.stbtn/.test(html));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
