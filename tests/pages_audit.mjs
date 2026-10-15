@@ -250,6 +250,15 @@ console.log('\n=== 开发交接页（dev/，给接手的 AI）===');
   check('站点地图含核心路径', /collect\//.test(html) && /admin\//.test(html) && /api\/_lib/.test(html));
   check('给下一个 AI 的复制指令在', /eraser\.de5\.net\/dev\//.test(html));
   check('有当前版本一栏', /当前版本/.test(html) && /main @/.test(html));
+
+  // M10：交接页必须跟上工程进度
+  check('M10 主线C 批次记录在', /M10c/.test(html) && /sitemap/.test(html) && /sw\.js/.test(html));
+  check('M10 主线A 批次记录在', /M10a/.test(html) && /一键接上 AI/.test(html) && /gaps=1/.test(html));
+  check('两种令牌的说明在', /eraser-ai-token-v1::/.test(html) && /eraser-admin-token-v1::/.test(html));
+  check('测试套数已更新为八套', /八套/.test(html) && /outline_check/.test(html));
+  check('后台标签数已更新为 9', /9 个标签/.test(html) || /9 标签/.test(html));
+  check('本机坑位补充了 BOM / PowerShell / gh PR 退出码', /BOM/.test(html) && /PowerShell/.test(html) && /SIGTERM/.test(html));
+  check('待办里写明 M10 主线B 搁置原因', /主线 B/.test(html) && /(0 篇|博客 0)/.test(html));
   const anchors = [...html.matchAll(/<a[^>]*href\s*=\s*["'](https?:\/\/[^"']+)["'][^>]*>/gi)];
   const unsafe = anchors.filter(a => !/rel\s*=\s*["'][^"']*noopener/i.test(a[0]));
   check(`站外链接都带 noopener（${anchors.length} 个）`, unsafe.length === 0,

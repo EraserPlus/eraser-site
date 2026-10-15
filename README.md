@@ -15,7 +15,12 @@ eraser-site/
 ├── index.html            首页 = 全站搜索（导航栏 + 搜索框 + 分组结果）
 ├── style.css             全站统一样式（改这里 = 公开页换肤）
 ├── md.js                 自研 Markdown 渲染器（内置转义，见「已知取舍」）
-├── vercel.json           响应头配置：/api/ 不缓存，静态资源缓存 1 小时 + 安全头
+├── shell.js              全站公共交互层（主题切换按钮 / Ctrl+K 命令面板 / g 前缀跳转 / 注册 Service Worker）
+├── sw.js                 Service Worker（HTML 网络优先带缓存兜底、静态资源缓存优先、接口不缓存、离线兜底页）
+├── manifest.webmanifest  PWA 清单（可「添加到主屏幕」）
+├── icon.svg              站点图标（可选作 maskable 的版本见 icon-maskable.svg）
+├── robots.txt            爬虫规则（屏蔽 /admin/ /dev/ /api/）+ 指向 sitemap
+├── vercel.json           响应头配置 + /sitemap.xml 重写到 api/sitemap：/api/ 不缓存，静态资源缓存 1 小时 + 安全头
 ├── .gitattributes        锁死 LF 行尾，杜绝 Windows CRLF 污染 diff
 ├── .gitignore            忽略 node_modules / .vercel / 临时文件，不进仓库
 ├── package.json          两个运行时依赖（@neondatabase/serverless + @vercel/blob）+ npm test 脚本
@@ -26,30 +31,35 @@ eraser-site/
 │   ├── todos.js          待办 CRUD（全部需登录，私人数据）
 │   ├── events.js         日程 CRUD（全部需登录，私人数据）
 │   ├── content.js        全站内容 CRUD（读公开，写需登录）
+│   ├── learn.js          学习地图（GET 公开；写需后台或 AI 令牌；?gaps=1 查漏补缺快照；节点粒度 action）
+│   ├── ai.js             给外部 AI 的接入信息与长效令牌（全部需后台令牌；AI 令牌不能管理自己）
+│   ├── backup.js         全量备份 / 校验 / 按 id 合并还原（需登录；永不 DELETE）
+│   ├── sitemap.js        动态 /sitemap.xml（读 content 表出全部页面/文章/地图）
 │   ├── rss.js            博客 RSS 订阅源（GET 公开，免登录）
 │   ├── upload.js         文件上传（需登录，裸 body 存 Vercel Blob）
 │   ├── favicon.js        站点图标代理（GET 公开，SSRF 防护 + 魔数识别 + 7 天缓存）
 │   ├── search.js         全站搜索（GET 公开，跨类型 ilike，草稿过滤）
 │   └── _lib/             公共库（不会成为路由）
-│       ├── db.js         数据库连接 + ensureSchema() 首次自动建表
-│       ├── token.js      HMAC 令牌签发/校验、密码校验、配置自检
+│       ├── db.js         数据库连接 + ensureSchema() 首次自动建表 + meta 键值存取
+│       ├── token.js      HMAC 令牌签发/校验（后台 30 天 / AI 365 天两套密钥）、密码校验、配置自检
 │       ├── http.js       响应封装 ok/send/fail、readJson、readBody（二进制安全、带大小上限）、入参校验
 │       ├── ratelimit.js  登录限流（5 次失败锁 15 分钟，按 IP）
 │       ├── favicon.js    favicon 的 SSRF 防护与图片魔数识别（纯函数，可单测）
-│       └── content.js    六种内容类型（含追更 media）的归一化与校验
+│       └── content.js    七种内容类型（含追更 media、学习地图 learn_map）的归一化与校验
 │
 ├── admin/                管理后台（独立单文件应用，自带样式）
-│   ├── index.html        后台全部界面与逻辑（约 43KB）
-│   └── content.js        导航/博客/页面/追更 内容管理模块（SCHEMA 驱动）
+│   ├── index.html        后台全部界面与逻辑（9 个标签，含「一键接上 AI」与「数据」备份）
+│   └── content.js        导航/博客/页面/追更/学习地图 内容管理模块（SCHEMA 驱动）
 │
-├── tests/                七套测试 + 测试用假数据库驱动
-│   ├── api_test.mjs      令牌/密码/入参校验/favicon SSRF 与魔数识别/api 与 admin 源文件语法（156 项）
-│   ├── content_test.mjs  六种内容类型归一化（含追更）/ Markdown 渲染与安全（136 项）
-│   ├── api_routes_test.mjs 接口全流程：鉴权/CRUD/注入/限流/PATCH 合并语义/RSS/上传/favicon/追更（212 项）
-│   ├── pages_audit.mjs   7 个公开页面（含追更/交接页）：结构/零站外资源/静态兜底/注入防护（149 项）
-│   ├── admin_audit.mjs   管理后台：主题/隐私/接口/安全/功能点（124 项）
+├── tests/                八套测试 + 测试用假数据库驱动
+│   ├── api_test.mjs      令牌/密码/入参校验/favicon SSRF 与魔数识别/后台令牌与 AI 令牌互不通用（181 项）
+│   ├── content_test.mjs  七种内容类型归一化（含追更、学习地图）/ Markdown 渲染与安全（158 项）
+│   ├── api_routes_test.mjs 接口全流程：鉴权/CRUD/注入/限流/PATCH 合并语义/RSS/上传/favicon/追更/学习地图 gaps/sitemap/备份（377 项）
+│   ├── pages_audit.mjs   8 个公开页面（含追更/交接页）：结构/零站外资源/静态兜底/注入防护/PWA（270 项）
+│   ├── admin_audit.mjs   管理后台：主题/隐私/接口/安全/功能点/接上 AI 面板（187 项）
+│   ├── outline_check.mjs 大纲解析（从 learn 页抽函数跑）：Markdown 标记/缩进/Tab/CRLF/坏输入（11 项）
 │   ├── nav_test.cjs      导航页核心逻辑：数据体检/查询/视图/最近访问/高亮/导入导出（145 项）
-│   ├── nav_audit.cjs     导航页静态审计：结构/零外部请求/DOM 接线/功能点（79 项）
+│   ├── nav_audit.cjs     导航页静态审计：结构/零外部请求/DOM 接线/功能点（84 项）
 │   ├── stubs/@neondatabase/serverless/   手写假驱动（只记录 SQL 不连库）
 │   └── stubs/@vercel/blob/               手写假驱动（只记录 put 调用不连 Blob）
 │
@@ -64,6 +74,8 @@ eraser-site/
 │   └── post.html         文章详情（?slug=xxx，用 md.js 渲染正文）
 ├── collect/
 │   └── index.html        追更页（追番/漫画留档，读 /api/content?type=media）
+├── learn/
+│   └── index.html        学习地图（列表可搜可汇总 / 分组折叠 / 节点就地编辑 / 拖动排序 / 导入大纲成图）
 ├── dev/
 │   ├── index.html        开发交接页（给接手的 AI：现状 / 六步流程 / 红线 / 批次记录）
 │   └── push-branch.sh    推送脚本（git push 直连不通时走 gh API；从自身位置推断仓库目录）
@@ -73,7 +85,7 @@ eraser-site/
 
 ### 数据流（文字版）
 
-**公开页（6 个分区 / 7 个页面：/（全站搜索）、/nav/、/blog/ 与 blog/post.html、/collect/、/about/、/tools/）**
+**公开页（7 个分区 / 8 个页面：/（全站搜索）、/nav/、/blog/ 与 blog/post.html、/collect/、/learn/、/about/、/tools/）**
 
 ```text
 打开页面
@@ -82,10 +94,11 @@ eraser-site/
   → ③ 成功：用数据库返回的数据替换静态内容
   → ④ 失败（接口挂了 / 数据库没内容）：保持静态内容，catch 兜底
   → 另：/api/rss 公开输出博客 RSS（阅读器订阅用，免登录）；/blog/ 页面 head 有 autodiscovery 链接
+  → 另：/api/sitemap 输出 /sitemap.xml（读 content 表出全部页面/文章/地图）；sw.js 提供离线兜底
   → 结果：任何情况下不白屏
 ```
 
-**管理后台（/admin/，七个标签：今天 / 待办 / 日程 / 导航 / 博客 / 追更 / 页面）**
+**管理后台（/admin/，九个标签：今天 / 待办 / 日程 / 导航 / 博客 / 追更 / 学习 / 页面 / 数据）**
 
 ```text
 打开后台 → POST /api/auth 用密码换 HMAC 令牌（30 天有效）→ 存 localStorage
@@ -93,6 +106,9 @@ eraser-site/
   → /api/todos、/api/events 的所有操作都要登录（401 自动退出登录）
   → 密码连错 5 次锁 15 分钟（login_attempts 表按 IP 记录）
   → 「日程」标签：月历看整月分布，计划表看今天起 60 天按天分组的安排（全天优先）
+  → 「学习」标签：最上面是「一键接上 AI」面板（生成令牌 / 复制配置 / 吊销），下面是地图列表与节点编辑
+  → 「数据」标签：全量备份下载 / 校验 / 按 id 合并还原（永不 DELETE）
+  → 给外部 AI 的令牌是另一套：365 天、独立密钥、带世代号，一起走 /api/ai 管理
 ```
 
 **数据库四张表（Neon Postgres，ensureSchema 首次访问自动建）**
@@ -102,7 +118,8 @@ eraser-site/
 | `todos` | 待办：标题 / 备注 / 完成 / 截止日期 / 优先级（0 低 1 中 2 高） |
 | `events` | 日程：标题 / 备注 / 开始 / 结束 / 全天 |
 | `login_attempts` | 登录限流：ip / fails / locked_until |
-| `content` | 全站内容一张表：nav_category / nav_link / post / file / page 五种 type 共用，data 为 jsonb |
+| `content` | 全站内容一张表：nav_category / nav_link / post / file / page / media / learn_map 七种 type 共用，data 为 jsonb |
+| `meta` | 键值小仓库：存 AI 令牌世代号（`ai_epoch`）与最近一次发出的令牌明文等零散状态 |
 
 ---
 
@@ -112,7 +129,7 @@ eraser-site/
 npm test
 ```
 
-一条命令按顺序跑完七套测试，共 **1001 项**，全部通过即说明站点核心逻辑健康。
+一条命令按顺序跑完八套测试，共 **1413 项**，全部通过即说明站点核心逻辑健康。
 
 - **不需要真数据库 / 真 Blob**：`tests/stubs/` 里有手写的假 Neon 驱动（全局 `__FAKE_DB__` 预设 SQL 返回值）和假 @vercel/blob 驱动（全局 `__FAKE_BLOB__` 预设 put 返回值），只验证逻辑不连外部服务。
 - CI 里也是同一套路：`npm ci` 装回真包后，用假驱动覆盖 `node_modules/@neondatabase/serverless`，再 `npm test`。
@@ -228,7 +245,36 @@ POST /api/upload?name=文件名（需登录，body 传原始文件，单文件�
 
 ---
 
-## 五之一、加一个新工具（工具箱预留接口）
+## 五之二、让 AI 管学习地图（M10 主线A）
+
+站长要的闭环是「我接上 API，它就能帮我建知识图 / 打卡 / 查漏补缺」。做法是：**后台点一下拿配置 → 贴给 AI → AI 直接调接口**。
+
+**第一步（站长在后台做）**：`/admin/` → 「学习」标签 → 「生成 / 换一条令牌」→「复制接入配置」。那段文字里已经有站点地址、令牌、接口清单、节点结构和建议用法。
+
+**第二步（AI 拿到后）**：每个写操作带 `Authorization: Bearer <令牌>`，`GET` 免登录。
+
+| | 方法 / 路径 | 说明 |
+| --- | --- | --- |
+| 拿说明书 | `GET /api/ai?guide=1` | 返回一份完整 Markdown 说明书（需后台令牌） |
+| 读令牌状态 | `GET /api/ai` | 是否已发 / 签发时间 / 世代号 / 有效期天数 |
+| 发新令牌 | `POST /api/ai` | 返回明文令牌（只在此时返回一次） |
+| 一键吊销 | `DELETE /api/ai` | 世代 +1，之前发出的所有 AI 令牌立刻失效 |
+| 列地图 | `GET /api/learn` | 含进度概览，不带节点 |
+| 读地图 | `GET /api/learn?id=123` | 含节点 + 按分组进度 |
+| **查漏补缺** | `GET /api/learn?gaps=1` | 每组状态 / 从没动过的组 / 落后的组 / 建议先补哪几个 |
+| 建图 | `POST /api/learn` | `{title, desc?, nodes?}` |
+| 改图信息 | `PATCH /api/learn` | 合并语义，不传的字段保持原样 |
+| 节点操作 | `POST /api/learn?action=…` | `addNode` / `updateNode` / `removeNode` / `toggleNode` / `setNodes` |
+
+写操作一律返回 `{ ok, item, progress }`，AI 不必自己算进度。
+
+**两种令牌的区别（重要）**：后台登录令牌 30 天、前缀 `eraser-admin-token-v1::`；AI 令牌 365 天、前缀 `eraser-ai-token-v1::`、payload 带 `kind:'ai'` 和世代号 `ep`。签名密钥不同，**互不通用**——吊销 AI 令牌不会把站长的后台登录踢掉；反过来 AI 令牌也**不能**管理令牌自己（`api/ai.js` 只认 `requireAdmin`）。
+
+**前台交互**：`/learn/` 页面本身也是完整可用的编辑器（登录后）：节点可就地改文字 / 改分组、可拖动排序（同组内）、可加删，还能把 Markdown / 缩进大纲整段导进来一次成图。未登录时整页只读并给出明确提示。
+
+---
+
+## 五之三、加一个新工具（工具箱预留接口）
 
 工具箱页面（`tools/index.html`）是**数据驱动**的：页面里的 `TOOLS` 数组就是唯一清单。上架一个新工具只要两步：
 
@@ -250,16 +296,17 @@ T12 起密码生成器已下架（主人预留位置回头补内容），数组�
 
 | 套件 | 覆盖 | 项数 |
 | --- | --- | --- |
-| `tests/api_test.mjs` | 令牌签发/校验/过期/改密码失效、密码校验、safeEqual、requireAuth、配置自检、入参校验、favicon SSRF 防护与图片魔数识别、api/ 与 admin/ 源文件语法 | 156 |
-| `tests/content_test.mjs` | 六种内容类型归一化（含追更 media：栏目/状态枚举、评分 0-10、可空字段）、Markdown 渲染 / 图片 / 安全性 / 边界、plain() 摘要 | 136 |
-| `tests/api_routes_test.mjs` | 接口全流程：未登录 401、CRUD、入参 400、404、405、优先级、SQL 注入、登录限流、缺配置 503、409 唯一性、级联删除、响应头、PATCH 合并语义、RSS 订阅源、文件上传、favicon 代理、追更（公开读 / 非法栏目 400） | 212 |
-| `tests/pages_audit.mjs` | 7 个公开页面（含追更/开发交接页）：内联脚本语法、零站外资源、同源 fetch、导航栏统一、静态兜底、Markdown 安全、各页功能点 | 149 |
-| `tests/admin_audit.mjs` | 后台：结构、深浅色主题、隐私（noindex/零站外资源）、Bearer 令牌、XSS 防护、七个标签功能点（含追更表单与列表）、Markdown 实时预览与草稿自动保存 | 124 |
+| `tests/api_test.mjs` | 令牌签发/校验/过期/改密码失效、密码校验、safeEqual、requireAuth、后台令牌与 AI 令牌互不通用、配置自检、入参校验、favicon SSRF 防护与图片魔数识别、api/ 与 admin/ 源文件语法 | 181 |
+| `tests/content_test.mjs` | 七种内容类型归一化（含追更 media、学习地图 learn_map）、Markdown 渲染 / 图片 / 安全性 / 边界、plain() 摘要 | 158 |
+| `tests/api_routes_test.mjs` | 接口全流程：未登录 401、CRUD、入参 400、404、405、优先级、SQL 注入、登录限流、缺配置 503、409 唯一性、级联删除、响应头、PATCH 合并语义、RSS 订阅源、文件上传、favicon 代理、追更、学习地图（节点粒度 action / 深链 / gaps 快照）、sitemap.xml、备份与还原 | 377 |
+| `tests/pages_audit.mjs` | 8 个公开页面（含追更/学习地图/开发交接页）：内联脚本语法、零站外资源、同源 fetch、导航栏统一、静态兜底、Markdown 安全、PWA（manifest/图标/sw 策略）、各页功能点 | 270 |
+| `tests/admin_audit.mjs` | 后台：结构、深浅色主题、隐私（noindex/零站外资源）、Bearer 令牌、XSS 防护、九个标签功能点（含追更表单、学习地图节点编辑、一键接上 AI、备份还原）、Markdown 实时预览与草稿自动保存 | 187 |
+| `tests/outline_check.mjs` | 大纲解析（直接从 `learn/index.html` 抽函数来跑）：四种 Markdown 标记、缩进与 Tab 等价、空格缩进、三层嵌套、CRLF、空/坏输入 | 11 |
 | `tests/nav_test.cjs` | 导航核心逻辑：links.js 数据体检、hostOf/initialOf/hueOf、查询匹配、分类过滤（含侧栏 cat）、最近访问、标签收集、高亮区间、导入导出往返、真实数据全视图 | 145 |
-| `tests/nav_audit.cjs` | 导航静态审计：结构、零外部请求、DOM 接线、localStorage 键规范、功能点（含最近视图/密度切换/复制/回到顶部）、全站一致性 | 79 |
-| **合计** | | **1001** |
+| `tests/nav_audit.cjs` | 导航静态审计：结构、零外部请求、DOM 接线、localStorage 键规范、功能点（含最近视图/密度切换/复制/回到顶部）、全站一致性 | 84 |
+| **合计** | | **1413** |
 
-> 注：`api_test.mjs` 的项数随 `api/` 与 `admin/` 下的 `.js` 文件数浮动（每个文件一条语法断言），当前为 156。
+> 注：`api_test.mjs` 的项数随 `api/` 与 `admin/` 下的 `.js` 文件数浮动（每个文件一条语法断言）。
 
 **CI**：`.github/workflows/ci.yml` —— push 或 PR 自动触发，ubuntu + Node 20，`npm ci` → 假驱动（neon + vercel/blob）覆盖真包 → `npm test`。全绿才允许合并。
 
@@ -279,8 +326,8 @@ push 到 main → GitHub → Vercel 监听到 webhook → 自动构建 → 1~2 �
 
 ## 八、已知取舍（明确不做的事）
 
-1. **单文件大页不拆**：`nav/index.html` 约 26KB、`admin/index.html` 约 43KB。「双击能开、断网能看」是刻意选择——不引构建、不打包模块，一个文件就是一个完整应用。
-2. **无评论 / 无多人 / 无 PWA / 无构建步骤**：个人单用户站，这些都不需要。评论和多用户要一张用户表和一整套会话体系，与「密码放环境变量」的极简模型冲突。
+1. **单文件大页不拆**：`nav/index.html` 约 26KB、`admin/index.html` 约 43KB、`learn/index.html` 约 30KB。「双击能开、断网能看」是刻意选择——不引构建、不打包模块，一个文件就是一个完整应用。
+2. **无评论 / 无多人 / 无构建步骤**：个人单用户站，这些都不需要。评论和多用户要一张用户表和一整套会话体系，与「密码放环境变量」的极简模型冲突。（PWA 已在 M10 主线C 补上：`manifest.webmanifest` + `sw.js`，可「添加到主屏幕」并离线打开。）
 3. **md.js 转义三铁律**（改渲染器前必读）：① 先整体转义，再生成标签；② 已转义的内容不再二次转义（query string 里的 `&` 只变 `&amp;` 一次）；③ 代码块抽出后单独转义。`tests/content_test.mjs` 的「Markdown 安全性」一节就是这三条的死锁。
 4. **PATCH 语义现状**：`todos` / `events` 是**全量更新**（不传的字段会被重置），`content` 是**合并更新**（只传的字段被改，旧字段保留）。两者不统一——统一成合并语义是后续批次的事，现在照实写、照实用。
 5. **管理后台不引 `style.css`**：后台是独立应用，自带完整样式（含深色模式、刘海屏安全区），与公开页面视觉体系刻意隔离，改公开页样式不会波及后台。
