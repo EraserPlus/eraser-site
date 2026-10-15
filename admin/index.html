@@ -283,6 +283,7 @@ textarea:focus{ outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgb
       <button data-tab="media">追更</button>
       <button data-tab="learn">学习</button>
       <button data-tab="page">页面</button>
+      <button data-tab="data">数据</button>
     </div>
 
     <section id="tab-today">
@@ -449,6 +450,41 @@ textarea:focus{ outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgb
         </p>
       </div>
       <div id="learnHost"></div>
+    </section>
+
+    <section id="tab-data" class="hide">
+      <div class="card"><h2>💾 备份与还原</h2>
+        <p style="font-size:13px;color:var(--ink2);margin:0 0 4px">
+          数据都存在服务器上，但「没备份」就是最大的风险。这里能拉一份全量 JSON，也能把它灌回去。
+        </p>
+        <p style="font-size:13px;color:var(--muted);margin:0">
+          备份包含：待办 / 日程 / 文章 / 文件 / 页面 / 导航 / 追更 / 学习地图（含每个节点）。
+        </p>
+        <div class="cf-actions" style="margin-top:12px">
+          <button class="btn" id="btnBackupPull">⬇ 下载全量备份</button>
+          <label class="btn ghost" for="backupFile" style="cursor:pointer">📂 选备份文件</label>
+          <input type="file" id="backupFile" accept=".json,application/json" class="hide">
+        </div>
+        <p class="hintline">下载下来的文件请存好（比如网盘 / 本地）。换电脑、换数据库时，用它一把灌回去。</p>
+      </div>
+
+      <div class="card">
+        <h2>♻️ 从备份还原</h2>
+        <p style="font-size:13px;color:var(--ink2);margin:0 0 10px">
+          把备份 JSON 的内容贴进下面的框，或点上面「选备份文件」。还原是<b>按 id 合并</b>：
+          备份里有、库里没有的就插入；两边都有的用备份覆盖；<b>库里多出来的不会删</b>——
+          这样用旧备份还原不会顺手清掉你后来新加的东西。
+        </p>
+        <textarea id="restoreText" rows="7" placeholder="把备份 JSON 贴在这里……"
+                  style="width:100%;box-sizing:border-box;font-family:ui-monospace,Consolas,monospace;
+                         font-size:12.5px;line-height:1.5;padding:10px 12px;border:1px solid var(--line);
+                         border-radius:10px;background:var(--card);color:var(--ink);resize:vertical"></textarea>
+        <div class="cf-actions" style="margin-top:12px">
+          <button class="btn ghost" id="btnBackupVerify">先检查一下</button>
+          <button class="btn danger" id="btnBackupRestore">确认还原</button>
+        </div>
+        <div id="backupReport"></div>
+      </div>
     </section>
 
     <p class="foot">数据存在服务器上，手机和电脑看到同一份<br>登录状态保留 30 天</p>
@@ -1028,7 +1064,7 @@ $("calToday").addEventListener("click", function(){
   selDay = todayStr(); renderCalendar(); renderDayEvents();
 });
 
-var TABS = ["today", "todos", "events", "nav", "post", "media", "learn", "page"];
+var TABS = ["today", "todos", "events", "nav", "post", "media", "learn", "page", "data"];
 
 document.querySelectorAll(".tabs button").forEach(function(btn){
   btn.addEventListener("click", function(){
@@ -1107,6 +1143,111 @@ function exportBackup(){
   });
 }
 $("btnExport").addEventListener("click", exportBackup);
+
+/* ---------- 备份与还原（「数据」标签） ----------
+   跑在浏览器里，两个按钮：下载 / 还原。数据量大也没关系，个人站量级小。
+   下载走 /api/backup（服务端一次拼好全量快照，含学习地图节点）；
+   还原也交给服务端，前端只负责把 JSON 递过去、把结果说给你听。 */
+function backupDownload(){
+  var btn = $("btnBackupPull");
+  if (!btn) return;
+  btn.disabled = true; var old = btn.textContent; btn.textContent = "导出中…";
+  api("backup").then(function(j){
+    var bk = (j && j.backup) || j;
+    var blob = new Blob([JSON.stringify(bk, null, 2)], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "eraser-backup-" + ymd(new Date()) + ".json";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 15000);
+    say("app", "备份已下载（含全部内容与学习地图节点）", "ok");
+  }).catch(function(e){
+    say("app", "导出失败：" + (e && e.message ? e.message : "未知错误"), "err");
+  }).then(function(){
+    btn.disabled = false; btn.textContent = old;
+  });
+}
+
+/* 把还原结果 / 校验结果画出来。
+   一律走 DOM API + textContent：备份 JSON 里的文字是不可信输入，
+   绝不拼进 innerHTML（防注入）。lines 是字符串数组，逐行渲染。 */
+function backupReport(kind, lines){
+  var host = $("backupReport");
+  if (!host) return;
+  host.textContent = "";
+  if (!kind) return;
+  var box = document.createElement("div");
+  box.className = "msg " + (kind === "ok" ? "ok" : "err");
+  var arr = Array.isArray(lines) ? lines : [lines];
+  arr.forEach(function(line, i){
+    if (i > 0) box.appendChild(document.createElement("br"));
+    box.appendChild(document.createTextNode(String(line == null ? "" : line)));
+  });
+  host.appendChild(box);
+}
+
+function readRestoreText(){
+  var ta = $("restoreText");
+  var raw = ta ? ta.value.trim() : "";
+  if (!raw) { say("app", "先贴上备份 JSON，或点「选备份文件」", "err"); return null; }
+  try { return JSON.parse(raw); }
+  catch (e) { say("app", "这不像一份备份 JSON（解析失败）：" + e.message, "err"); return null; }
+}
+
+function backupVerify(){
+  var data = readRestoreText();
+  if (!data) return;
+  var btn = $("btnBackupVerify");
+  btn.disabled = true;
+  api("backup?action=verify", { method:"POST", body: data }).then(function(j){
+    var c = j.counts || {};
+    var line = "待办 " + (c.todos||0) + " · 日程 " + (c.events||0) + " · 文章 " + (c.posts||0)
+      + " · 页面 " + (c.pages||0) + " · 追更 " + (c.media||0) + " · 学习地图 " + (c.learnMaps||0)
+      + " · 导航 " + (c.navCategories||0) + "类/" + (c.navLinks||0) + "链";
+    if (j.ok){
+      backupReport("ok", ["这份备份没问题，可以还原。", line]);
+    } else {
+      backupReport("err", ["这份备份有问题，不能还原："].concat(j.errors || []));
+    }
+    say("app", j.ok ? "检查通过" : "检查没通过", j.ok ? "ok" : "err");
+  }).catch(function(e){
+    backupReport("err", [e.message || "检查失败"]);
+  }).then(function(){ btn.disabled = false; });
+}
+
+function backupRestore(){
+  var data = readRestoreText();
+  if (!data) return;
+  if (!confirm("确认把这份备份灌回去？\n\n规则：按 id 合并——库里有同名 id 的会被备份覆盖；库里多出来的不会删。\n建议先点「先检查一下」确认没问题。")) return;
+  var btn = $("btnBackupRestore");
+  btn.disabled = true; var old = btn.textContent; btn.textContent = "还原中…";
+  api("backup", { method:"POST", body: data }).then(function(j){
+    var r = j.restored || {};
+    backupReport("ok", ["还原完成：待办 " + (r.todos||0) + " · 日程 " + (r.events||0)
+      + " · 内容 " + (r.content||0) + " 条已写入。"]);
+    say("app", "还原完成，正在刷新…", "ok");
+    return refresh();
+  }).catch(function(e){
+    backupReport("err", [e.message || "还原失败"]);
+    say("app", "还原失败：" + (e && e.message ? e.message : "未知错误"), "err");
+  }).then(function(){ btn.disabled = false; btn.textContent = old; });
+}
+
+if ($("btnBackupPull")) $("btnBackupPull").addEventListener("click", backupDownload);
+if ($("btnBackupVerify")) $("btnBackupVerify").addEventListener("click", backupVerify);
+if ($("btnBackupRestore")) $("btnBackupRestore").addEventListener("click", backupRestore);
+if ($("backupFile")) $("backupFile").addEventListener("change", function(){
+  var f = this.files && this.files[0];
+  if (!f) return;
+  var rd = new FileReader();
+  rd.onload = function(){
+    if ($("restoreText")) $("restoreText").value = String(rd.result || "");
+    say("app", "已读入「" + f.name + "」，先点「先检查一下」更稳妥", "ok");
+  };
+  rd.onerror = function(){ say("app", "读不了这个文件", "err"); };
+  rd.readAsText(f);
+});
 
 (function boot(){
   if (!getToken()){ showLogin(); return; }

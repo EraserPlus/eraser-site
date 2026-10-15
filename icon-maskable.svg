@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Eraser 的小站">
+  <!-- maskable：内容缩到中间 80% 安全区内，四周留满底色，被裁成圆形也不缺角 -->
+  <rect width="512" height="512" fill="#2563eb"/>
+  <text x="256" y="256" font-size="230" text-anchor="middle" dominant-baseline="central" fill="#ffffff" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Segoe UI Emoji',sans-serif">🧩</text>
+</svg>

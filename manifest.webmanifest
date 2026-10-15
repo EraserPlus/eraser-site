@@ -1,0 +1,31 @@
+{
+  "name": "Eraser 的小站",
+  "short_name": "Eraser",
+  "description": "个人小站：搜索 / 工具箱 / 博客 / 追更 / 学习地图 / 导航",
+  "lang": "zh-CN",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    { "name": "搜索", "url": "/", "description": "全站搜索" },
+    { "name": "学习地图", "url": "/learn/", "description": "勾掉今天学的东西" },
+    { "name": "追更", "url": "/collect/", "description": "追番与漫画" },
+    { "name": "导航", "url": "/nav/", "description": "网址导航" }
+  ]
+}

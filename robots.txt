@@ -1,0 +1,12 @@
+# robots.txt · Eraser 的小站
+# 公开页随便抓；后台、开发交接页、接口一律不抓（后台本来也进不去，没密码）。
+
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /dev/
+Disallow: /api/
+
+# sitemap.xml 由 api/sitemap.js 动态生成，内容随数据库里的文章 / 页面 /
+# 追更 / 学习地图变化，不用手动维护。
+Sitemap: https://eraser.de5.net/sitemap.xml

@@ -241,5 +241,77 @@ console.log('\n=== 开发交接页（dev/，给接手的 AI）===');
   check('没有站外资源（脚本/样式/图片）', ext.length === 0, ext.join(', '));
 }
 
+console.log('\n=== PWA 可安装（manifest + 图标 + Service Worker，M10） ===');
+{
+  /* ---- manifest ---- */
+  let mf = null, mfErr = '';
+  try { mf = JSON.parse(read('manifest.webmanifest')); } catch (e) { mfErr = e.message; }
+  check('manifest.webmanifest 是合法 JSON', !!mf, mfErr);
+  if (mf) {
+    check('有 name 与 short_name', !!mf.name && !!mf.short_name, JSON.stringify([mf.name, mf.short_name]));
+    check('start_url 是站点根', mf.start_url === '/', String(mf.start_url));
+    check('display 是 standalone（可加到主屏独立运行）', mf.display === 'standalone', String(mf.display));
+    check('theme_color 与全站主题蓝一致（#2563eb）', mf.theme_color === '#2563eb', String(mf.theme_color));
+    check('icons 含 svg 图标', Array.isArray(mf.icons) && mf.icons.length > 0
+          && mf.icons.every(i => /svg/.test(i.type)), JSON.stringify(mf.icons));
+    check('有 maskable 图标（被裁圆角也不缺角）',
+          (mf.icons || []).some(i => String(i.purpose).includes('maskable')));
+    check('scope 限定在同站', mf.scope === '/', String(mf.scope));
+  }
+
+  /* ---- 图标文件存在且是 SVG ---- */
+  for (const f of ['icon.svg', 'icon-maskable.svg']) {
+    let ok = true, body = '';
+    try { body = read(f); } catch (e) { ok = false; }
+    check(`${f} 存在且是 SVG`, ok && /<svg[\s>]/.test(body), body.slice(0, 40));
+    check(`${f} 没有站外引用`, !/https?:\/\//.test(body.replace(/xmlns="[^"]*"/g, '')));
+  }
+
+  /* ---- Service Worker ---- */
+  const sw = read('sw.js');
+  check('sw.js 注册 install / activate / fetch 三个事件',
+        /addEventListener\('install'/.test(sw) && /addEventListener\('activate'/.test(sw)
+        && /addEventListener\('fetch'/.test(sw));
+  check('sw.js 有缓存版本号（改样式后靠它换新）', /const VERSION = 'eraser-v\d+'/.test(sw));
+  check('activate 里清理旧版本缓存', /caches\.delete\(k\)/.test(sw));
+  check('接口（/api/）一律不缓存', /isApi\(url\)\) return/.test(sw));
+  check('HTML 走 network-first（联网时永远拿最新页）', /isHtml\(req\)/.test(sw) && /fetch\(req\)\.then/.test(sw));
+  check('静态资源走 cache-first', /isStatic\(url\)/.test(sw) && /caches\.match\(req\)/.test(sw));
+  check('只处理 GET（写操作永不拦截）', /req\.method !== 'GET'\) return/.test(sw));
+  check('站外请求不碰（只处理同源）', /url\.origin !== self\.location\.origin/.test(sw));
+  check('有内联离线页（断网不白屏）', /OFFLINE_HTML/.test(sw) && /现在没网/.test(sw));
+  check('预缓存了首页外壳', /PRECACHE/.test(sw) && /'\/'/.test(sw));
+
+  /* ---- 各公开页 head 都挂了 manifest + 图标 + 主题色 ---- */
+  for (const f of PAGES) {
+    const html = read(f);
+    check(`${f} 引了 manifest`, /rel="manifest"[^>]*manifest\.webmanifest/.test(html));
+    check(`${f} 引了 svg 图标`, /rel="icon"[^>]*icon\.svg/.test(html));
+    check(`${f} 有 theme-color（地址栏 / 状态栏跟随主题）`, /name="theme-color"[^>]*#2563eb/.test(html));
+  }
+
+  /* ---- 后台页刻意不注册 SW ---- */
+  const shell = read('shell.js');
+  check('shell.js 负责注册 Service Worker', /serviceWorker\.register/.test(shell));
+  check('注册逻辑避开后台页（/admin/ 不注册）', /\/\^\\\/admin\\\/\//.test(shell));
+  check('只在安全上下文注册（https / localhost）', /location\.protocol !== "https:"/.test(shell));
+  check('SW 注册失败被吞掉（不影响页面）', /register\([^)]*\)\.catch\(function \(\) \{ \/\* 忽略 \*\/ \}\)/.test(shell));
+}
+
+console.log('\n=== 键盘快捷键：g 前缀跳转（M10） ===');
+{
+  const shell = read('shell.js');
+  check('PAGES 每条带快捷键字母（key 字段）', /key: "h"/.test(shell) && /key: "l"/.test(shell)
+        && /key: "b"/.test(shell));
+  check('有 g 前缀待命机制', /gArmed/.test(shell) && /disarmG/.test(shell));
+  check('按 g 后 1.5 秒没跟上第二个键就作废', /setTimeout\(disarmG, 1500\)/.test(shell));
+  check('输入框里打字不触发跳转', /function typingIn/.test(shell) && /typingIn\(document\.activeElement\)/.test(shell));
+  check('面板开着时键盘归面板管', /paletteOpen\(\)\) return/.test(shell));
+  check('修饰键组合不参与（不抢浏览器快捷键）', /e\.ctrlKey \|\| e\.metaKey \|\| e\.altKey/.test(shell));
+  check('按字母跳转到对应页面', /function goByKey/.test(shell) && /go\(PAGES\[i\]\.href\)/.test(shell));
+  check('Ctrl+K 面板仍然保留', /e\.key === "k" \|\| e\.key === "K"/.test(shell));
+  check('命令面板里显示 g 快捷键（可发现性）', /"前往 · g " \+ p\.key/.test(shell));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

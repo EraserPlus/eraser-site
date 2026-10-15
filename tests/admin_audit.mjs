@@ -121,7 +121,7 @@ console.log('\n=== 功能点 ===');
 console.log('\n=== 内容管理（导航 / 博客 / 页面 / 追更 / 学习）===');
 {
   const must = [
-    ['八个标签页', /data-tab="today"[\s\S]*data-tab="todos"[\s\S]*data-tab="events"[\s\S]*data-tab="nav"[\s\S]*data-tab="post"[\s\S]*data-tab="media"[\s\S]*data-tab="learn"[\s\S]*data-tab="page"/],
+    ['九个标签页', /data-tab="today"[\s\S]*data-tab="todos"[\s\S]*data-tab="events"[\s\S]*data-tab="nav"[\s\S]*data-tab="post"[\s\S]*data-tab="media"[\s\S]*data-tab="learn"[\s\S]*data-tab="page"[\s\S]*data-tab="data"/],
     ['导航标签内容区', /id="tab-nav"[\s\S]*id="navHost"/],
     ['博客标签内容区', /id="tab-post"[\s\S]*id="postHost"/],
     ['追更标签内容区', /id="tab-media"[\s\S]*id="mediaHost"/],
@@ -131,13 +131,38 @@ console.log('\n=== 内容管理（导航 / 博客 / 页面 / 追更 / 学习）=
     ['加载了内容管理模块', /<script src="content\.js"><\/script>/],
     ['初始化时把 api 和 say 传进去', /ContentAdmin\.init\(\{\s*api:\s*api,\s*say:\s*say\s*\}\)/],
     ['切标签时调用内容渲染', /ContentAdmin\.render\(tab\)/],
-    ['标签栏可横向滚动（手机上有 8 个标签）', /\.tabs\{\s*overflow-x:auto/],
+    ['标签栏可横向滚动（手机上有 9 个标签）', /\.tabs\{\s*overflow-x:auto/],
     ['表单弹层样式', /\.cf-overlay\{/],
     ['Markdown 预览样式', /\.mdprev\{/],
     ['学习地图：节点行样式', /\.lmrow\{/],
     ['学习地图：分组小标题样式', /\.lmgrp-h\{/],
+    ['数据标签内容区（备份 / 还原）', /id="tab-data"[\s\S]*id="btnBackupPull"[\s\S]*id="backupReport"/],
+    ['TABS 数组含 data（切标签用）', /var TABS = \[[^\]]*"data"\]/],
   ];
   must.forEach(([name, re]) => check(`包含：${name}`, re.test(html)));
+
+  /* ---------- 备份与还原（M10 新增的「数据」标签） ---------- */
+  const bkMust = [
+    ['有下载全量备份按钮', /id="btnBackupPull"/],
+    ['有选备份文件的输入框', /id="backupFile"[^>]*type="file"|type="file"[^>]*id="backupFile"/],
+    ['有还原文本框', /id="restoreText"/],
+    ['有「先检查一下」按钮', /id="btnBackupVerify"/],
+    ['有「确认还原」按钮', /id="btnBackupRestore"/],
+    ['下载走 /api/backup', /api\("backup"\)/],
+    ['校验走 /api/backup?action=verify', /api\("backup\?action=verify"/],
+    ['还原走 POST /api/backup', /api\("backup", \{ method:"POST"/],
+    ['还原前有二次确认弹窗', /confirm\("确认把这份备份灌回去/],
+    ['确认文案说明了「库里多出来的不会删」', /库里多出来的不会删/],
+    ['选文件用 FileReader 读入', /new FileReader\(\)/],
+    ['还原结果用 DOM API 渲染（防注入，不拼 innerHTML）', /function backupReport\(kind, lines\)/],
+    ['报告文案走 textContent', /box\.appendChild\(document\.createTextNode/],
+  ];
+  bkMust.forEach(([name, re]) => check(`备份还原：${name}`, re.test(html)));
+
+  /* 备份报告绝不能把 JSON 内容拼进 innerHTML */
+  const badInner = [...html.matchAll(/\.innerHTML\s*=\s*([^;]+);/g)].map(m => m[1].trim());
+  const riskyBk = badInner.filter(v => /lines|errors|message|backup/i.test(v));
+  check('备份还原没有把数据拼进 innerHTML', riskyBk.length === 0, riskyBk.join(' | '));
 
   const cjs = fs.readFileSync(path.join(REPO, 'admin', 'content.js'), 'utf8');
   try { new Function(cjs); check('admin/content.js 语法正确', true); }

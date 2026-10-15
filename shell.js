@@ -1,11 +1,12 @@
 /* ===========================================================================
    shell.js   全站公共交互层（公开页统一引入，用 <script src> 加载）
    ---------------------------------------------------------------------------
-   三件事：
+   四件事：
      ① 顶栏「主题」按钮：切换深浅色，选择存 localStorage（键 eraser.theme）
      ② Ctrl+K 命令面板：快速跳分区 / 搜当前关键词 / 触发常用动作
-     ③ 复制当前链接
-   为什么单独一个文件：这三处 UI 全站重复，写一份、各页共用（和 md.js 一样是
+     ③ 复制当前链接 + g 前缀快捷键（见下）
+     ④ 注册 Service Worker（PWA 离线外壳，仅前台页；后台页不注册）
+   为什么单独一个文件：这几处 UI 全站重复，写一份、各页共用（和 md.js 一样是
    「零构建的普通脚本」，不打包、不引框架）。
    注意：主题的「防闪」必须在每页 <head> 的内联脚本里先写好 data-theme（见各页
    head），本文件只负责按钮与面板；不请求任何外部资源，数据全部来自页面自身。
@@ -21,15 +22,16 @@
   var PATH = location.pathname;
   var PREFIX = (PATH === "/" || /^\/[^/]*\.html$/.test(PATH)) ? "" : "../";
 
+  /* key = g 前缀快捷键的第二段（g 后按它跳转），见下面的 keydown 处理 */
   var PAGES = [
-    { ic: "⌕", name: "搜索", href: "index.html" },
-    { ic: "🧰", name: "工具箱", href: "tools/index.html" },
-    { ic: "📝", name: "博客", href: "blog/index.html" },
-    { ic: "📺", name: "追更", href: "collect/index.html" },
-    { ic: "🗺️", name: "学习", href: "learn/index.html" },
-    { ic: "🔗", name: "导航", href: "nav/index.html" },
-    { ic: "📄", name: "关于", href: "about/index.html" },
-    { ic: "🎛️", name: "开发交接", href: "dev/index.html" }
+    { ic: "⌕", name: "搜索", href: "index.html", key: "h" },
+    { ic: "🧰", name: "工具箱", href: "tools/index.html", key: "t" },
+    { ic: "📝", name: "博客", href: "blog/index.html", key: "b" },
+    { ic: "📺", name: "追更", href: "collect/index.html", key: "c" },
+    { ic: "🗺️", name: "学习", href: "learn/index.html", key: "l" },
+    { ic: "🔗", name: "导航", href: "nav/index.html", key: "n" },
+    { ic: "📄", name: "关于", href: "about/index.html", key: "a" },
+    { ic: "🎛️", name: "开发交接", href: "dev/index.html", key: "d" }
   ];
 
   function make(tag, cls, text) {
@@ -114,7 +116,7 @@
     }
     PAGES.forEach(function (p) {
       if (query && p.name.toLowerCase().indexOf(lq) === -1) return;
-      out.push({ ic: p.ic, lb: p.name, hint: "前往", run: function () { go(p.href); } });
+      out.push({ ic: p.ic, lb: p.name, hint: "前往 · g " + p.key, run: function () { go(p.href); } });
     });
     out.push({ ic: "🌓", lb: themeNow() === "dark" ? "切换到浅色" : "切换到深色",
                hint: "主题", run: function () { toggleTheme(); closePalette(); } });
@@ -210,18 +212,73 @@
     paintThemeBtn();
   }
 
-  /* 全局快捷键：Ctrl/⌘+K 开合面板 */
+  /* ------------------------------------------------------- g 前缀快捷键 */
+  /* 在输入框 / 文本域 / 可编辑区里打字时不要触发跳转 */
+  function typingIn(el) {
+    if (!el || !el.tagName) return false;
+    var t = el.tagName.toUpperCase();
+    return t === "INPUT" || t === "TEXTAREA" || t === "SELECT" || el.isContentEditable === true;
+  }
+
+  /* 找到了 g 后面那个字母对应的页面就跳过去；返回是否命中 */
+  function goByKey(letter) {
+    var lc = String(letter || "").toLowerCase();
+    for (var i = 0; i < PAGES.length; i++) {
+      if (PAGES[i].key === lc) { go(PAGES[i].href); return true; }
+    }
+    return false;
+  }
+
+  /* 全局快捷键：
+       Ctrl/⌘+K  开合命令面板
+       g 然后再按一个字母 → 跳到对应分区（gh 首页 / gl 学习 / gb 博客 …）
+     g 前缀只在非输入状态下生效，且 1.5 秒内没按第二个键就作废。 */
+  var gArmed = false, gTimer = null;
+  function disarmG() { gArmed = false; if (gTimer) { clearTimeout(gTimer); gTimer = null; } }
+
   document.addEventListener("keydown", function (e) {
+    /* Ctrl/⌘+K：开合面板 */
     if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) {
       e.preventDefault();
       if (paletteOpen()) closePalette(); else openPalette();
+      return;
     }
+    /* 面板开着时，键盘都归面板管，不走 g 前缀 */
+    if (paletteOpen()) return;
+    /* 修饰键组合不参与（别抢浏览器快捷键） */
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    /* 正在输入框里打字，不管 */
+    if (typingIn(document.activeElement)) return;
+
+    if (!gArmed) {
+      if (e.key === "g" || e.key === "G") {
+        gArmed = true;
+        gTimer = setTimeout(disarmG, 1500);
+      }
+      return;
+    }
+    /* 第二段：命中就跳，没命中就取消待命 */
+    disarmG();
+    if (goByKey(e.key)) e.preventDefault();
   });
+
+  /* ------------------------------------------------------ Service Worker */
+  /* 注册离线外壳。只在安全上下文（https / localhost）注册；失败也不影响页面。
+     后台页（/admin/）不注册——它是动态管理界面，缓存住旧版反而误事。 */
+  function registerSW() {
+    if (!("serviceWorker" in navigator)) return;
+    if (/^\/admin\//.test(location.pathname)) return;
+    if (location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") return;
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register(PREFIX + "sw.js").catch(function () { /* 忽略 */ });
+    });
+  }
 
   function init() {
     mountNavOps();
     buildPalette();
     paintThemeBtn();
+    registerSW();
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
