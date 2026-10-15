@@ -306,5 +306,43 @@ console.log('\n=== 计划表分组 ===');
   check('不传 days 就不限天数', agendaGroups([{ id: 7, start_at: '2030-01-01T00:00:00Z' }], '2026-10-14').length === 1);
 }
 
+console.log('\n=== 一键接上 AI 面板（M10）===');
+{
+  check('学习 tab 里有接上 AI 的标题', /🤖\s*一键接上 AI/.test(html));
+  check('有状态容器 #aiStatus', /id="aiStatus"/.test(html));
+  check('有配置文件文本框 #aiGuide（只读）', /id="aiGuide"[\s\S]{0,120}?readonly/.test(html));
+  check('有「生成 / 换一条令牌」按钮', /id="btnAiIssue"/.test(html));
+  check('有「复制接入配置」按钮', /id="btnAiCopy"/.test(html));
+  check('有「展开说明书」按钮', /id="btnAiShow"/.test(html));
+  check('有「吊销全部令牌」按钮', /id="btnAiRevoke"/.test(html));
+  check('吊销按钮是危险样式', /id="btnAiRevoke"[^>]*/.test(html) && /class="btn danger" id="btnAiRevoke"/.test(html));
+
+  check('读状态用 GET /api/ai', /api\("ai"\)/.test(html));
+  check('发令牌用 POST /api/ai', /api\("ai",\s*\{\s*method:\s*"POST"/.test(html));
+  check('吊销用 DELETE /api/ai', /api\("ai",\s*\{\s*method:\s*"DELETE"/.test(html));
+  check('拉说明书用 ?guide=1', /api\("ai\?guide=1"\)/.test(html));
+
+  check('面板函数 renderAiPanel 存在', /function renderAiPanel\(/.test(html));
+  check('切到学习 tab 时会刷新面板', /tab === "learn"[\s\S]{0,120}?renderAiPanel\(\)/.test(html));
+  check('进入后台时绑定了按钮事件', /function enterApp\(\)[\s\S]{0,220}?aiBind\(\)/.test(html));
+
+  check('复制按钮用 navigator.clipboard', /navigator\.clipboard\.writeText/.test(html));
+  check('复制失败有 execCommand 兜底', /execCommand\("copy"\)/.test(html));
+  check('吊销前有确认弹窗', /confirm\("吊销后[\s\S]{0,80}?\)/.test(html));
+
+  check('状态区用 textContent 渲染（防注入）', /function aiRenderStatus\([\s\S]{0,900}?textContent/.test(html));
+  check('状态区不用 innerHTML 拼令牌', !/aiStatus[\s\S]{0,400}?\.innerHTML/.test(html));
+  check('已有令牌时一次性填好配置（不重复请求）', /if \(j && j\.hasToken && !\$\("aiGuide"\)\.value\) aiFillGuide/.test(html));
+  check('生成令牌后本地更新状态（不再回读接口）', /aiRenderStatus\(\{ hasToken: true/.test(html));
+  check('吊销后本地更新状态（不再回读接口）', /aiRenderStatus\(\{ hasToken: false/.test(html));
+
+  check('说明书提到只读接口 /api/learn', /GET\s+"?\s*\+?\s*base\s*\+\s*"\/api\/learn/.test(html)
+        || /\/api\/learn\s+列出全部地图/.test(html));
+  check('说明书提到查漏补缺 gaps=1', /gaps=1/.test(html));
+  check('说明书提到 toggleNode 打卡', /toggleNode/.test(html));
+  check('说明书提到 addNode', /addNode/.test(html));
+  check('说明书带 Authorization 请求头写法', /Authorization:\s*Bearer/.test(html));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

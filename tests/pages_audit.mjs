@@ -206,13 +206,34 @@ console.log('\n=== 学习地图页 ===');
   check('有进度条（.lm-bar）', /lm-bar/.test(html));
   check('按分组渲染节点', /function groupNodes/.test(html));
   check('勾选完成走 toggleNode', /action=toggleNode/.test(html));
-  check('未登录时复选框禁用（避免点了没反应）', /chk\.disabled = !token\(\)/.test(html));
+  check('未登录时复选框禁用（避免点了没反应）', /chk\.disabled = !canEdit\(\)/.test(html) && /function canEdit\(\)/.test(html));
   check('勾选失败会回滚', /chk\.checked = !chk\.checked/.test(html));
-  check('节点文字用 textContent 渲染（防注入）', /el\("div", null, n\.text/.test(html));
-  check('没有把节点数据塞进 innerHTML', !/innerHTML\s*=\s*[^"']*n\.text/.test(html));
-  check('进度用服务端返回的值（不在本地瞎算）', /paintDetailHead\(j\.progress\)/.test(html));
+  check('节点文字用 textContent 渲染（防注入）', /el\("div", "t", node\.text/.test(html));
+  check('没有把节点数据塞进 innerHTML', !/innerHTML\s*=\s*[^"']*node\.text/.test(html));
+  check('进度用服务端返回的值（不在本地瞎算）', /if \(j && j\.progress\) progress = j\.progress;\s*\n\s*paintDetailHead\(progress\)/.test(html));
   check('深链 ?id= 可直接打开某张地图', /URLSearchParams\(location\.search\)/.test(html));
   check('令牌 key 与后台一致', /eraser\.admin\.token/.test(html));
+
+  // M10 主线 A4：仿 MapFlow 的交互增强
+  check('地图卡可点开（键盘可达）', /card\.addEventListener\("click"/.test(html) && /ev\.key === "Enter"/.test(html));
+  check('有搜索框过滤地图', /id="filterInput"/.test(html));
+  check('有汇总条（几张图 / 总进度）', /function renderSummary/.test(html) && /总进度/.test(html));
+  check('分组可折叠', /lm-grp" \+ \(cmap\[g\.name\] \? " collapsed"/.test(html) && /function rebuildNodes/.test(html));
+  check('分组头带进度条', /lm-bar slim gbar/.test(html));
+  check('节点可就地改文字', /function inlineEdit/.test(html));
+  check('节点可改分组', /inlineEdit\(node, "group"/.test(html));
+  check('节点可拖动排序', /dragstart/.test(html) && /function bindDrag/.test(html) && /function moveNode/.test(html));
+  check('拖动限定同组、不跨组', /不跨组/.test(html));
+  check('排序走 setNodes', /action=setNodes/.test(html));
+  check('节点可删除', /action=removeNode/.test(html));
+  check('可加节点（addNode）', /action=addNode/.test(html));
+  check('未登录时顶部有只读提示', /id="lockNote"/.test(html) && /只能看，不能改/.test(html));
+  check('可一键复制给 AI 的指令', /function copyAiPrompt/.test(html) && /复制给 AI 的指令/.test(html));
+  check('复制内容提到 gaps=1', /gaps=1/.test(html));
+  check('导入大纲：能解析 Markdown / 缩进列表', /function parseOutline/.test(html));
+  check('导入前有预览', /function previewGroups/.test(html) && /解析出 /.test(html));
+  check('导入走 POST /api/learn', /api\("\/api\/learn",\s*\{\s*method:\s*"POST"/.test(html));
+  check('有新建地图入口', /function newMap/.test(html) && /id="btnNew"/.test(html));
 }
 
 console.log('\n=== 开发交接页（dev/，给接手的 AI）===');

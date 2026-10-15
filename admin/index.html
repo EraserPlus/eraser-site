@@ -183,6 +183,14 @@ textarea:focus{ outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgb
 .btn.danger{ color:var(--red); border-color:var(--red); }
 .cf-bool{ display:flex; align-items:center; gap:8px; font-size:13.5px; color:var(--ink2); }
 .cf-bool input{ width:auto; }
+/* 「一键接上 AI」面板 */
+.aibox{ padding:11px 13px; border-radius:10px; font-size:13px; line-height:1.7;
+        background:var(--sunk); border:1px solid var(--line); color:var(--ink2); }
+.aibox b{ color:var(--ink); }
+.aibox.on{ background:var(--green-l); border-color:var(--green); color:var(--green); }
+.aibox.off{ background:var(--amber-l); border-color:var(--amber); color:var(--amber); }
+.aibox .akit{ display:block; margin-top:6px; font-family:ui-monospace,Consolas,monospace;
+              font-size:11.5px; word-break:break-all; color:var(--ink2); }
 .mdprev{ margin-top:10px; padding:12px 14px; background:var(--sunk); border:1px solid var(--line);
          border-radius:10px; font-size:14px; line-height:1.7; overflow-wrap:break-word; }
 .mdprev h1,.mdprev h2,.mdprev h3,.mdprev h4{ font-size:1.05em; margin:12px 0 6px; }
@@ -439,14 +447,28 @@ textarea:focus{ outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgb
     </section>
 
     <section id="tab-learn" class="hide">
+      <div class="card"><h2>🤖 一键接上 AI</h2>
+        <p class="hintline" style="margin:0 0 12px">
+          把下面这段发给 AI（ChatGPT / Claude / 任何能发 HTTP 请求的助手），它就能帮你建学习地图、
+          勾进度、<b>查漏补缺</b>。令牌是长期有效的，独立于你的登录，随时可以一键吊销。
+        </p>
+        <div class="aibox" id="aiStatus">正在读取…</div>
+        <div class="cf-actions" style="margin-top:12px">
+          <button class="btn" id="btnAiIssue">生成 / 换一条令牌</button>
+          <button class="btn ghost" id="btnAiCopy">复制接入配置</button>
+          <button class="btn ghost" id="btnAiShow">展开说明书</button>
+          <button class="btn danger" id="btnAiRevoke">吊销全部令牌</button>
+        </div>
+        <label class="fl" style="margin-top:14px">接入配置（直接整段复制给 AI）</label>
+        <textarea id="aiGuide" rows="10" readonly
+                  style="width:100%;box-sizing:border-box;font-family:ui-monospace,Consolas,monospace;
+                         font-size:12.5px;line-height:1.5;padding:10px 12px;border:1px solid var(--line);
+                         border-radius:10px;background:var(--sunk);color:var(--ink);resize:vertical"></textarea>
+        <p class="hintline">生成令牌后这里会自动填好；也可以点「展开说明书」看完整版。</p>
+      </div>
       <div class="card"><h2>🗺️ 学习地图</h2>
         <p style="font-size:13px;color:var(--ink2);margin:0">
           把要学的东西拆成节点，一个个勾掉。前台在 <b>eraser.de5.net/learn/</b>，勾选进度实时同步。
-        </p>
-        <p style="font-size:13px;margin:10px 0 0;padding:10px 12px;border-radius:9px;
-                  background:var(--blue-l);color:var(--blue);border:1px solid var(--blue)">
-          <b>给 AI 助手用的接口</b>：<code>/api/learn</code> 支持按节点粒度增删改。
-          AI 用后台密码换令牌后，就能帮你建图、勾进度、<b>查漏补缺</b>。
         </p>
       </div>
       <div id="learnHost"></div>
@@ -1081,8 +1103,167 @@ function renderAll(){
   if (tab === "today") renderToday();
   else if (tab === "todos") renderTodos();
   else if (tab === "events") { renderCalendar(); renderDayEvents(); renderAgenda(); }
+  else if (tab === "learn") { renderAiPanel(); if (window.ContentAdmin) ContentAdmin.render(tab); }
   else if (window.ContentAdmin) ContentAdmin.render(tab);
 }
+
+/* ---------- 一键接上 AI ----------
+   目的：站长不用手抄令牌，点一下就拿到一段能整段贴给 AI 的配置。
+   令牌是独立于登录的长效凭证（1 年），点「吊销全部令牌」世代 +1，已发出的立刻作废。 */
+var aiGuideCache = "";     /* 完整说明书，点「展开说明书」时才拉 */
+var aiBusy = false;
+
+function aiRenderStatus(j){
+  var box = $("aiStatus");
+  if (!box) return;
+  box.className = "aibox";
+  box.textContent = "";
+  function line(text, cls){
+    var d = document.createElement("div");
+    if (cls) d.className = cls;
+    d.textContent = text;
+    box.appendChild(d);
+    return d;
+  }
+  function bold(parent, label, val){
+    var b = document.createElement("b");
+    b.textContent = label;
+    parent.appendChild(b);
+    parent.appendChild(document.createTextNode(val));
+  }
+
+  if (j && j.hasToken){
+    box.classList.add("on");
+    var d1 = line("");
+    bold(d1, "已生成令牌", "（最近一次发出的明文存在服务器上，方便你再复制一次）");
+    var k = document.createElement("span");
+    k.className = "akit";
+    k.textContent = String(j.token || "");
+    d1.appendChild(k);
+    var d2 = line("");
+    bold(d2, "签发时间：", j.issuedAt ? new Date(j.issuedAt).toLocaleString("zh-CN") : "未知");
+    var d3 = line("");
+    bold(d3, "有效期：", (j.ttlDays || 365) + " 天 · 世代 #" + (j.epoch || 0));
+  } else {
+    box.classList.add("off");
+    var d = line("");
+    bold(d, "还没生成令牌。", "点下面的「生成 / 换一条令牌」，拿到就能直接贴给 AI。");
+    var d2b = line("");
+    bold(d2b, "当前世代：", "#" + ((j && j.epoch) || 0));
+  }
+}
+
+function loadAiStatus(){
+  var box = $("aiStatus");
+  if (box){ box.className = "aibox"; box.textContent = "正在读取…"; }
+  return api("ai").then(aiRenderStatus).catch(function(e){
+    if (box){ box.className = "aibox"; box.textContent = e.message; }
+  });
+}
+
+/* 用当前令牌拼一份「最小够用」的配置，直接填进文本框 */
+function aiFillGuide(token, baseUrl){
+  var ta = $("aiGuide");
+  if (!ta) return;
+  var base = baseUrl || "https://eraser.de5.net";
+  var t = token || "<点上面的按钮生成令牌>";
+  ta.value = [
+    "我要用 AI 帮你在 Eraser 小站上管理学习地图。请按下面的信息操作。",
+    "",
+    "站点地址：" + base,
+    "鉴权令牌：" + t,
+    "请求方式：每个写操作都要带请求头  Authorization: Bearer <上面的令牌>",
+    "",
+    "只读接口（不用令牌）：",
+    "  GET " + base + "/api/learn            列出全部地图（含进度概览）",
+    "  GET " + base + "/api/learn?id=123    读一张地图的节点",
+    "  GET " + base + "/api/learn?gaps=1   查漏补缺快照（停滞分组 / 从没动过的分组 / 每组还差哪些）",
+    "",
+    "写操作（要令牌）：",
+    "  POST   " + base + "/api/learn                      新建地图  body: {title, desc, nodes:[...]}",
+    "  PATCH  " + base + "/api/learn                      改地图信息（合并语义）body: {id, title?, desc?, status?}",
+    "  DELETE " + base + "/api/learn?id=123               删整张地图",
+    "  POST   " + base + "/api/learn?action=addNode       加节点   body: {id, node:{text, group?, note?}}",
+    "  POST   " + base + "/api/learn?action=updateNode    改节点   body: {id, nodeId, patch:{text?, group?, done?}}",
+    "  POST   " + base + "/api/learn?action=removeNode    删节点   body: {id, nodeId}",
+    "  POST   " + base + "/api/learn?action=toggleNode    勾选打卡 body: {id, nodeId}",
+    "  POST   " + base + "/api/learn?action=setNodes      整表替换 body: {id, nodes:[...]}",
+    "",
+    "节点结构：{\"id\":\"n1\",\"text\":\"要学的东西\",\"group\":\"分组名\",\"done\":false,\"note\":\"备注\"}",
+    "写操作会返回整张地图 + 现成进度 progress，你不用自己算。",
+    "",
+    "请先问我「想学什么」，再把目标拆成分组的节点，用一次 POST /api/learn 带 nodes 建好。"
+  ].join("\n");
+}
+
+function aiIssue(){
+  if (aiBusy) return;
+  aiBusy = true;
+  $("btnAiIssue").disabled = true;
+  api("ai", { method: "POST" }).then(function(j){
+    aiFillGuide(j.token, j.baseUrl);
+    aiRenderStatus({ hasToken: true, token: j.token, issuedAt: new Date().toISOString(),
+                     epoch: j.epoch, ttlDays: j.ttlDays });
+    say("app", "已生成新令牌，配置已填在下面，直接复制");
+  }).catch(function(e){ say("app", e.message, "err"); })
+    .then(function(){ aiBusy = false; $("btnAiIssue").disabled = false; });
+}
+
+function aiCopy(){
+  var ta = $("aiGuide");
+  if (!ta) return;
+  function done(){ say("app", "已复制，粘贴给 AI 就能用"); }
+  function fail(){ ta.removeAttribute("readonly"); ta.select(); say("app", "请按 Ctrl/Cmd + C 复制", "err"); }
+  if (ta.value && navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(ta.value).then(done).catch(function(){
+      try{ ta.select(); document.execCommand("copy"); done(); }catch(e){ fail(); }
+    });
+    return;
+  }
+  try{ ta.select(); document.execCommand("copy"); done(); }catch(e){ fail(); }
+}
+
+function aiShowGuide(){
+  var b = $("btnAiShow");
+  if (aiGuideCache){ $("aiGuide").value = aiGuideCache; say("app", "已展开完整说明书"); return; }
+  b.disabled = true; b.textContent = "读取中…";
+  api("ai?guide=1").then(function(j){
+    aiGuideCache = j.guide || "";
+    $("aiGuide").value = aiGuideCache;
+    say("app", "已展开完整说明书");
+  }).catch(function(e){ say("app", e.message, "err"); })
+    .then(function(){ b.disabled = false; b.textContent = "展开说明书"; });
+}
+
+function aiRevoke(){
+  if (!confirm("吊销后，之前发给所有 AI 的令牌立刻失效（它们得重新接一次）。确定吗？")) return;
+  api("ai", { method: "DELETE" }).then(function(j){
+    aiGuideCache = "";
+    aiFillGuide(null, null);
+    aiRenderStatus({ hasToken: false, epoch: j.epoch });
+    say("app", "已吊销，当前世代 #" + (j.epoch || 0));
+  }).catch(function(e){ say("app", e.message, "err"); });
+}
+
+function renderAiPanel(){
+  if (!$("aiStatus")) return Promise.resolve();
+  return api("ai").then(function(j){
+    aiRenderStatus(j);
+    /* 已经有令牌的话，顺手把配置填好，省得站长再点一次 */
+    if (j && j.hasToken && !$("aiGuide").value) aiFillGuide(j.token, j.baseUrl);
+  }).catch(function(e){
+    var box = $("aiStatus");
+    if (box){ box.className = "aibox"; box.textContent = e.message; }
+  });
+}
+
+function aiBind(){
+  if ($("btnAiIssue")) $("btnAiIssue").addEventListener("click", aiIssue);
+  if ($("btnAiCopy")) $("btnAiCopy").addEventListener("click", aiCopy);
+  if ($("btnAiShow")) $("btnAiShow").addEventListener("click", aiShowGuide);
+  if ($("btnAiRevoke")) $("btnAiRevoke").addEventListener("click", aiRevoke);
+}
+
 function refresh(){
   return Promise.all([loadTodos(), loadEvents()]).then(renderAll);
 }
@@ -1090,6 +1271,7 @@ function refresh(){
 function enterApp(){
   showApp();
   if (window.ContentAdmin) ContentAdmin.init({ api: api, say: say });
+  aiBind();
   cancelEditTodo();
   cancelEditEvent();
   refresh().catch(function(e){ say("app", e.message, "err"); });

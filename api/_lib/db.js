@@ -77,10 +77,40 @@ export function ensureSchema() {
 
       await sql`CREATE INDEX IF NOT EXISTS todos_due_idx ON todos (due_date)`;
       await sql`CREATE INDEX IF NOT EXISTS events_start_idx ON events (start_at)`;
+
+      /* ------------------------------------------------------------------
+         站点级小状态：键值对。目前只存一个 ai_epoch（AI 令牌的「吊销世代」）。
+         发 AI 令牌时把当前世代写进令牌；「一键吊销」就是把这个世代 +1，
+         之前发出去的所有 AI 令牌立刻全部失效（后台登录令牌不受影响）。
+         ------------------------------------------------------------------ */
+      await sql`
+        CREATE TABLE IF NOT EXISTS meta (
+          key         text PRIMARY KEY,
+          value       text,
+          updated_at  timestamptz NOT NULL DEFAULT now()
+        )`;
     })().catch((e) => {
       schemaReady = null;   // 失败就下次重试
       throw e;
     });
   }
   return schemaReady;
+}
+
+/* 读一个站点级状态值，没有就返回 fallback */
+export async function getMeta(key, fallback = null) {
+  const sql = db();
+  const rows = await sql`SELECT value FROM meta WHERE key = ${key}`;
+  if (!rows.length || rows[0].value == null) return fallback;
+  return rows[0].value;
+}
+
+/* 写一个站点级状态值（upsert） */
+export async function setMeta(key, value) {
+  const sql = db();
+  await sql`
+    INSERT INTO meta (key, value, updated_at)
+    VALUES (${key}, ${String(value)}, now())
+    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`;
+  return String(value);
 }

@@ -14,49 +14,180 @@
 <link rel="apple-touch-icon" href="../icon.svg">
 <meta name="theme-color" content="#2563eb">
 <style>
-/* 学习地图页专属样式：地图卡 / 进度条 / 节点列表 / 分组 */
-.lm-sec { margin-top: 30px; }
-.lm-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+/* 学习地图页专属样式：地图卡 / 进度 / 分组 / 节点 / 大纲导入 */
+.lm-sec { margin-top: 26px; }
 
-/* 地图卡（列表） */
+/* ---------- 顶部工具条 ---------- */
+.lm-toolbar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 14px;
+}
+.lm-toolbar .grow { flex: 1; min-width: 120px; }
+.lm-input {
+  width: 100%; padding: 9px 12px; border: 1px solid var(--line2); border-radius: 9px;
+  background: var(--card); color: var(--ink); font-size: 14px; font-family: inherit;
+}
+.lm-input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+.lm-btn {
+  border: 1px solid var(--line2); background: var(--card); color: var(--ink2);
+  border-radius: 9px; padding: 8px 14px; font-size: 13.5px; font-family: inherit;
+  cursor: pointer; white-space: nowrap;
+}
+.lm-btn:hover { border-color: var(--blue); color: var(--blue); }
+.lm-btn.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+.lm-btn.primary:hover { background: var(--blue-d); color: #fff; }
+.lm-btn:disabled { opacity: .5; cursor: not-allowed; }
+.lm-btn.sm { padding: 5px 10px; font-size: 12.5px; }
+
+/* ---------- 汇总条（几张图 / 总进度 / 待补） ---------- */
+.lm-sum {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px; margin-top: 16px;
+}
+.lm-sum .cell {
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  padding: 12px 14px;
+}
+.lm-sum .cell b { display: block; font-size: 20px; line-height: 1.3; color: var(--ink); }
+.lm-sum .cell span { font-size: 12px; color: var(--muted); }
+.lm-sum .cell.hot b { color: var(--amber, #9a6700); }
+
+/* ---------- 地图卡 ---------- */
 .lm-card {
   background: var(--card); border: 1px solid var(--line); border-radius: 10px;
-  padding: 14px 16px; margin-bottom: 12px;
+  padding: 14px 16px; margin-bottom: 12px; transition: border-color .15s, box-shadow .15s;
+  cursor: pointer;
 }
+.lm-card:hover { border-color: var(--blue); box-shadow: 0 2px 10px rgba(37,99,235,.08); }
 .lm-card .top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .lm-card .ttl { font-weight: 600; font-size: 15px; word-break: break-word; }
 .lm-card .ttl a { color: inherit; }
-.lm-card .ttl a:hover { color: var(--blue); }
+.lm-card .ttl a:hover { color: var(--blue); text-decoration: none; }
 .lm-card .dsc { color: var(--muted); font-size: 13px; margin-top: 4px; word-break: break-word; }
+.lm-card .gchips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.lm-chip {
+  font-size: 11.5px; padding: 2px 8px; border-radius: 999px;
+  background: var(--sunk); color: var(--ink4); border: 1px solid var(--line);
+}
+.lm-chip.done { background: rgba(37,99,235,.10); color: var(--blue); border-color: transparent; }
+.lm-chip.hot { background: rgba(154,103,0,.12); color: #9a6700; border-color: transparent; }
 
-/* 进度条 */
+/* ---------- 进度条 ---------- */
 .lm-bar { height: 8px; border-radius: 999px; background: var(--sunk); overflow: hidden; margin-top: 10px; }
 .lm-bar > i { display: block; height: 100%; background: var(--blue); border-radius: 999px; transition: width .25s; }
-.lm-card .pmeta { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-top: 6px; }
+.lm-bar.slim { height: 6px; margin-top: 0; }
+.lm-card .pmeta, .lm-head .pmeta {
+  display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-top: 6px;
+}
+.lm-status { font-size: 12px; color: var(--muted); white-space: nowrap; }
 
-/* 详情视图 */
+/* ---------- 详情视图 ---------- */
 .lm-back { display: inline-block; margin: 4px 0 14px; font-size: 13px; color: var(--blue); cursor: pointer; }
 .lm-back:hover { text-decoration: underline; }
-.lm-grp { margin-top: 22px; }
-.lm-grp > h3 {
-  font-size: 14px; margin: 0 0 8px; color: var(--muted); font-weight: 600;
-  display: flex; align-items: center; gap: 8px;
+.lm-hero {
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  padding: 16px 18px;
 }
-.lm-grp > h3 .gcnt { font-weight: normal; font-size: 12px; }
+.lm-hero .top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.lm-hero .ttl { font-weight: 700; font-size: 18px; word-break: break-word; }
+.lm-hero .dsc { color: var(--muted); font-size: 13px; margin-top: 5px; }
+
+/* ---------- 分组 ---------- */
+.lm-grp { margin-top: 18px; border: 1px solid var(--line); border-radius: 12px;
+          background: var(--card); overflow: hidden; }
+.lm-grp > h3 {
+  font-size: 13.5px; margin: 0; padding: 11px 14px; color: var(--ink2); font-weight: 600;
+  display: flex; align-items: center; gap: 9px; cursor: pointer; user-select: none;
+  background: var(--sunk); border-bottom: 1px solid var(--line);
+}
+.lm-grp.collapsed > h3 { border-bottom: none; }
+.lm-grp > h3 .caret { font-size: 10px; color: var(--muted); transition: transform .15s; display: inline-block; }
+.lm-grp.collapsed > h3 .caret { transform: rotate(-90deg); }
+.lm-grp > h3 .gname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lm-grp > h3 .gcnt { font-weight: normal; font-size: 12px; color: var(--muted); }
+.lm-grp > h3 .gbar { width: 74px; flex: 0 0 auto; }
+.lm-grp.collapsed .lm-body { display: none; }
+.lm-body { padding: 6px 0; }
+
+/* ---------- 节点 ---------- */
 .lm-node {
   display: flex; align-items: flex-start; gap: 10px;
-  padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px;
-  margin-bottom: 7px; background: var(--card);
+  padding: 9px 14px; border-bottom: 1px solid var(--line);
+  background: transparent; position: relative;
 }
-.lm-node .chk { flex-shrink: 0; margin-top: 2px; }
+.lm-node:last-child { border-bottom: none; }
+.lm-node.done { opacity: .6; }
+.lm-node.done .txt > .t { text-decoration: line-through; text-decoration-color: var(--line2); }
+.lm-node .chk { flex-shrink: 0; margin-top: 3px; width: 16px; height: 16px; accent-color: var(--blue); }
 .lm-node .txt { flex: 1; min-width: 0; word-break: break-word; }
-.lm-node .nt { color: var(--muted); font-size: 12px; margin-top: 3px; word-break: break-word; }
-.lm-node.done { opacity: .62; }
-.lm-node.done .txt { text-decoration: line-through; text-decoration-color: var(--line2); }
-.lm-status { font-size: 12px; color: var(--muted); }
+.lm-node .txt > .t { font-size: 14.5px; }
+.lm-node .nt { color: var(--muted); font-size: 12px; margin-top: 2px; word-break: break-word; }
+.lm-node .ops { display: flex; gap: 2px; opacity: 0; transition: opacity .12s; flex-shrink: 0; }
+.lm-node:hover .ops, .lm-node:focus-within .ops { opacity: 1; }
+.lm-node .ops button {
+  border: none; background: transparent; color: var(--muted); cursor: pointer;
+  font-size: 14px; line-height: 1; padding: 4px 6px; border-radius: 6px;
+}
+.lm-node .ops button:hover { background: var(--sunk); color: var(--blue); }
+.lm-node .drag { cursor: grab; color: var(--muted); font-size: 13px; padding-top: 2px; opacity: 0; }
+.lm-node:hover .drag { opacity: 1; }
+.lm-node.dragging { opacity: .35; }
+.lm-node.dropbefore { box-shadow: inset 0 2px 0 var(--blue); }
+.lm-node.dropafter { box-shadow: inset 0 -2px 0 var(--blue); }
+.lm-node .editbar { display: flex; gap: 6px; margin-top: 7px; }
+.lm-node .editbar input {
+  padding: 5px 9px; font-size: 13px; border-radius: 7px; border: 1px solid var(--line2);
+  background: var(--card); color: var(--ink); font-family: inherit;
+}
+.lm-node .editbar .g { flex: 0 0 110px; }
+
+/* 新增节点行 */
+.lm-add { display: flex; gap: 8px; padding: 10px 14px; align-items: center; }
+
+/* ---------- 空状态 / 提示 ---------- */
+.lm-empty {
+  border: 1px dashed var(--line2); border-radius: 12px; padding: 26px 20px;
+  text-align: center; color: var(--muted); font-size: 14px; margin-top: 18px;
+  background: var(--card);
+}
+.lm-empty .big { font-size: 30px; display: block; margin-bottom: 8px; }
+.lm-note {
+  font-size: 12.5px; color: var(--muted); margin-top: 10px;
+  padding: 9px 12px; border-radius: 9px; background: var(--sunk); border: 1px solid var(--line);
+}
+.lm-note b { color: var(--ink2); }
+.lm-locked {
+  font-size: 12.5px; color: #9a6700; background: rgba(154,103,0,.10);
+  padding: 8px 12px; border-radius: 9px; margin-top: 12px;
+}
+
+/* ---------- 大纲导入弹层 ---------- */
+.lm-modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,.42); z-index: 60;
+  display: flex; align-items: center; justify-content: center; padding: 18px;
+}
+.lm-modal .box {
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+  width: 100%; max-width: 560px; max-height: 86vh; overflow: auto; padding: 18px 20px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.24);
+}
+.lm-modal h3 { margin: 0 0 6px; font-size: 16px; }
+.lm-modal textarea {
+  width: 100%; box-sizing: border-box; min-height: 180px; padding: 11px 12px;
+  font-family: ui-monospace, Consolas, monospace; font-size: 13px; line-height: 1.6;
+  border: 1px solid var(--line2); border-radius: 10px; background: var(--sunk);
+  color: var(--ink); resize: vertical;
+}
+.lm-modal .acts { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+.lm-preview { margin-top: 12px; font-size: 13px; }
+.lm-preview .pv-grp { margin-top: 8px; }
+.lm-preview .pv-grp > b { color: var(--ink2); font-size: 12.5px; }
+.lm-preview ul { margin: 4px 0 0; padding-left: 20px; color: var(--ink4); }
+.lm-preview li { font-size: 12.5px; }
 
 @media (max-width: 560px) {
   .lm-card .top { flex-direction: column; align-items: flex-start; }
+  .lm-node .ops { opacity: 1; }
+  .lm-node .drag { display: none; }
 }
 </style>
 </head>
@@ -77,27 +208,46 @@
   <h1>学习地图</h1>
   <p class="muted">把要学的东西拆成节点，一个个勾掉。也可以让 AI 助手帮你建图、查漏补缺。</p>
 
-  <!-- 列表视图 -->
+  <!-- ============ 列表视图 ============ -->
   <section class="lm-sec" id="viewList">
-    <div class="lm-head"><h2 style="font-size:18px;margin:0">我的地图</h2><span class="lm-status" id="listCount"></span></div>
+    <div class="lm-toolbar">
+      <div class="grow"><input type="text" class="lm-input" id="filterInput" placeholder="搜地图 / 分组 / 节点…" autocomplete="off"></div>
+      <button class="lm-btn" id="btnRefresh" type="button">刷新</button>
+      <button class="lm-btn" id="btnImport" type="button">导入大纲</button>
+      <button class="lm-btn primary" id="btnNew" type="button">＋ 新建地图</button>
+    </div>
+
+    <div class="lm-sum" id="sumBox"></div>
+
     <!-- 数据库里还没内容时保留这段静态兜底，别删 -->
-    <p class="muted" id="listEmpty">数据库里还没内容。去管理后台的「学习」标签新建一张地图，或者让 AI 助手帮你建。</p>
+    <p class="muted" id="listEmpty" style="margin-top:18px">数据库里还没内容。点上面的「新建地图」手搓一张，或者让 AI 助手帮你建。</p>
     <div id="listHost"></div>
+
+    <p class="lm-locked hide" id="lockNote">🔒 现在只能看，不能改。想勾选 / 编辑节点，请先去 <a href="../admin/index.html">管理后台</a> 登录一次（本浏览器会记住 30 天）。</p>
   </section>
 
-  <!-- 详情视图 -->
+  <!-- ============ 详情视图 ============ -->
   <section class="lm-sec" id="viewDetail" style="display:none">
     <span class="lm-back" id="btnBack">← 返回地图列表</span>
-    <div class="lm-card" id="detailHead"></div>
+    <div class="lm-hero" id="detailHead"></div>
+    <div class="lm-toolbar" id="detailTools" style="margin-top:12px"></div>
     <div id="nodeHost"></div>
   </section>
 </div>
 
 <script>
-/* 学习地图：先静态兜底 → 再读接口渲染 → 失败保持静态，永不白屏。
-   勾选完成走 /api/learn?action=toggleNode，需要登录令牌；未登录时复选框禁用，
-   避免点了没反应让人困惑。令牌存在 localStorage 的 eraser.admin.token（后台登录后写入）。 */
+/* 学习地图（仿 MapFlow 的交互）
+   设计要点：
+     1) 列表 → 详情两级视图，?id= 深链直达；浏览器回退也认。
+     2) 详情里按分组折叠 / 展开，分组头挂进度条，一眼看出哪组落后。
+     3) 登录后节点可勾选、可就地改文字 / 分组、可拖动排序、可删除，全部即时落库。
+     4) 未登录 → 只读：复选框禁用并给出明确提示，绝不出现「点了没反应」。
+     5) 编辑写操作统一走 /api/learn 的节点级 action，服务端返回的 progress 直接拿来刷头部。
+     6) 接口挂了保持静态兜底，永不白屏。
+   数据由 /api/learn 提供；令牌沿用后台的 eraser.admin.token。 */
 (function () {
+  "use strict";
+
   function $(id) { return document.getElementById(id); }
   function el(tag, cls, text) {
     var e = document.createElement(tag);
@@ -108,6 +258,8 @@
   function token() {
     try { return localStorage.getItem("eraser.admin.token") || ""; } catch (e) { return ""; }
   }
+  function canEdit() { return !!token(); }
+
   function api(path, opts) {
     opts = opts || {};
     var h = { Accept: "application/json" };
@@ -125,25 +277,71 @@
     });
   }
 
-  /* 当前状态：地图列表 / 选中的地图 */
-  var maps = [];
-  var current = null;
+  /* 当前状态 */
+  var maps = [];          /* 列表接口返回的概览 */
+  var current = null;     /* 详情：{id, title, desc, status, nodes} */
+  var progress = null;    /* 服务端算好的进度 */
+  var collapsed = {};     /* 分组折叠状态：{ 地图id: { 组名: true } } */
+  var filterText = "";
+  var busy = false;
 
-  function pct(p) { return Math.max(0, Math.min(100, Number(p) || 0)); }
+  function pct(p) { return Math.max(0, Math.min(100, Math.round(Number(p) || 0))); }
+  function statusText(s) { return ({ active: "在学", done: "学完", archived: "归档" })[s] || ""; }
+
+  function toast(text, kind) {
+    var host = $("listHost");
+    var old = $("lmToast");
+    if (old) old.remove();
+    var d = el("div", "lm-note");
+    d.id = "lmToast";
+    d.style.marginTop = "14px";
+    if (kind === "err") { d.style.background = "rgba(210,36,47,.09)"; d.style.color = "#d1242f"; d.style.borderColor = "transparent"; }
+    d.textContent = text;
+    (host ? host.parentNode : document.body).insertBefore(d, host ? host.nextSibling : null);
+    setTimeout(function () { if (d.parentNode) d.remove(); }, 3200);
+  }
+
+  /* ================= 列表视图 ================= */
+
+  function mapGroupsOf(m) {
+    var gs = (m.groups || m.progress && m.progress.groups) || [];
+    return gs;
+  }
 
   function makeMapCard(m) {
     var card = el("div", "lm-card");
+    card.setAttribute("role", "button");
+    card.tabIndex = 0;
+    card.addEventListener("click", function () { openMap(m.id); });
+    card.addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); openMap(m.id); }
+    });
+
     var top = el("div", "top");
     var ttl = el("div", "ttl");
     var a = el("a", null, m.title || "(未命名地图)");
     a.href = "?id=" + m.id;
-    a.addEventListener("click", function (ev) { ev.preventDefault(); openMap(m.id); });
+    a.addEventListener("click", function (ev) { ev.stopPropagation(); ev.preventDefault(); openMap(m.id); });
     ttl.appendChild(a);
     top.appendChild(ttl);
-    var st = { active: "在学", done: "学完", archived: "归档" }[m.status];
+    var st = statusText(m.status);
     if (st) top.appendChild(el("span", "lm-status", st));
     card.appendChild(top);
     if (m.desc) card.appendChild(el("div", "dsc", m.desc));
+
+    /* 分组小标签：完成 / 落后一眼可辨 */
+    var gs = mapGroupsOf(m);
+    if (gs.length) {
+      var chips = el("div", "gchips");
+      gs.forEach(function (g) {
+        var done = Number(g.done) || 0, total = Number(g.total) || 0;
+        var cls = "lm-chip";
+        if (total && done >= total) cls += " done";
+        else if (done > 0) cls += " hot";
+        chips.appendChild(el("span", cls, g.name + " " + done + "/" + total));
+      });
+      card.appendChild(chips);
+    }
 
     var p = m.progress || { total: 0, done: 0, percent: 0 };
     var bar = el("div", "lm-bar");
@@ -159,14 +357,62 @@
     return card;
   }
 
+  /* 过滤：标题 / 说明 / 分组名里命中即可 */
+  function matches(m) {
+    if (!filterText) return true;
+    var hay = [m.title || "", m.desc || ""].concat(mapGroupsOf(m).map(function (g) { return g.name; })).join(" ").toLowerCase();
+    return hay.indexOf(filterText.toLowerCase()) >= 0;
+  }
+
+  function renderSummary() {
+    var box = $("sumBox");
+    if (!box) return;
+    box.innerHTML = "";
+    if (!maps.length) { box.style.display = "none"; return; }
+    box.style.display = "";
+
+    var totalNodes = 0, doneNodes = 0, hot = 0;
+    maps.forEach(function (m) {
+      var p = m.progress || {};
+      totalNodes += Number(p.total) || 0;
+      doneNodes += Number(p.done) || 0;
+      if ((Number(p.left) || 0) > 0) hot++;
+    });
+    var overall = totalNodes ? Math.round(doneNodes / totalNodes * 100) : 0;
+
+    function cell(val, label, cls) {
+      var c = el("div", "cell" + (cls ? " " + cls : ""));
+      c.appendChild(el("b", null, String(val)));
+      c.appendChild(el("span", null, label));
+      return c;
+    }
+    box.appendChild(cell(maps.length, "张地图"));
+    box.appendChild(cell(overall + "%", "总进度"));
+    box.appendChild(cell(doneNodes + " / " + totalNodes, "已勾节点"));
+    box.appendChild(cell(hot, "还没学完的图", hot ? "hot" : ""));
+  }
+
   function renderList() {
     var host = $("listHost"), empty = $("listEmpty");
     host.innerHTML = "";
-    $("listCount").textContent = maps.length ? "共 " + maps.length + " 张" : "";
-    if (!maps.length) { empty.style.display = ""; return; }
+    var shown = maps.filter(matches);
+    renderSummary();
+
+    if (!maps.length) {
+      empty.style.display = "";
+      empty.textContent = "数据库里还没内容。点上面的「新建地图」手搓一张，或者让 AI 助手帮你建。";
+      return;
+    }
+    if (!shown.length) {
+      empty.style.display = "";
+      empty.textContent = "没有匹配「" + filterText + "」的地图。";
+      return;
+    }
     empty.style.display = "none";
-    maps.forEach(function (m) { host.appendChild(makeMapCard(m)); });
+    shown.forEach(function (m) { host.appendChild(makeMapCard(m)); });
   }
+
+  /* ================= 详情视图 ================= */
 
   /* 组内节点顺序保持原样，分组按首次出现顺序 */
   function groupNodes(nodes) {
@@ -179,43 +425,13 @@
     return order.map(function (g) { return { name: g, nodes: byKey[g] }; });
   }
 
-  function makeNode(n) {
-    var row = el("div", "lm-node" + (n.done ? " done" : ""));
-    var chk = el("input", "chk");
-    chk.type = "checkbox";
-    chk.checked = !!n.done;
-    chk.disabled = !token();
-    if (!token()) chk.title = "勾选需要先在后台登录";
-    chk.addEventListener("change", function () {
-      chk.disabled = true;
-      api("/api/learn?action=toggleNode", { method: "POST", body: { id: current.id, nodeId: n.id } })
-        .then(function (j) {
-          n.done = !n.done;
-          row.classList.toggle("done", n.done);
-          /* 用服务端返回的进度刷新头部，避免本地算错 */
-          if (j && j.progress) paintDetailHead(j.progress);
-        })
-        .catch(function (e) {
-          chk.checked = !chk.checked;   /* 回滚 */
-          alert(e.message || "操作失败");
-        })
-        .then(function () { chk.disabled = false; });
-    });
-    row.appendChild(chk);
-
-    var box = el("div", "txt");
-    box.appendChild(el("div", null, n.text || ""));
-    if (n.note) box.appendChild(el("div", "nt", n.note));
-    row.appendChild(box);
-    return row;
-  }
-
   function paintDetailHead(p) {
     var head = $("detailHead");
+    if (!current) return;
     head.innerHTML = "";
     var top = el("div", "top");
     top.appendChild(el("div", "ttl", current.title || "(未命名地图)"));
-    var st = { active: "在学", done: "学完", archived: "归档" }[current.status];
+    var st = statusText(current.status);
     if (st) top.appendChild(el("span", "lm-status", st));
     head.appendChild(top);
     if (current.desc) head.appendChild(el("div", "dsc", current.desc));
@@ -227,61 +443,605 @@
     head.appendChild(bar);
 
     var meta = el("div", "pmeta");
-    meta.appendChild(el("span", null, "完成 " + p.done + " / " + p.total + " 个节点"));
-    meta.appendChild(el("span", null, pct(p.percent) + "%"));
+    meta.appendChild(el("span", null, "完成 " + (p.done || 0) + " / " + (p.total || 0) + " 个节点"));
+    var right = el("span");
+    var left = Number(p.left) || 0;
+    right.textContent = pct(p.percent) + "%" + (left ? " · 还差 " + left + " 个" : " · 全勾完了 🎉");
+    meta.appendChild(right);
     head.appendChild(meta);
+
+    if (!canEdit()) $("lockNote").classList.remove("hide");
+    else $("lockNote").classList.add("hide");
   }
 
-  function renderDetail(item, progress) {
-    current = item.data ? Object.assign({ id: item.id }, item.data) : item;
-    var nodes = (current.nodes || []);
-    paintDetailHead(progress || { done: 0, total: nodes.length, percent: 0 });
+  function paintDetailTools() {
+    var host = $("detailTools");
+    host.innerHTML = "";
+    if (!current) return;
 
+    var addBtn = el("button", "lm-btn", "＋ 加节点");
+    addBtn.type = "button";
+    addBtn.disabled = !canEdit();
+    addBtn.addEventListener("click", function () { addNodeInline(""); });
+    host.appendChild(addBtn);
+
+    var copyBtn = el("button", "lm-btn", "复制给 AI 的指令");
+    copyBtn.type = "button";
+    copyBtn.addEventListener("click", function () { copyAiPrompt(); });
+    host.appendChild(copyBtn);
+
+    host.appendChild(el("span", "grow"));
+
+    var archBtn = el("button", "lm-btn", current.status === "archived" ? "取消归档" : "归档");
+    archBtn.type = "button";
+    archBtn.disabled = !canEdit();
+    archBtn.addEventListener("click", function () {
+      setStatus(current.status === "archived" ? "active" : "archived");
+    });
+    host.appendChild(archBtn);
+  }
+
+  /* 把当前地图的缺口拼成一段可直接贴给 AI 的指令 */
+  function copyAiPrompt() {
+    var nodes = (current && current.nodes) || [];
+    var gs = groupNodes(nodes).map(function (g) {
+      var done = g.nodes.filter(function (n) { return n.done; }).length;
+      return { name: g.name, done: done, total: g.nodes.length, pending: g.nodes.filter(function (n) { return !n.done; }) };
+    });
+    gs.sort(function (a, b) { return (a.done / (a.total || 1)) - (b.done / (b.total || 1)); });
+    var lines = [
+      "我在 Eraser 小站有一张学习地图「" + (current.title || "") + "」（地图 id = " + current.id + "）。",
+      "当前进度：" + (progress ? progress.done + " / " + progress.total + "（" + pct(progress.percent) + "%）" : "未知"),
+      "",
+      "按「落后程度」排的分组："
+    ];
+    gs.forEach(function (g) {
+      lines.push("- " + g.name + "：" + g.done + "/" + g.total + (g.pending.length ? "，还差：" + g.pending.map(function (n) { return n.text; }).join("；") : "（已全勾）"));
+    });
+    lines.push("");
+    lines.push("请帮我查漏补缺：结合站点接口 GET /api/learn?gaps=1 看整体情况，");
+    lines.push("然后建议我「接下来先学哪几个」，并把我的新进度用 toggleNode 勾上（节点 id 见接口返回）。");
+    var text = lines.join("\n");
+
+    function done() { toast("已复制，粘贴给 AI 就能用"); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(function () { fallbackCopy(text, done); });
+    } else {
+      fallbackCopy(text, done);
+    }
+  }
+  function fallbackCopy(text, done) {
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); done(); } catch (e) { toast("复制失败，请手动选择复制", "err"); }
+    ta.remove();
+  }
+
+  function setStatus(next) {
+    if (busy) return;
+    busy = true;
+    api("/api/learn", { method: "PATCH", body: { id: current.id, status: next } })
+      .then(function (j) {
+        current.status = next;
+        if (j && j.progress) progress = j.progress;
+        paintDetailHead(progress);
+        paintDetailTools();
+        toast(next === "archived" ? "已归档" : "已取消归档");
+        return loadList();
+      })
+      .catch(function (e) { toast(e.message || "操作失败", "err"); })
+      .then(function () { busy = false; });
+  }
+
+  /* --- 单节点控件 --- */
+
+  function patchNode(node, patch, rollback) {
+    if (busy) return;
+    busy = true;
+    api("/api/learn?action=updateNode", { method: "POST", body: { id: current.id, nodeId: node.id, patch: patch } })
+      .then(function (j) {
+        Object.keys(patch).forEach(function (k) { node[k] = patch[k]; });
+        if (j && j.progress) progress = j.progress;
+        paintDetailHead(progress);
+        refreshGroupCounts();
+        return loadList();
+      })
+      .catch(function (e) { if (rollback) rollback(); toast(e.message || "保存失败", "err"); })
+      .then(function () { busy = false; });
+  }
+
+  function toggleNode(node, chk, row) {
+    if (busy) return;
+    busy = true;
+    chk.disabled = true;
+    api("/api/learn?action=toggleNode", { method: "POST", body: { id: current.id, nodeId: node.id } })
+      .then(function (j) {
+        node.done = !node.done;
+        row.classList.toggle("done", node.done);
+        if (j && j.progress) progress = j.progress;
+        paintDetailHead(progress);
+        refreshGroupCounts();
+        return loadList();
+      })
+      .catch(function (e) {
+        chk.checked = !chk.checked;   /* 回滚 */
+        toast(e.message || "操作失败", "err");
+      })
+      .then(function () { chk.disabled = false; busy = false; });
+  }
+
+  function removeNode(node, row) {
+    if (!confirm("删掉节点「" + (node.text || "") + "」？")) return;
+    api("/api/learn?action=removeNode", { method: "POST", body: { id: current.id, nodeId: node.id } })
+      .then(function (j) {
+        current.nodes = (current.nodes || []).filter(function (n) { return n.id !== node.id; });
+        if (j && j.progress) progress = j.progress;
+        row.remove();
+        paintDetailHead(progress);
+        refreshGroupCounts();
+        toast("已删除");
+        return loadList();
+      })
+      .catch(function (e) { toast(e.message || "删除失败", "err"); });
+  }
+
+  /* 就地编辑：文字 / 分组（回车或失焦保存，Esc 放弃） */
+  function inlineEdit(node, field, row, input) {
+    if (!canEdit()) return;
+    if (row.querySelector(".editbar")) return;
+    var bar = el("div", "editbar");
+    var box = el("input", field === "group" ? "g" : null);
+    box.type = "text";
+    box.value = (node[field] || "");
+    box.placeholder = field === "group" ? "分组名" : "要学的内容";
+    bar.appendChild(box);
+    var ok = el("button", "lm-btn sm", "保存");
+    ok.type = "button";
+    var cancel = el("button", "lm-btn sm", "取消");
+    cancel.type = "button";
+    bar.appendChild(ok); bar.appendChild(cancel);
+    input.parentNode.insertBefore(bar, input.nextSibling);
+    box.focus(); box.select();
+
+    function close() { bar.remove(); }
+    function save() {
+      var v = box.value.trim();
+      if (v === (node[field] || "")) { close(); return; }
+      if (field === "text" && !v) { toast("内容不能为空", "err"); return; }
+      close();
+      patchNode(node, field === "group" ? { group: v } : { text: v }, null);
+      rebuildNodes();
+    }
+    ok.addEventListener("click", save);
+    cancel.addEventListener("click", close);
+    box.addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter") { ev.preventDefault(); save(); }
+      else if (ev.key === "Escape") { ev.preventDefault(); close(); }
+    });
+  }
+
+  function makeNode(node, groupName) {
+    var row = el("div", "lm-node" + (node.done ? " done" : ""));
+    row.dataset.nid = node.id;
+    row.draggable = canEdit();
+
+    var drag = el("span", "drag", "⠿");
+    row.appendChild(drag);
+
+    var chk = el("input", "chk");
+    chk.type = "checkbox";
+    chk.checked = !!node.done;
+    chk.disabled = !canEdit();
+    chk.title = canEdit() ? "标记完成" : "勾选需要先在后台登录";
+    chk.addEventListener("change", function () { toggleNode(node, chk, row); });
+    row.appendChild(chk);
+
+    var box = el("div", "txt");
+    var t = el("div", "t", node.text || "");
+    if (canEdit()) {
+      t.style.cursor = "text";
+      t.title = "点一下改文字";
+      t.addEventListener("click", function () { inlineEdit(node, "text", row, t); });
+    }
+    box.appendChild(t);
+    if (node.note) box.appendChild(el("div", "nt", node.note));
+    row.appendChild(box);
+
+    var ops = el("div", "ops");
+    if (canEdit()) {
+      var gb = el("button", null, "🏷");
+      gb.type = "button";
+      gb.title = "改分组";
+      gb.addEventListener("click", function () { inlineEdit(node, "group", row, t); });
+      ops.appendChild(gb);
+      var del = el("button", null, "✕");
+      del.type = "button";
+      del.title = "删掉这个节点";
+      del.addEventListener("click", function () { removeNode(node, row); });
+      ops.appendChild(del);
+    }
+    row.appendChild(ops);
+
+    /* 拖动排序：在同一分组内上下移动 */
+    if (canEdit()) bindDrag(row, node, groupName);
+    return row;
+  }
+
+  /* --- 拖动排序 ---
+     只允许在同一分组内移动；落点按鼠标相对行高的一半判定「插前面 / 插后面」。 */
+  var dragState = null;
+  function bindDrag(row, node, groupName) {
+    row.addEventListener("dragstart", function (ev) {
+      dragState = { node: node, groupName: groupName };
+      row.classList.add("dragging");
+      try { ev.dataTransfer.effectAllowed = "move"; ev.dataTransfer.setData("text/plain", node.id); } catch (e) {}
+    });
+    row.addEventListener("dragend", function () {
+      row.classList.remove("dragging");
+      dragState = null;
+      document.querySelectorAll(".lm-node.dropbefore, .lm-node.dropafter").forEach(function (r) {
+        r.classList.remove("dropbefore", "dropafter");
+      });
+    });
+    row.addEventListener("dragover", function (ev) {
+      if (!dragState || dragState.node.id === node.id) return;
+      if (dragState.groupName !== groupName) return;   /* 不跨组 */
+      ev.preventDefault();
+      var rect = row.getBoundingClientRect();
+      var after = ev.clientY > rect.top + rect.height / 2;
+      row.classList.toggle("dropafter", after);
+      row.classList.toggle("dropbefore", !after);
+    });
+    row.addEventListener("dragleave", function () {
+      row.classList.remove("dropbefore", "dropafter");
+    });
+    row.addEventListener("drop", function (ev) {
+      ev.preventDefault();
+      if (!dragState || dragState.node.id === node.id) return;
+      if (dragState.groupName !== groupName) return;
+      var after = row.classList.contains("dropafter");
+      row.classList.remove("dropbefore", "dropafter");
+      moveNode(dragState.node, node, after);
+    });
+  }
+
+  /* 把 from 挪到 target 前 / 后，再整组重排后提交 setNodes */
+  function moveNode(from, target, after) {
+    var nodes = current.nodes || [];
+    var fi = nodes.indexOf(from);
+    if (fi < 0) return;
+    nodes.splice(fi, 1);
+    var ti = nodes.indexOf(target);
+    if (ti < 0) return;
+    nodes.splice(after ? ti + 1 : ti, 0, from);
+    commitOrder();
+  }
+
+  function commitOrder() {
+    var copy = (current.nodes || []).map(function (n) {
+      return { id: n.id, text: n.text, group: n.group || "", done: !!n.done, note: n.note || "" };
+    });
+    api("/api/learn?action=setNodes", { method: "POST", body: { id: current.id, nodes: copy } })
+      .then(function (j) {
+        if (j && j.progress) progress = j.progress;
+        paintDetailHead(progress);
+        rebuildNodes();
+        toast("顺序已保存");
+      })
+      .catch(function (e) { toast(e.message || "排序保存失败", "err"); rebuildNodes(); });
+  }
+
+  /* 新增节点：把 addNode 的结果并进本地，再重画 */
+  function addNodeInline(groupName) {
+    if (!canEdit()) { toast("请先在后台登录", "err"); return; }
+    var text = prompt("要加什么节点？", "");
+    if (text == null) return;
+    text = text.trim();
+    if (!text) return;
+    var g = groupName || "";
+    if (!g) {
+      var groups = groupNodes(current.nodes || []);
+      g = groups.length ? groups[groups.length - 1].name : "";
+    }
+    api("/api/learn?action=addNode", { method: "POST", body: { id: current.id, node: { text: text, group: g } } })
+      .then(function (j) {
+        current.nodes = ((j && j.item && j.item.data && j.item.data.nodes) || current.nodes || []);
+        if (j && j.progress) progress = j.progress;
+        paintDetailHead(progress);
+        rebuildNodes();
+        toast("已添加");
+        return loadList();
+      })
+      .catch(function (e) { toast(e.message || "添加失败", "err"); });
+  }
+
+  /* 分组进度小回填：不整页重画，只更新每组头部的计数和进度条 */
+  function refreshGroupCounts() {
+    var nodes = (current && current.nodes) || [];
+    groupNodes(nodes).forEach(function (g) {
+      var sec = document.querySelector('.lm-grp[data-g="' + cssEscape(g.name) + '"]');
+      if (!sec) return;
+      var done = g.nodes.filter(function (n) { return n.done; }).length;
+      var cnt = sec.querySelector(".gcnt");
+      if (cnt) cnt.textContent = done + "/" + g.nodes.length;
+      var fill = sec.querySelector(".gbar i");
+      if (fill) fill.style.width = (g.nodes.length ? Math.round(done / g.nodes.length * 100) : 0) + "%";
+    });
+  }
+  function cssEscape(s) { return String(s).replace(/["\\]/g, "\\$&"); }
+
+  function rebuildNodes() {
     var host = $("nodeHost");
+    var nodes = (current && current.nodes) || [];
     host.innerHTML = "";
     if (!nodes.length) {
-      host.appendChild(el("p", "muted", "这张地图还没有节点。去后台加，或者让 AI 助手帮你拆解。"));
+      var empty = el("div", "lm-empty");
+      empty.appendChild(el("span", "big", "🗺️"));
+      empty.appendChild(el("div", null, "这张地图还没有节点。"));
+      var tip = el("p", "muted", canEdit() ? "点上面的「＋ 加节点」开始拆解。" : "去后台加，或者让 AI 助手帮你拆解。");
+      empty.appendChild(tip);
+      host.appendChild(empty);
       return;
     }
+    var cmap = collapsed[current.id] || {};
     groupNodes(nodes).forEach(function (g) {
-      var sec = el("div", "lm-grp");
+      var sec = el("div", "lm-grp" + (cmap[g.name] ? " collapsed" : ""));
+      sec.dataset.g = g.name;
+
       var h = el("h3");
-      h.appendChild(el("span", null, g.name));
-      var doneN = g.nodes.filter(function (n) { return n.done; }).length;
-      h.appendChild(el("span", "gcnt", doneN + " / " + g.nodes.length));
+      h.appendChild(el("span", "caret", "▼"));
+      h.appendChild(el("span", "gname", g.name));
+      var done = g.nodes.filter(function (n) { return n.done; }).length;
+      h.appendChild(el("span", "gcnt", done + "/" + g.nodes.length));
+      var gb = el("div", "lm-bar slim gbar");
+      var gf = el("i");
+      gf.style.width = (g.nodes.length ? Math.round(done / g.nodes.length * 100) : 0) + "%";
+      gb.appendChild(gf);
+      h.appendChild(gb);
+      h.addEventListener("click", function () {
+        var cm = collapsed[current.id] || (collapsed[current.id] = {});
+        cm[g.name] = !cm[g.name];
+        sec.classList.toggle("collapsed", cm[g.name]);
+      });
       sec.appendChild(h);
-      g.nodes.forEach(function (n) { sec.appendChild(makeNode(n)); });
+
+      var body = el("div", "lm-body");
+      g.nodes.forEach(function (n) { body.appendChild(makeNode(n, g.name)); });
+      if (canEdit()) {
+        var add = el("div", "lm-add");
+        var ab = el("button", "lm-btn sm", "＋ 加到「" + g.name + "」");
+        ab.type = "button";
+        ab.addEventListener("click", function () { addNodeInline(g.name); });
+        add.appendChild(ab);
+        body.appendChild(add);
+      }
+      sec.appendChild(body);
       host.appendChild(sec);
     });
   }
 
+  function renderDetail(item, p) {
+    current = item.data ? Object.assign({ id: item.id, status: item.data.status }, item.data) : item;
+    if (!current.status) current.status = "active";
+    current.nodes = current.nodes || [];
+    progress = p || { done: 0, total: current.nodes.length, percent: 0 };
+    paintDetailHead(progress);
+    paintDetailTools();
+    rebuildNodes();
+  }
+
+  /* ================= 视图切换 ================= */
+
   function showList() {
+    current = null;
     $("viewDetail").style.display = "none";
     $("viewList").style.display = "";
     if (location.search) history.replaceState(null, "", location.pathname);
+    window.scrollTo(0, 0);
   }
 
   function openMap(id) {
-    api("/api/learn?id=" + encodeURIComponent(id))
+    return api("/api/learn?id=" + encodeURIComponent(id))
       .then(function (j) {
         $("viewList").style.display = "none";
         $("viewDetail").style.display = "";
         renderDetail(j.item, j.progress);
-        history.replaceState(null, "", "?id=" + encodeURIComponent(id));
+        try { history.replaceState(null, "", "?id=" + encodeURIComponent(id)); } catch (e) {}
         window.scrollTo(0, 0);
       })
-      .catch(function (e) { alert(e.message || "打不开这张地图"); });
+      .catch(function (e) { toast(e.message || "打不开这张地图", "err"); });
   }
 
-  $("btnBack").addEventListener("click", showList);
-
-  if (!window.fetch) return;
-  api("/api/learn")
-    .then(function (j) {
+  function loadList() {
+    return api("/api/learn").then(function (j) {
       maps = (j && j.items) || [];
       renderList();
+    });
+  }
+
+  /* ================= 新建 / 导入大纲 ================= */
+
+  function newMap() {
+    if (!canEdit()) { toast("请先在后台登录", "err"); return; }
+    var title = prompt("新地图叫什么？（比如：前端入门路线）", "");
+    if (title == null) return;
+    title = title.trim();
+    if (!title) return;
+    var desc = prompt("一句话说明学到哪（可空）", "") || "";
+    api("/api/learn", { method: "POST", body: { title: title, desc: desc.trim(), nodes: [] } })
+      .then(function (j) {
+        var id = j && j.item && j.item.id;
+        toast("已新建");
+        return loadList().then(function () { if (id) return openMap(id); });
+      })
+      .catch(function (e) { toast(e.message || "新建失败", "err"); });
+  }
+
+  /* 把缩进大纲 / Markdown 列表解析成 {group, text} 序列。
+     规则：
+       - `- xxx` / `* xxx` / `1. xxx` / `# xxx` 都能认，去掉标记取正文
+       - 缩进每深 1 级（2 空格或 1 个 Tab）→ 归到上一层文字命名的分组
+       - 顶层条目：写成「分组：说明」或「分组」+ 子项时，当成分组名
+       - 没缩进的纯文本行，作为「未分组」下的节点 */
+  function parseOutline(text) {
+    var lines = String(text || "").replace(/\r\n?/g, "\n").split("\n");
+    var out = [];          /* {group, text} */
+    var stack = [];        /* 每层的标题文字，用来当分组名 */
+    var lastTop = "";
+
+    lines.forEach(function (raw) {
+      if (!raw.trim()) return;
+      var indentMatch = raw.match(/^[\t ]*/)[0];
+      var depth = Math.floor(indentMatch.replace(/\t/g, "  ").length / 2);
+      var body = raw.trim().replace(/^([-*+]|\d+[.)])\s+/, "").replace(/^#{1,6}\s+/, "").trim();
+      if (!body) return;
+
+      /* 「名称：说明」在顶层时，左边当分组名 */
+      var colon = depth === 0 ? body.match(/^([^：:]{1,30})[：:]\s*(.+)$/) : null;
+
+      stack = stack.slice(0, depth);
+      if (colon) {
+        var gname = colon[1].trim();
+        stack[depth] = gname;
+        lastTop = gname;
+        out.push({ group: gname, text: colon[2].trim() });
+        return;
+      }
+      if (depth === 0) {
+        /* 顶层条目：先当分组名，同时自己也作为一个节点 */
+        stack[0] = body;
+        lastTop = body;
+        out.push({ group: "", text: body });
+        return;
+      }
+      /* 有缩进：归到上一层（或最近的顶层）名字下 */
+      var g = "";
+      for (var i = depth - 1; i >= 0; i--) { if (stack[i]) { g = stack[i]; break; } }
+      if (!g) g = lastTop;
+      out.push({ group: g, text: body });
+    });
+    return out;
+  }
+
+  /* 预览用：按分组归并 */
+  function previewGroups(items) {
+    var order = [], byg = {};
+    items.forEach(function (it) {
+      var g = it.group || "未分组";
+      if (!byg[g]) { byg[g] = []; order.push(g); }
+      byg[g].push(it.text);
+    });
+    return order.map(function (g) { return { name: g, items: byg[g] }; });
+  }
+
+  function openImport() {
+    if (!canEdit()) { toast("请先在后台登录", "err"); return; }
+    var modal = el("div", "lm-modal");
+    var box = el("div", "box");
+    box.appendChild(el("h3", null, "导入大纲 → 变成学习地图"));
+    var intro = el("p", "muted");
+    intro.style.fontSize = "13px";
+    intro.textContent = "把 Markdown 列表或缩进大纲粘进来，每行一个节点；缩进会用上一层文字当分组名。";
+    box.appendChild(intro);
+
+    var titleIn = el("input", "lm-input");
+    titleIn.type = "text";
+    titleIn.placeholder = "地图名字（比如：前端入门路线）";
+    titleIn.style.marginTop = "10px";
+    box.appendChild(titleIn);
+
+    var ta = document.createElement("textarea");
+    ta.placeholder = "例：\n基础\n    - HTML 标签\n    - CSS 选择器\n进阶：JavaScript\n    - 变量与作用域\n    - 异步 / Promise";
+    ta.style.marginTop = "10px";
+    box.appendChild(ta);
+
+    var pv = el("div", "lm-preview");
+    box.appendChild(pv);
+
+    function refreshPreview() {
+      var items = parseOutline(ta.value);
+      pv.innerHTML = "";
+      if (!items.length) return;
+      var stat = el("div", "muted", "解析出 " + items.length + " 个节点：");
+      stat.style.fontSize = "12.5px";
+      pv.appendChild(stat);
+      previewGroups(items).forEach(function (g) {
+        var d = el("div", "pv-grp");
+        d.appendChild(el("b", null, g.name + "（" + g.items.length + "）"));
+        var ul = el("ul");
+        g.items.slice(0, 6).forEach(function (t) { ul.appendChild(el("li", null, t)); });
+        if (g.items.length > 6) ul.appendChild(el("li", null, "…还有 " + (g.items.length - 6) + " 个"));
+        d.appendChild(ul);
+        pv.appendChild(d);
+      });
+    }
+    ta.addEventListener("input", refreshPreview);
+
+    var acts = el("div", "acts");
+    var cancel = el("button", "lm-btn", "取消");
+    cancel.type = "button";
+    cancel.addEventListener("click", function () { modal.remove(); });
+    var ok = el("button", "lm-btn primary", "导入");
+    ok.type = "button";
+    ok.addEventListener("click", function () {
+      var title = titleIn.value.trim();
+      var items = parseOutline(ta.value);
+      if (!title) { titleIn.focus(); return; }
+      if (!items.length) { ta.focus(); return; }
+      var nodes = items.map(function (it, i) {
+        return { id: "n" + (i + 1), text: it.text.slice(0, 200), group: it.group || "" };
+      });
+      ok.disabled = true;
+      ok.textContent = "导入中…";
+      api("/api/learn", { method: "POST", body: { title: title, desc: "由大纲导入", nodes: nodes } })
+        .then(function (j) {
+          modal.remove();
+          var id = j && j.item && j.item.id;
+          toast("已导入 " + nodes.length + " 个节点");
+          return loadList().then(function () { if (id) return openMap(id); });
+        })
+        .catch(function (e) { ok.disabled = false; ok.textContent = "导入"; toast(e.message || "导入失败", "err"); });
+    });
+    acts.appendChild(cancel); acts.appendChild(ok);
+    box.appendChild(acts);
+
+    modal.appendChild(box);
+    modal.addEventListener("click", function (ev) { if (ev.target === modal) modal.remove(); });
+    document.body.appendChild(modal);
+    titleIn.focus();
+  }
+
+  /* ================= 绑定 & 启动 ================= */
+
+  var fi = $("filterInput");
+  if (fi) fi.addEventListener("input", function () { filterText = fi.value.trim(); renderList(); });
+  var br = $("btnBack");
+  if (br) br.addEventListener("click", showList);
+  var bn = $("btnNew");
+  if (bn) bn.addEventListener("click", newMap);
+  var bi = $("btnImport");
+  if (bi) bi.addEventListener("click", openImport);
+  var bref = $("btnRefresh");
+  if (bref) bref.addEventListener("click", function () {
+    loadList().then(function () { toast("已刷新"); }).catch(function (e) { toast(e.message, "err"); });
+  });
+  window.addEventListener("popstate", function () {
+    var id = new URLSearchParams(location.search).get("id");
+    if (id) openMap(id); else showList();
+  });
+
+  if (!canEdit()) {
+    var ln = $("lockNote");
+    if (ln) ln.classList.remove("hide");
+  }
+
+  if (!window.fetch) return;
+  loadList()
+    .then(function () {
       var id = new URLSearchParams(location.search).get("id");
-      if (id) openMap(id);
+      if (id) return openMap(id);
     })
     .catch(function () { /* 接口挂了：保持静态空状态，不白屏 */ });
 })();

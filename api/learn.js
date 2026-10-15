@@ -12,12 +12,15 @@
      - 读进度（完成数 / 总数 / 还差哪些）
      - 查漏补缺（哪些分组里还有没完成的节点）
 
-   鉴权：复用后台同一套令牌（Authorization: Bearer <token>）。
-        先 POST /api/auth 用密码换 token，再带着 token 调这里。
+   鉴权：接受两种令牌（都放 Authorization: Bearer <token>）——
+         ① 后台登录令牌（POST /api/auth 用密码换，30 天）；
+         ② AI 专用长效令牌（后台「一键接上 AI」生成，365 天，可一键吊销）。
+         两者由 /api/_lib/token.js 用不同密钥签名，互不通用；吊销 AI 令牌不影响后台登录。
 
    方法一览（除 GET 外都需要登录）：
      GET    /api/learn                      列全部地图（含进度概览）
      GET    /api/learn?id=123               读一张地图（含节点 + 进度明细）
+     GET    /api/learn?gaps=1               查漏补缺快照（AI 不用自己算）
      POST   /api/learn                      新建地图 { title, desc?, nodes? }
      PATCH  /api/learn                      改地图信息 { id, title?, desc?, status? }
      DELETE /api/learn?id=123               删整张地图
@@ -28,8 +31,8 @@
      POST   /api/learn?action=setNodes      整表替换 { id, nodes:[…] }
    =========================================================================== */
 
-import { db, ensureSchema } from './_lib/db.js';
-import { requireAuth } from './_lib/token.js';
+import { db, ensureSchema, getMeta } from './_lib/db.js';
+import { requireAny } from './_lib/token.js';
 import { ok, send, fail, readJson, needId } from './_lib/http.js';
 import { normalize } from './_lib/content.js';
 
@@ -89,6 +92,68 @@ function brief(row) {
   };
 }
 
+/* ---------------- 查漏补缺（?gaps=1） ----------------
+   AI 最想要的能力：不想自己一遍遍读节点、算哪组落后。这里一次性把「哪里漏了」
+   整理成结论给它：
+     - 未分组/分组统计，标出每组还差几个、拖了多久没动
+     - 「停滞」的分组：这一组最后一个完成的节点时间距今最久，或从来没完成过
+     - 建议下一步：先补哪个分组的哪几个节点
+   时间用 updated_at（整张地图的更新时间）当粗粒度依据——节点本身不记时间戳，
+   想要精确到节点得改数据结构，对个人站没必要。 */
+function gapReport(row) {
+  const s = shape(row);
+  const d = s.data;
+  const nodes = Array.isArray(d.nodes) ? d.nodes : [];
+  const p = progressOf(d);
+
+  const groups = p.groups.map(function (g) {
+    const left = nodes.filter(function (n) {
+      return ((n && n.group) || '未分组') === g.name && !(n && n.done);
+    }).map(function (n) { return { id: n.id, text: n.text, note: n.note || '' }; });
+    return {
+      name: g.name,
+      total: g.total,
+      done: g.done,
+      left: left.length,
+      percent: g.total ? Math.round((g.done / g.total) * 100) : 0,
+      /* 全组没勾过 → 明显是还没开始；部分没勾 → 进行中；全勾完 → 完成 */
+      state: g.done === 0 ? 'not_started' : (g.done >= g.total ? 'done' : 'in_progress'),
+      pending: left,
+    };
+  });
+
+  /* 从没开始的组排前面（最该补），然后是按完成度低的排 */
+  const ranking = groups.slice().sort(function (a, b) {
+    if (a.state === 'not_started' && b.state !== 'not_started') return -1;
+    if (b.state === 'not_started' && a.state !== 'not_started') return 1;
+    return a.percent - b.percent;
+  });
+
+  const untouched = groups.filter(function (g) { return g.state === 'not_started'; });
+  const stalled = groups.filter(function (g) { return g.state === 'in_progress'; });
+
+  /* 建议：先补「从没开始的组」里的前几个节点，没有就补进度最低的在学组 */
+  const suggest = [];
+  ranking.forEach(function (g) {
+    if (suggest.length >= 5) return;
+    g.pending.slice(0, Math.max(0, 5 - suggest.length)).forEach(function (n) {
+      suggest.push({ group: g.name, nodeId: n.id, text: n.text, reason: g.state === 'not_started' ? '这组还没开始' : '这组落后了' });
+    });
+  });
+
+  return {
+    mapId: s.id,
+    title: d.title || '',
+    status: d.status || 'active',
+    updated_at: s.updated_at,
+    progress: { total: p.total, done: p.done, left: p.left, percent: p.percent },
+    untouchedGroups: untouched.map(function (g) { return g.name; }),
+    stalledGroups: stalled.map(function (g) { return g.name; }),
+    groups: ranking,
+    suggest: suggest,
+  };
+}
+
 /* 读一张地图，找不到就抛 404 */
 async function loadMap(sql, id) {
   const rows = await sql`SELECT * FROM content WHERE id = ${id} AND type = ${TYPE}`;
@@ -144,6 +209,28 @@ export default async function handler(req, res) {
 
     /* ---------------- 只读：公开（前台页面要读） ---------------- */
     if (req.method === 'GET') {
+      /* 查漏补缺快照：一次性把「哪里漏了」整理好，AI 不用自己算。
+         可以整体看（不带 id → 所有地图），也可以只看一张（?id=123&gaps=1）。 */
+      if (String(q.gaps || '') === '1') {
+        if (q.id) {
+          const row = await loadMap(sql, needId(q.id));
+          return ok(res, { ok: true, gap: gapReport(row) });
+        }
+        const all = await sql`
+          SELECT * FROM content WHERE type = ${TYPE} ORDER BY sort_order ASC, id ASC`;
+        const maps = all.map(gapReport).filter(function (g) {
+          return g.status !== 'archived';   /* 归档的不用补 */
+        });
+        /* 总体摘要：哪张地图最该先补 */
+        const totalLeft = maps.reduce(function (s, m) { return s + m.progress.left; }, 0);
+        const needFirst = maps.filter(function (m) { return m.progress.left > 0; })
+          .sort(function (a, b) { return a.progress.percent - b.progress.percent })
+          .map(function (m) {
+            return { mapId: m.mapId, title: m.title, percent: m.progress.percent,
+                     left: m.progress.left, untouched: m.untouchedGroups };
+          });
+        return ok(res, { ok: true, totalLeft: totalLeft, maps: maps, needFirst: needFirst });
+      }
       if (q.id) {
         const row = await loadMap(sql, needId(q.id));
         const s = shape(row);
@@ -155,8 +242,10 @@ export default async function handler(req, res) {
       return ok(res, { ok: true, items: items });
     }
 
-    /* ---------------- 以下都需要登录 ---------------- */
-    requireAuth(req);
+    /* ---------------- 以下都需要登录 ----------------
+       接受后台登录令牌或 AI 长效令牌；AI 令牌要世代对得上（被吊销过就不认）。 */
+    const epoch = await getMeta('ai_epoch', '0');
+    requireAny(req, Number.isFinite(Number(epoch)) ? Number(epoch) : 0);
 
     if (req.method === 'POST') {
       const b = await readJson(req);
