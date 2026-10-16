@@ -121,6 +121,42 @@ console.log('\n=== 评分处理（越界不能瞎猜） ===');
   check('非数字 → 丢掉', r.items[3].score === '', '[' + r.items[3].score + ']');
 }
 
+console.log('\n=== 总集数 / 进度列（M13）===');
+{
+  check('ContentAdmin 暴露了 normCount', typeof CA.normCount === 'function');
+
+  const tsv = '名称\t总集数\t进度\n葬送的芙莉莲\t28\t12\n迷宫饭\t\t3';
+  const r = CA.parseImport(tsv);
+  check('TSV：识别「总集数 / 进度」表头', r.hasHead === true && r.items.length === 2, String(r.items.length));
+  check('TSV：总集数 / 进度各自归位',
+    r.items[0].episodes === '28' && r.items[0].progress === '12',
+    r.items[0].episodes + '/' + r.items[0].progress);
+  check('TSV：总集数留空不报错', r.items[1].episodes === '', '[' + r.items[1].episodes + ']');
+  check('TSV：只有进度也能读', r.items[1].progress === '3', r.items[1].progress);
+
+  const alias = CA.parseImport('名称\t集数\t看到\nA\t24 话\t第 5 集');
+  check('别名「集数 / 看到」也认，且从文字里抠数字',
+    alias.items[0].episodes === '24' && alias.items[0].progress === '5',
+    alias.items[0].episodes + '/' + alias.items[0].progress);
+
+  const en = CA.parseImport('name\tepisodes\tprogress\nB\t12\t4');
+  check('英文表头 episodes / progress 也认',
+    en.items[0].episodes === '12' && en.items[0].progress === '4',
+    en.items[0].episodes + '/' + en.items[0].progress);
+
+  const js = CA.parseImport(JSON.stringify([{ name: 'C', episodes: 26, progress: 7 }]));
+  check('JSON 里的 episodes / progress 保留',
+    js.items[0].episodes === '26' && js.items[0].progress === '7',
+    js.items[0].episodes + '/' + js.items[0].progress);
+
+  /* normCount：抠不到数字宁可留空，也不瞎猜 */
+  check('normCount 抠「第 12 集」→ 12', CA.normCount('第 12 集') === '12', CA.normCount('第 12 集'));
+  check('normCount 抠「28 话」→ 28', CA.normCount('28 话') === '28', CA.normCount('28 话'));
+  check('normCount 纯数字原样', CA.normCount('7') === '7', CA.normCount('7'));
+  check('normCount 没数字 → 空', CA.normCount('不知道') === '', '[' + CA.normCount('不知道') + ']');
+  check('normCount 空 → 空', CA.normCount('') === '' && CA.normCount(null) === '');
+}
+
 console.log('\n=== 脏数据 ===');
 {
   const r = CA.parseImport('名称\t状态\n\t在看\n好的\t看完');

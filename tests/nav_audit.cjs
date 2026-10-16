@@ -178,7 +178,7 @@ console.log('\n=== 与站点其它页的一致性 ===');
   check('本页没有重复定义 .navbar 样式（交给 style.css）', !/\.navbar\s*\{/.test(html));
 
   check('主题色与全站一致（#2563eb）', html.includes('#2563eb'));
-  check('页面标题正确', /<title>网址导航 · Eraser 小站<\/title>/.test(html));
+  check('页面标题正确', /<title>网址导航 · Eraser 的小站<\/title>/.test(html));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

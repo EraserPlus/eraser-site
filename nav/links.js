@@ -1,5 +1,5 @@
 /* ===========================================================================
-   Eraser 小站 · 网址导航数据
+   Eraser 的小站 · 网址导航数据
    ===========================================================================
 
    怎么加链接：
@@ -116,7 +116,7 @@ window.NAV_DATA = {
       id: "mine",
       name: "我的",
       links: [
-        { name: "Eraser 小站", url: "https://eraser.de5.net", desc: "本站首页", tags: ["我的"] },
+        { name: "Eraser 的小站", url: "https://eraser.de5.net", desc: "本站首页", tags: ["我的"] },
         { name: "站点仓库", url: "https://github.com/EraserPlus/eraser-site", desc: "改站就来这", tags: ["我的", "代码"] }
       ]
     }

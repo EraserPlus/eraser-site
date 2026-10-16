@@ -66,6 +66,26 @@ for (const f of PAGES) {
   check(`${f} 标了当前页 active`, /class="active"/.test(html));
 }
 
+console.log('\n=== 无障碍 / 分享 / 品牌一致性（M13）===');
+for (const f of PAGES) {
+  const html = read(f);
+  check(`${f} 有 <main id="main"> 地标`, /<main[^>]*id="main"/.test(html));
+  check(`${f} 有跳过导航的链接`, /<a class="skip-link" href="#main">/.test(html));
+  check(`${f} 有 meta description`, /<meta name="description" content="[^"]{10,}"/.test(html));
+  check(`${f} 有 og 分享卡片`,
+        /property="og:title"/.test(html) && /property="og:image"/.test(html) &&
+        /property="og:url" content="https:\/\/eraser\.de5\.net\//.test(html));
+  check(`${f} 标题用统一品牌名「Eraser 的小站」`,
+        /<title>[^<]*Eraser 的小站<\/title>/.test(html));
+  check(`${f} 标题分隔符统一为 ·`, /<title>[^<]* · Eraser 的小站<\/title>/.test(html));
+}
+check('skip-link 样式在 style.css 里', /\.skip-link\s*\{/.test(read('style.css')));
+check('sw.js 缓存版本号已升级到 v2', /VERSION = 'eraser-v2'/.test(read('sw.js')));
+check('孤儿页 files/ 已删除（T10 已下架）',
+      !fs.existsSync(path.join(REPO, 'files/index.html')));
+check('全站不再出现「Eraser 小站」这种少一个「的」的写法',
+      PAGES.every(f => !/Eraser 小站/.test(read(f))));
+
 console.log('\n=== 静态兜底：接口挂了也不能白屏 ===');
 {
   const cases = [
@@ -230,6 +250,25 @@ console.log('\n=== 追更页 ===');
   check('提交走需登录的 content 接口并带令牌', /Authorization: "Bearer " \+ t/.test(html) && /apiPost\("content"/.test(html));
   check('前台也能按名字补全（调按名字查接口）', /\/api\/content\?action=lookup&q=/.test(html));
   check('快速添加也做了转义（不拼 innerHTML）', !/innerHTML\s*=\s*[^"';]*(name|note|cover)/.test(html));
+
+  /* --- 追更进度（M13）：看到第几集 + 一键 ＋1 --- */
+  check('有进度解析函数 progressOf', /function progressOf/.test(html));
+  check('进度条样式（.mg-prog / .track i）', /\.mg-prog \.track i/.test(html));
+  check('有总集数才画进度条，否则只显示文字',
+        /if \(pg\.pct != null\)/.test(html) && /text: "共 " \+ tot \+ " 话"/.test(html));
+  check('「＋1 话」只在登录后且状态是在看时出现',
+        /if \(canEdit && d\.status === "watching"\)/.test(html) && /classList\.add\("has-plus"\)/.test(html));
+  check('＋1 走 PATCH 且带后台令牌',
+        /method: "PATCH"/.test(html) && /data: \{ progress: next \}/.test(html) &&
+        /Authorization: "Bearer " \+ getToken\(\)/.test(html));
+  check('＋1 成功后就地改数据重画（不整页刷新）',
+        /d\.progress = next;/.test(html) && /apply\(allItems\);/.test(html));
+  check('卡片是 <div> 容器 + 覆盖式链接层（button 不能嵌在 a 里）',
+        /el\("div", "mg-item"\)/.test(html) && /"mg-hit"/.test(html));
+  check('＋1 按钮压在链接层之上（否则点不到）',
+        /\.mg-plus \{[\s\S]{0,200}?z-index: 4/.test(html));
+  check('快速添加表单也能填总集数 / 进度', /epInput/.test(html) && /pgInput/.test(html));
+  check('按名字补全会带出总集数', /if \(hit\.episodes != null\) epInput\.value/.test(html));
 }
 
 console.log('\n=== 学习地图页 ===');

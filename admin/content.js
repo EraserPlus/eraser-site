@@ -57,7 +57,9 @@
             ["paused", "搁置（弃坑 / 缓一缓）"]
         ] },
         { k: "score", l: "评分（可空，0-10）", t: "text", ph: "比如：9.0 或 8.5，留空不显示" },
-        { k: "note", l: "备注（可空）", t: "text", ph: "一句话，比如：周五更新 · 看到第 8 话" },
+        { k: "episodes", l: "总集数（可空）", t: "text", ph: "比如：28。「按名字自动填充」会帮你填" },
+        { k: "progress", l: "看到第几集（可空）", t: "text", ph: "比如：12。填了才显示进度条" },
+        { k: "note", l: "备注（可空）", t: "text", ph: "一句话，比如：周五更新 · B站有删减" },
         { k: "date", l: "日期（可空）", t: "text", ph: "比如：2026-10-14" },
         { k: "url", l: "链接（可空）", t: "text", ph: "https://…（豆瓣 / B站 / bgm 页面）" },
         { k: "cover", l: "封面图链接（可空）", t: "text", ph: "https://…图片地址，留空则只显示文字" }
@@ -378,6 +380,15 @@
     return "";
   }
 
+  /* 集数 / 进度这类数字：从「28 话」「第 12 集」「12」里抠出数字。
+     抠不到就留空——宁可让用户自己补，也不瞎猜一个数出来。 */
+  function normCount(v) {
+    var s = String(v == null ? "" : v).trim();
+    if (!s) return "";
+    var mm = s.match(/\d+/);
+    return mm ? String(Number(mm[0])) : "";
+  }
+
   /* 一行文本按分隔符切成格子。支持 Tab / 逗号（中英） / 竖线 / 多个空格 */
   function splitRow(line) {
     if (line.indexOf("\t") >= 0) return line.split("\t").map(function (x) { return x.trim(); });
@@ -392,6 +403,8 @@
     category: ["栏目", "分类", "类型", "category", "type", "kind"],
     status: ["状态", "status"],
     score: ["评分", "分数", "打分", "score", "rating"],
+    episodes: ["总集数", "集数", "话数", "总话数", "episodes", "eps", "total"],
+    progress: ["进度", "看到", "看到第几集", "已看", "progress", "current"],
     note: ["备注", "说明", "note", "remark", "desc"],
     date: ["日期", "时间", "date"],
     url: ["链接", "网址", "地址", "url", "link"],
@@ -447,6 +460,8 @@
         name: name,
         status: normStatus(o.status) || "watching",
         score: "",
+        episodes: normCount(o.episodes),
+        progress: normCount(o.progress),
         note: String(o.note == null ? "" : o.note).trim(),
         date: String(o.date == null ? "" : o.date).trim(),
         url: String(o.url == null ? "" : o.url).trim(),
@@ -478,6 +493,8 @@
         name: String(d.name == null ? "" : d.name).trim(),
         status: normStatus(d.status) || "watching",
         score: (d.score == null || d.score === "") ? "" : String(d.score),
+        episodes: normCount(d.episodes),
+        progress: normCount(d.progress),
         note: String(d.note == null ? "" : d.note).trim(),
         date: String(d.date == null ? "" : d.date).trim(),
         url: String(d.url == null ? "" : d.url).trim(),
@@ -860,6 +877,14 @@
     var sub = el("div", "sub");
     sub.appendChild(el("span", "pill", mediaCatLabel(d.category)));
     if (d.score != null && d.score !== "") sub.appendChild(el("span", "pill", d.score + " 分"));
+    /* 进度：两个都有就 12 / 28，只有一个就按有的那个显示 */
+    if (d.progress != null && d.progress !== "" && d.episodes != null && d.episodes !== "") {
+      sub.appendChild(el("span", "pill", d.progress + " / " + d.episodes + " 话"));
+    } else if (d.episodes != null && d.episodes !== "") {
+      sub.appendChild(el("span", "pill", "共 " + d.episodes + " 话"));
+    } else if (d.progress != null && d.progress !== "") {
+      sub.appendChild(el("span", "pill", "看到 " + d.progress + " 话"));
+    }
     if (d.date) sub.appendChild(el("span", "pill", d.date));
     if (d.url) {
       var a = document.createElement("a");
@@ -889,6 +914,18 @@
     row.appendChild(main);
 
     var o = el("div", "ops");
+    /* 一键 +1 话：追更最高频的动作，不用开表单。只在「在看」时出现 */
+    if (d.status === "watching") {
+      var e0 = el("button", null, "＋1");
+      e0.title = "看到下一话（进度 +1）";
+      e0.addEventListener("click", function () {
+        var next = Number(d.progress || 0) + 1;
+        update(it.id, { progress: next }, function () {
+          return reload("media").then(function () { say("app", "进度 → 第 " + next + " 话"); refresh(); });
+        });
+      });
+      o.appendChild(e0);
+    }
     var e1 = el("button", null, "✎");
     e1.title = "编辑";
     e1.addEventListener("click", function () { editItem("media", it, hostId, mediaListOpts(hostId)); });
@@ -1032,6 +1069,10 @@
         line.appendChild(c);
         line.appendChild(s);
         if (it.score) line.appendChild(el("span", "pill", it.score + " 分"));
+        /* 进度：两个都有就显示 12 / 28，只有一个就按有的那个显示 */
+        if (it.progress && it.episodes) line.appendChild(el("span", "pill", it.progress + " / " + it.episodes + " 话"));
+        else if (it.episodes) line.appendChild(el("span", "pill", "共 " + it.episodes + " 话"));
+        else if (it.progress) line.appendChild(el("span", "pill", "看到 " + it.progress + " 话"));
         t.appendChild(line);
       });
       if (parsed.items.length > 30) {
@@ -1136,6 +1177,7 @@
                 name: r.name,
                 status: "watching",
                 score: r.score == null ? "" : String(r.score),
+                episodes: r.episodes == null ? "" : String(r.episodes),
                 note: r.note || "",
                 date: "",
                 url: r.url || "",
@@ -1617,5 +1659,6 @@
     parseJsonItems: parseJsonItems,
     normCategory: normCategory,
     normStatus: normStatus,
+    normCount: normCount,
   };
 })(window);

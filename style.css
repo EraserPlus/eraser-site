@@ -34,6 +34,15 @@ a:hover { text-decoration: underline; }
 .navbar nav a { margin-right: 16px; color: var(--ink3); font-size: 15px; }
 .navbar nav a.active { color: var(--blue); font-weight: 600; }
 
+/* 无障碍：键盘用户跳过导航直达正文。平时移出视口（不占位、不被读屏重复念），
+   按 Tab 聚焦时才滑出来。目标是各页 <main id="main"> */
+.skip-link {
+  position: absolute; left: -9999px; top: 0; z-index: 300;
+  background: var(--blue); color: #fff; padding: 9px 16px;
+  border-radius: 0 0 9px 0; font-size: 14px; text-decoration: none;
+}
+.skip-link:focus { left: 0; color: #fff; text-decoration: none; outline: 2px solid var(--card); outline-offset: -4px; }
+
 .container { max-width: 880px; margin: 40px auto; padding: 0 20px; }
 h1 { font-size: 26px; margin-bottom: 8px; }
 h2 { font-size: 20px; margin: 32px 0 12px; }

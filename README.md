@@ -19,6 +19,7 @@ eraser-site/
 ├── sw.js                 Service Worker（HTML 网络优先带缓存兜底、静态资源缓存优先、接口不缓存、离线兜底页）
 ├── manifest.webmanifest  PWA 清单（可「添加到主屏幕」）
 ├── icon.svg              站点图标（可选作 maskable 的版本见 icon-maskable.svg）
+├── og.png                分享卡片图（1200×630，各公开页的 og:image 指向它）
 ├── robots.txt            爬虫规则（屏蔽 /admin/ /dev/ /api/）+ 指向 sitemap
 ├── vercel.json           响应头配置 + /sitemap.xml 重写到 api/sitemap：/api/ 不缓存，静态资源缓存 1 小时 + 安全头
 ├── .gitattributes        锁死 LF 行尾，杜绝 Windows CRLF 污染 diff
@@ -30,7 +31,7 @@ eraser-site/
 │   ├── auth.js           POST 登录换令牌 / GET 配置自检
 │   ├── todos.js          待办 CRUD（全部需登录，私人数据）
 │   ├── events.js         日程 CRUD（全部需登录，私人数据）
-│   ├── content.js        全站内容 CRUD（读公开，写需登录）
+│   ├── content.js        全站内容 CRUD（读公开，写需登录；?batch=1 批量导入、?action=lookup 按名字查 AniList）
 │   ├── learn.js          学习地图（GET 公开；写需后台或 AI 令牌；?gaps=1 查漏补缺快照；节点粒度 action）
 │   ├── ai.js             给外部 AI 的接入信息与长效令牌（全部需后台令牌；AI 令牌不能管理自己）
 │   ├── backup.js         全量备份 / 校验 / 按 id 合并还原（需登录；永不 DELETE）
@@ -55,12 +56,12 @@ eraser-site/
 │
 ├── tests/                十套测试 + 测试用假数据库驱动
 │   ├── api_test.mjs      令牌/密码/入参校验/favicon SSRF 与魔数识别/后台令牌与 AI 令牌互不通用（182 项）
-│   ├── content_test.mjs  七种内容类型归一化（含追更、学习地图）/ Markdown 渲染与安全（158 项）
-│   ├── api_routes_test.mjs 接口全流程：鉴权/CRUD/注入/限流/PATCH 合并语义/RSS/上传/favicon/追更/学习地图 gaps/sitemap/备份/批量导入（409 项）
-│   ├── pages_audit.mjs   8 个公开页面（含追更/交接页）：结构/零站外资源/静态兜底/注入防护/PWA/前台快捷录入（299 项）
-│   ├── admin_audit.mjs   管理后台：主题/隐私/接口/安全/功能点/接上 AI 面板/批量导入与自动填充（211 项）
+│   ├── content_test.mjs  七种内容类型归一化（含追更、学习地图）/ Markdown 渲染与安全（169 项）
+│   ├── api_routes_test.mjs 接口全流程：鉴权/CRUD/注入/限流/PATCH 合并语义/RSS/上传/favicon/追更/学习地图 gaps/sitemap/备份/批量导入（414 项）
+│   ├── pages_audit.mjs   8 个公开页面（含追更/交接页）：结构/零站外资源/静态兜底/注入防护/PWA/前台快捷录入（361 项）
+│   ├── admin_audit.mjs   管理后台：主题/隐私/接口/安全/功能点/接上 AI 面板/批量导入与自动填充（217 项）
 │   ├── outline_check.mjs 大纲解析（从 learn 页抽函数跑）：Markdown 标记/缩进/Tab/CRLF/坏输入（11 项）
-│   ├── media_import_test.mjs  批量导入解析：TSV/JSON/中英表头/无表头/管道分隔/评分越界/坏 JSON（33 项）
+│   ├── media_import_test.mjs  批量导入解析：TSV/JSON/中英表头/无表头/管道分隔/评分越界/坏 JSON（46 项）
 │   ├── lookup_test.mjs   AniList 查询纯逻辑：入参/关键词进 variables/打分换算/episodes 回落 chapters/结果整形（38 项）
 │   ├── nav_test.cjs      导航页核心逻辑：数据体检/查询/视图/最近访问/高亮/导入导出（145 项）
 │   ├── nav_audit.cjs     导航页静态审计：结构/零外部请求/DOM 接线/功能点（84 项）
@@ -133,7 +134,7 @@ eraser-site/
 npm test
 ```
 
-一条命令按顺序跑完十套测试，共 **1570 项**，全部通过即说明站点核心逻辑健康。
+一条命令按顺序跑完十套测试，共 **1667 项**，全部通过即说明站点核心逻辑健康。
 
 - **不需要真数据库 / 真 Blob**：`tests/stubs/` 里有手写的假 Neon 驱动（全局 `__FAKE_DB__` 预设 SQL 返回值）和假 @vercel/blob 驱动（全局 `__FAKE_BLOB__` 预设 put 返回值），只验证逻辑不连外部服务。
 - CI 里也是同一套路：`npm ci` 装回真包后，用假驱动覆盖 `node_modules/@neondatabase/serverless`，再 `npm test`。
@@ -310,6 +311,48 @@ body: { items: [ {type:"media", data:{...}}, ... ] }     一次最多 500 条
 
 ---
 
+## 五之五、追更进度 + 门面收尾（M13）
+
+起因：站长说「继续寻找可能存在的优化点并优化」。整站扫了一遍，挑出四条一起做。
+
+### 1. 追更进度（看到第几集）
+
+`media` 类型新增两个**可空非负整数**字段，校验在 `api/_lib/content.js` 的 `count()`（上限 100000）：
+
+| 字段 | 含义 | 来源 |
+| --- | --- | --- |
+| `episodes` | 总集数 | 「按名字自动填充」从 AniList 带出来，也可手填 |
+| `progress` | 看到第几集 | 前台「＋1 话」或手填 |
+
+海报墙的显示规则（`collect/index.html` 的 `progressOf()`）：两个都有 → 进度条 + `12 / 28`；只有总集数 → `共 28 话`；只有进度 → `看到 12 话`（连载中不知道总数是常态，不硬凑）。
+
+**「＋1 话」按钮**：登录后（认 `eraser.admin.token`）、且状态是「在看」时，卡片右下角出现一个小圆钮，点一下走 `PATCH /api/content {id, data:{progress: n+1}}`，成功后就地重画整面墙。后台列表行里也有同样的 ＋1。
+
+> ⚠️ 卡片原本是 `<a>`，现在改成 `<div>` + 一层覆盖式 `<a class="mg-hit">`——**`<button>` 不允许嵌在 `<a>` 里**。按钮 `z-index: 4` 压在链接层（`z-index: 3`）之上才点得到。
+
+**PATCH 是「先合并再归一化」**（`Object.assign({}, row.data, patch)` 之后再 `normalize`），所以只传 `{progress: 13}` 不会把 `episodes` 冲掉。回归测试专门钉了这条。
+
+批量导入新增可识别的列名：`总集数 / 集数 / 话数 / episodes / eps / total` 与 `进度 / 看到 / progress / current`，能从「28 话」「第 12 集」里抠出数字（抠不到就留空，不瞎猜）。
+
+### 2. 全站 meta / 分享卡片
+
+8 个公开页都补了 `meta description` + `og:*` + `twitter:card`，图片统一指向仓库根的 `og.png`（1200×630）。想换图直接改它——**它没有源文件**，是当时用无头 Chrome 截一张临时 HTML 出来的；重做请保持 1200×630，否则微信 / Telegram 会裁切。
+
+### 3. 无障碍
+
+公开页 + 交接页的内容容器由 `<div class="container">` 改为 `<main class="container" id="main">`，并在 `<body>` 后加「跳到正文」链接（样式见 `style.css` 的 `.skip-link`：平时 `left:-9999px`，聚焦才滑出）。
+
+### 4. 一致性收尾
+
+- 品牌名统一为 **`Eraser 的小站`**（原来 index / nav / admin 少一个「的」）；
+- 标题分隔符统一为 **`·`**（早期页用的 `-` 全改掉）；
+- **删掉孤儿页 `/files/`**：T10 就下架了，页面却一直留着——站内零链接、不在 sitemap、导航栏还是旧结构、缺防闪主题脚本与 `shell.js`、还教人去点一个已经不存在的「文件」标签；
+- `sw.js` 缓存版本号 `eraser-v1 → v2`：M11/M12/M13 都动过 `style.css` 和页面，文件注释本来就要求 +1，之前一直没升（后果是老访客会先看到一次旧 CSS）。
+
+> ⚠️ **`.gitattributes` 挡不住 CRLF**：里面的 `* text=auto eol=lf` **只管 `git add`**，而 `dev/push-branch.sh` 走 GitHub API 直接建 blob，完全绕过 git 的行尾规范化。推送前请逐文件查（用 Python 数 `b'\r'` 字节，别信 `grep -c $'\r'`——Git Bash 里那个转义会给出虚高的数）。
+
+---
+
 ## 五之三、加一个新工具（工具箱预留接口）
 
 工具箱页面（`tools/index.html`）是**数据驱动**的：页面里的 `TOOLS` 数组就是唯一清单。上架一个新工具只要两步：
@@ -333,16 +376,16 @@ T12 起密码生成器已下架（主人预留位置回头补内容），数组�
 | 套件 | 覆盖 | 项数 |
 | --- | --- | --- |
 | `tests/api_test.mjs` | 令牌签发/校验/过期/改密码失效、密码校验、safeEqual、requireAuth、后台令牌与 AI 令牌互不通用、配置自检、入参校验、favicon SSRF 防护与图片魔数识别、api/ 与 admin/ 源文件语法 | 182 |
-| `tests/content_test.mjs` | 七种内容类型归一化（含追更 media、学习地图 learn_map）、Markdown 渲染 / 图片 / 安全性 / 边界、plain() 摘要 | 158 |
-| `tests/api_routes_test.mjs` | 接口全流程：未登录 401、CRUD、入参 400、404、405、优先级、SQL 注入、登录限流、缺配置 503、409 唯一性、级联删除、响应头、PATCH 合并语义、RSS 订阅源、文件上传、favicon 代理、追更、学习地图（节点粒度 action / 深链 / gaps 快照）、sitemap.xml、备份与还原、**批量导入（预校验零写入 / 上限 500 / 批内去重 / 个别失败）**、**按名字查（AniList 打桩全流程，挂在 /api/content 上）** | 409 |
-| `tests/pages_audit.mjs` | 8 个公开页面（含追更海报墙/学习地图/开发交接页）：内联脚本语法、零站外资源、同源 fetch、导航栏统一、静态兜底、Markdown 安全、PWA（manifest/图标/sw 策略）、各页功能点、**追更页「＋ 快速添加」（认令牌/静默隐藏/DOM 拼装）、交接页批次与套数同步** | 299 |
-| `tests/admin_audit.mjs` | 后台：结构、深浅色主题、隐私（noindex/零站外资源）、Bearer 令牌、XSS 防护、九个标签功能点（含追更表单、学习地图节点编辑、一键接上 AI、备份还原）、**追更列表搜索/筛选/排序、行内改状态、封面缩略图回落、批量导入弹层与失败上报、按名字自动填充**、Markdown 实时预览与草稿自动保存 | 211 |
+| `tests/content_test.mjs` | 七种内容类型归一化（含追更 media 的**进度字段与合并语义**、学习地图 learn_map）、Markdown 渲染 / 图片 / 安全性 / 边界、plain() 摘要 | 169 |
+| `tests/api_routes_test.mjs` | 接口全流程：未登录 401、CRUD、入参 400、404、405、优先级、SQL 注入、登录限流、缺配置 503、409 唯一性、级联删除、响应头、PATCH 合并语义、RSS 订阅源、文件上传、favicon 代理、追更、学习地图（节点粒度 action / 深链 / gaps 快照）、sitemap.xml、备份与还原、**批量导入（预校验零写入 / 上限 500 / 批内去重 / 个别失败 / 进度字段校验）**、**按名字查（AniList 打桩全流程，挂在 /api/content 上）**、**PATCH 只改进度不丢总集数** | 414 |
+| `tests/pages_audit.mjs` | 8 个公开页面（含追更海报墙/学习地图/开发交接页）：内联脚本语法、零站外资源、同源 fetch、导航栏统一、静态兜底、Markdown 安全、PWA（manifest/图标/sw 策略）、各页功能点、**追更页「＋ 快速添加」与进度条 / ＋1 话、交接页批次与套数同步**、**无障碍（main 地标 / 跳转链接）、分享卡片（description / og）、品牌与标题一致性** | 361 |
+| `tests/admin_audit.mjs` | 后台：结构、深浅色主题、隐私（noindex/零站外资源）、Bearer 令牌、XSS 防护、九个标签功能点（含追更表单、学习地图节点编辑、一键接上 AI、备份还原）、**追更列表搜索/筛选/排序、行内改状态、封面缩略图回落、批量导入弹层与失败上报、按名字自动填充、进度字段与行内 ＋1**、Markdown 实时预览与草稿自动保存 | 217 |
 | `tests/outline_check.mjs` | 大纲解析（直接从 `learn/index.html` 抽函数来跑）：四种 Markdown 标记、缩进与 Tab 等价、空格缩进、三层嵌套、CRLF、空/坏输入 | 11 |
-| `tests/media_import_test.mjs` | 批量导入解析（在 vm 沙箱里加载 `admin/content.js` 的真函数）：TSV 带表头、中文逗号表头、英文表头、无表头纯名字、无表头带状态、管道分隔、JSON 数组 / `{type,data}` / `{items:[…]}`、空名字行、评分越界（99 / -3 / 8.4 / abc）、坏 JSON 抛错 | 33 |
+| `tests/media_import_test.mjs` | 批量导入解析（在 vm 沙箱里加载 `admin/content.js` 的真函数）：TSV 带表头、中文逗号表头、英文表头、无表头纯名字、无表头带状态、管道分隔、JSON 数组 / `{type,data}` / `{items:[…]}`、空名字行、评分越界（99 / -3 / 8.4 / abc）、坏 JSON 抛错、**总集数 / 进度列（含别名与从「28 话」抠数字）** | 46 |
 | `tests/lookup_test.mjs` | AniList 查询纯逻辑：空/超长入参、kind 归一化、perPage 夹取、**关键词只进 variables 不进查询串**、打分 0–100→0–10、name 取 native→romaji→english、episodes 回落 chapters、note 拼装、0 结果过滤 | 38 |
 | `tests/nav_test.cjs` | 导航核心逻辑：links.js 数据体检、hostOf/initialOf/hueOf、查询匹配、分类过滤（含侧栏 cat）、最近访问、标签收集、高亮区间、导入导出往返、真实数据全视图 | 145 |
 | `tests/nav_audit.cjs` | 导航静态审计：结构、零外部请求、DOM 接线、localStorage 键规范、功能点（含最近视图/密度切换/复制/回到顶部）、全站一致性 | 84 |
-| **合计** | | **1570** |
+| **合计** | | **1667** |
 
 > 注：`api_test.mjs` 的项数随 `api/` 与 `admin/` 下的 `.js` 文件数浮动（每个文件一条语法断言）。
 

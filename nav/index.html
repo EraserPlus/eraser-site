@@ -7,12 +7,21 @@
 /* 尽早定主题，避免闪白；没存过就跟随系统偏好（切换按钮与命令面板见 shell.js） */
 (function(){try{var t=localStorage.getItem("eraser.theme");if(t!=="light"&&t!=="dark"){t=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";}document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();
 </script>
-<title>网址导航 · Eraser 小站</title>
+<title>网址导航 · Eraser 的小站</title>
 <link rel="stylesheet" href="../style.css">
 <link rel="manifest" href="../manifest.webmanifest">
 <link rel="icon" href="../icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="../icon.svg">
 <meta name="theme-color" content="#2563eb">
+<meta name="description" content="Eraser 的网址导航：常用站点分类整理，支持搜索、星标、最近访问与离线使用。">
+<!-- 分享卡片（og / twitter）：贴到聊天工具里能出预览 -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Eraser 的小站">
+<meta property="og:title" content="网址导航 · Eraser 的小站">
+<meta property="og:description" content="Eraser 的网址导航：常用站点分类整理，支持搜索、星标、最近访问与离线使用。">
+<meta property="og:url" content="https://eraser.de5.net/nav/">
+<meta property="og:image" content="https://eraser.de5.net/og.png">
+<meta name="twitter:card" content="summary_large_image">
 <style>
 /* 本页只写 style.css 里没有的样式；导航栏、容器基础一律交给 style.css，保证和全站一致 */
 :root{
@@ -249,6 +258,7 @@ html[data-theme="dark"] .btntop:hover{ color:var(--blue); border-color:#1e3a5f; 
 </style>
 </head>
 <body>
+<a class="skip-link" href="#main">跳到正文</a>
 
 <div class="navbar">
   <span class="logo">🧩 Eraser 的小站</span>
@@ -263,7 +273,7 @@ html[data-theme="dark"] .btntop:hover{ color:var(--blue); border-color:#1e3a5f; 
   </nav>
 </div>
 
-<div class="container">
+<main class="container" id="main">
   <h1>网址导航</h1>
   <p class="sub">共 <b id="total">0</b> 个站点 · <b id="totalCat">0</b> 个分类 · 浏览器主页可以设成这一页</p>
 
@@ -311,7 +321,7 @@ html[data-theme="dark"] .btntop:hover{ color:var(--blue); border-color:#1e3a5f; 
   </p>
     </div>
   </div>
-</div>
+</main>
 
 <button type="button" id="btnTop" class="btntop" aria-label="回到顶部" title="回到顶部">↑</button>
 

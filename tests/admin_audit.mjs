@@ -189,6 +189,15 @@ console.log('\n=== 内容管理（导航 / 博客 / 页面 / 追更 / 学习）=
     ['追更：状态四种齐全', /\["wish"[\s\S]*\["watching"[\s\S]*\["finished"[\s\S]*\["paused"/],
     ['追更：列表显示栏目 / 状态 / 评分', /function mediaCatLabel\(c\) \{ return c === "comic" \? "漫画" : "追番"; \}/],
     ['追更的链接与封面带上传按钮（可达）', /\{ file: \["url"\], media: \["url", "cover"\] \}/],
+    /* M13：追更进度 */
+    ['追更：表单带总集数 / 看到第几集字段',
+      /\{ k: "episodes", l: "总集数[\s\S]{0,220}?\{ k: "progress", l: "看到第几集/],
+    ['追更：列表行显示进度（12 / 28）', /d\.progress \+ " \/ " \+ d\.episodes \+ " 话"/],
+    ['追更：列表行有「＋1」按钮', /el\("button", null, "＋1"\)/],
+    ['追更：＋1 只在「在看」时出现', /if \(d\.status === "watching"\)/],
+    ['追更：自动填充会带出总集数', /episodes: r\.episodes == null \? "" : String\(r\.episodes\)/],
+    ['追更：导入识别「总集数 / 进度」列别名',
+      /episodes: \["总集数"[\s\S]{0,120}?progress: \["进度"/],
     ['下拉框有选项（select 构建）', /var sel = el\("select"\)/],
     ['链接表单带搜索关键词字段', /\{ k: "keywords", l: "搜索关键词/],
     ['通用表单构建器', /function buildForm\(type, onSave, onCancel\)/],
@@ -225,7 +234,7 @@ console.log('\n=== 内容管理（导航 / 博客 / 页面 / 追更 / 学习）=
 
 console.log('\n=== 与全站一致性 ===');
 {
-  check('标题正确', /<title>管理后台 · Eraser 小站<\/title>/.test(html));
+  check('标题正确', /<title>管理后台 · Eraser 的小站<\/title>/.test(html));
   check('主色与全站一致（#2563eb）', html.includes('#2563eb'));
   check('管理页没有加入公开导航栏（保持隐蔽）', !/class="navbar"/.test(html));
 }

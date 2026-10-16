@@ -76,6 +76,61 @@ console.log('\n=== 令牌过期 ===');
   check('exp 前一毫秒仍有效', T.verifyToken(t.token, t.exp - 1) !== null);
 }
 
+console.log('\n=== AI 专用令牌与后台令牌互不通用（M10） ===');
+{
+  process.env.ADMIN_PASSWORD = PW;
+
+  const admin = T.issueToken();
+  const ai = T.issueAiToken(undefined, 0);
+
+  check('AI 令牌也是两段式', ai.token.split('.').length === 2, ai.token);
+  check('AI 令牌只含 URL 安全字符', /^[A-Za-z0-9._-]+$/.test(ai.token));
+  check('AI 令牌有效期比后台令牌长（默认一年）', T.AI_TOKEN_TTL_MS > T.TOKEN_TTL_MS,
+        String(T.AI_TOKEN_TTL_MS) + ' vs ' + String(T.TOKEN_TTL_MS));
+  check('AI 令牌的 exp 符合 TTL', ai.exp - Date.now() > T.AI_TOKEN_TTL_MS - 5000);
+
+  check('AI 令牌能被默认校验通过', T.verifyToken(ai.token) !== null);
+  check('AI 令牌校验结果标了 kind=ai', (T.verifyToken(ai.token) || {}).kind === 'ai');
+  check('后台令牌校验结果标了 kind=admin', (T.verifyToken(admin.token) || {}).kind === 'admin');
+
+  /* 关键：两种令牌互不通用 */
+  check('AI 令牌拿去当后台登录用 → 拒绝', T.verifyToken(ai.token, Date.now(), { kind: 'admin' }) === null);
+  check('后台令牌拿去当 AI 令牌用 → 拒绝', T.verifyToken(admin.token, Date.now(), { kind: 'ai' }) === null);
+  check('两种令牌用不同密钥签名', T.signingKey('ai').toString('hex') !== T.signingKey('admin').toString('hex'));
+
+  /* 世代（吊销）机制 */
+  check('AI 令牌带世代号 ep', (T.verifyToken(ai.token) || {}).ep === 0);
+  check('世代对得上 → 有效', T.verifyToken(ai.token, Date.now(), { epoch: 0 }) !== null);
+  check('世代对不上 → 失效（等于被吊销）', T.verifyToken(ai.token, Date.now(), { epoch: 1 }) === null);
+  check('后台令牌不受世代影响（吊销 AI 不影响后台登录）',
+        T.verifyToken(admin.token, Date.now(), { epoch: 99 }) !== null);
+
+  const ai2 = T.issueAiToken(undefined, 5);
+  check('新世代发的令牌只认新世代',
+        T.verifyToken(ai2.token, Date.now(), { epoch: 5 }) !== null
+        && T.verifyToken(ai2.token, Date.now(), { epoch: 0 }) === null);
+
+  check('AI 令牌也随 exp 过期', T.verifyToken(ai.token, ai.exp) === null);
+  check('AI 令牌被篡改 body → 拒绝', (() => {
+    const [body] = ai.token.split('.');
+    const evil = Buffer.from(JSON.stringify({ v: 1, kind: 'ai', exp: Date.now() + 9e9, ep: 0 })).toString('base64url');
+    const s = createHmac('sha256', T.signingKey('ai')).update(evil).digest('base64url');
+    return T.verifyToken(evil + '.' + s, Date.now(), { epoch: 0 }) !== null
+        && T.verifyToken(evil + '.' + s, Date.now(), { epoch: 1 }) === null;
+  })());
+  check('改密码后 AI 令牌也失效（换了密码等于全废）', (() => {
+    const old = ai.token;
+    process.env.ADMIN_PASSWORD = 'another-different-password-99';
+    const dead = T.verifyToken(old, Date.now(), { epoch: 0 }) === null;
+    process.env.ADMIN_PASSWORD = PW;
+    return dead;
+  })());
+
+  /* 明文里不含密码 */
+  const raw = Buffer.from(ai.token, 'base64url').toString('utf8');
+  check('AI 令牌里看不到密码明文', !raw.includes(PW) && !ai.token.includes(PW));
+}
+
 console.log('\n=== 换密码后旧令牌失效 ===');
 {
   const old = T.issueToken().token;

@@ -578,6 +578,38 @@ console.log('\n=== 内容接口 /api/content ===');
         String(executed.filter(e => /INSERT INTO content/.test(e.text)).length));
   check('错误信息点出是第几条不对', /第\s*2\s*条/.test(res.json.error || ''), res.json.error);
 
+  /* 进度字段（M13）走同一套预校验 */
+  fakeDb((t) => /INSERT INTO content/.test(t) ? [row({ id: 7 })] : []);
+  res = await call(contentRoute, 'POST', { token: TOKEN, query: { batch: '1' }, body: {
+    items: [{ type: 'media', data: media('坏进度', { progress: -1 }) }],
+  } });
+  check('批量导入里的非法进度 → 整批 400', res.statusCode === 400, String(res.statusCode));
+  check('错误信息点名「进度」', /进度/.test(res.json.error || ''), res.json.error);
+
+  fakeDb((t) => /INSERT INTO content/.test(t) ? [row({ id: 7, type: 'media', data: { name: 'x' } })] : []);
+  res = await call(contentRoute, 'POST', { token: TOKEN, query: { batch: '1' }, body: {
+    items: [{ type: 'media', data: media('带进度', { episodes: 28, progress: 12 }) }],
+  } });
+  check('批量导入接受合法的总集数 / 进度',
+        res.statusCode === 200 && res.json.created === 1, String(res.statusCode));
+
+  /* PATCH 只改进度：合并语义不能把总集数冲掉（前台「＋1」就靠这个） */
+  fakeDb((t) => {
+    if (/SELECT \* FROM content WHERE id/.test(t)) {
+      return [row({ id: 7, type: 'media', data: { category: 'anime', name: '芙莉莲', status: 'watching', episodes: 28, progress: 12 } })];
+    }
+    if (/UPDATE content/.test(t)) return [row({ id: 7, type: 'media' })];
+    return [];
+  });
+  res = await call(contentRoute, 'PATCH', { token: TOKEN, body: { id: 7, data: { progress: 13 } } });
+  check('PATCH 只传 progress → 200', res.statusCode === 200, String(res.statusCode));
+  {
+    const up = executed.filter(e => /UPDATE content/.test(e.text)).pop();
+    const payload = up ? String(up.values && up.values[0]) : '';
+    check('PATCH 合并后 total 保留、progress 前进',
+          /"episodes":28/.test(payload) && /"progress":13/.test(payload), payload.slice(0, 200));
+  }
+
   /* 超上限 */
   fakeDb(noop);
   res = await call(contentRoute, 'POST', { token: TOKEN, query: { batch: '1' }, body: {
