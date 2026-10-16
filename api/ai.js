@@ -45,7 +45,7 @@ async function currentEpoch() {
 function buildGuide(req, token) {
   const base = baseUrl(req);
   const lines = [
-    '# Eraser 小站 · 学习地图 AI 助手接入说明',
+    '# Eraser 的小站 · 学习地图 AI 助手接入说明',
     '',
     '你（AI）可以通过下面的 HTTP 接口帮站长管理**学习地图**：建图、拆节点、勾进度、查漏补缺。',
     '',

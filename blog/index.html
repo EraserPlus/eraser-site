@@ -7,15 +7,25 @@
 /* 尽早定主题，避免闪白；没存过就跟随系统偏好（切换按钮与命令面板见 shell.js） */
 (function(){try{var t=localStorage.getItem("eraser.theme");if(t!=="light"&&t!=="dark"){t=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";}document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();
 </script>
-<title>博客 - Eraser 的小站</title>
+<title>博客 · Eraser 的小站</title>
 <link rel="stylesheet" href="../style.css">
 <link rel="manifest" href="../manifest.webmanifest">
 <link rel="icon" href="../icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="../icon.svg">
 <meta name="theme-color" content="#2563eb">
+<meta name="description" content="Eraser 的博客：用 Markdown 写下的技术笔记与随笔，按时间倒序列出。">
+<!-- 分享卡片（og / twitter）：贴到聊天工具里能出预览 -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Eraser 的小站">
+<meta property="og:title" content="博客 · Eraser 的小站">
+<meta property="og:description" content="Eraser 的博客：用 Markdown 写下的技术笔记与随笔，按时间倒序列出。">
+<meta property="og:url" content="https://eraser.de5.net/blog/">
+<meta property="og:image" content="https://eraser.de5.net/og.png">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="alternate" type="application/rss+xml" title="RSS 订阅" href="/api/rss">
 </head>
 <body>
+<a class="skip-link" href="#main">跳到正文</a>
 <div class="navbar">
   <span class="logo">🧩 Eraser 的小站</span>
   <nav>
@@ -28,14 +38,14 @@
     <a href="../about/index.html">关于</a>
   </nav>
 </div>
-<div class="container">
+<main class="container" id="main">
   <h1>✏️ 博客</h1>
   <p class="muted">文章在管理后台里用 Markdown 写，这里自动列出。</p>
 
   <!-- 空状态：还没有文章、或接口不可用时显示，页面不会白屏 -->
   <div id="list"></div>
   <p class="muted" id="hint">还没有文章。去管理后台的「博客」标签写一篇。</p>
-</div>
+</main>
 
 <script>
 (function(){

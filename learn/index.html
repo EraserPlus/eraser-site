@@ -13,6 +13,15 @@
 <link rel="icon" href="../icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="../icon.svg">
 <meta name="theme-color" content="#2563eb">
+<meta name="description" content="Eraser 的学习地图：把想学的东西拆成节点、分组勾进度，还能一键复制指令交给 AI 建图与查漏补缺。">
+<!-- 分享卡片（og / twitter）：贴到聊天工具里能出预览 -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Eraser 的小站">
+<meta property="og:title" content="学习地图 · Eraser 的小站">
+<meta property="og:description" content="Eraser 的学习地图：把想学的东西拆成节点、分组勾进度，还能一键复制指令交给 AI 建图与查漏补缺。">
+<meta property="og:url" content="https://eraser.de5.net/learn/">
+<meta property="og:image" content="https://eraser.de5.net/og.png">
+<meta name="twitter:card" content="summary_large_image">
 <style>
 /* 学习地图页专属样式：地图卡 / 进度 / 分组 / 节点 / 大纲导入 */
 .lm-sec { margin-top: 26px; }
@@ -192,6 +201,7 @@
 </style>
 </head>
 <body>
+<a class="skip-link" href="#main">跳到正文</a>
 <div class="navbar">
   <span class="logo">🧩 Eraser 的小站</span>
   <nav>
@@ -204,7 +214,7 @@
     <a href="../about/index.html">关于</a>
   </nav>
 </div>
-<div class="container">
+<main class="container" id="main">
   <h1>学习地图</h1>
   <p class="muted">把要学的东西拆成节点，一个个勾掉。也可以让 AI 助手帮你建图、查漏补缺。</p>
 
@@ -233,7 +243,7 @@
     <div class="lm-toolbar" id="detailTools" style="margin-top:12px"></div>
     <div id="nodeHost"></div>
   </section>
-</div>
+</main>
 
 <script>
 /* 学习地图（仿 MapFlow 的交互）
@@ -490,7 +500,7 @@
     });
     gs.sort(function (a, b) { return (a.done / (a.total || 1)) - (b.done / (b.total || 1)); });
     var lines = [
-      "我在 Eraser 小站有一张学习地图「" + (current.title || "") + "」（地图 id = " + current.id + "）。",
+      "我在 Eraser 的小站有一张学习地图「" + (current.title || "") + "」（地图 id = " + current.id + "）。",
       "当前进度：" + (progress ? progress.done + " / " + progress.total + "（" + pct(progress.percent) + "%）" : "未知"),
       "",
       "按「落后程度」排的分组："

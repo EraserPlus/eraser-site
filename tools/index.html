@@ -7,12 +7,21 @@
 /* 尽早定主题，避免闪白；没存过就跟随系统偏好（切换按钮与命令面板见 shell.js） */
 (function(){try{var t=localStorage.getItem("eraser.theme");if(t!=="light"&&t!=="dark"){t=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";}document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();
 </script>
-<title>工具箱 - Eraser 的小站</title>
+<title>工具箱 · Eraser 的小站</title>
 <link rel="stylesheet" href="../style.css">
 <link rel="manifest" href="../manifest.webmanifest">
 <link rel="icon" href="../icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="../icon.svg">
 <meta name="theme-color" content="#2563eb">
+<meta name="description" content="Eraser 的小站工具箱：全部在浏览器本地运行、数据不上传的小工具合集。">
+<!-- 分享卡片（og / twitter）：贴到聊天工具里能出预览 -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Eraser 的小站">
+<meta property="og:title" content="工具箱 · Eraser 的小站">
+<meta property="og:description" content="Eraser 的小站工具箱：全部在浏览器本地运行、数据不上传的小工具合集。">
+<meta property="og:url" content="https://eraser.de5.net/tools/">
+<meta property="og:image" content="https://eraser.de5.net/og.png">
+<meta name="twitter:card" content="summary_large_image">
 <style>
   /* 本页只写 style.css 里没有的样式 */
   .hintline{font-size:12.5px;color:var(--muted);margin:22px auto 0;max-width:640px;line-height:1.9;
@@ -22,6 +31,7 @@
 </style>
 </head>
 <body>
+<a class="skip-link" href="#main">跳到正文</a>
 <div class="navbar">
   <span class="logo">🧩 Eraser 的小站</span>
   <nav>
@@ -34,7 +44,7 @@
     <a href="../about/index.html">关于</a>
   </nav>
 </div>
-<div class="container">
+<main class="container" id="main">
   <h1>🧰 工具箱</h1>
   <p class="muted">所有工具均在浏览器本地运行，数据不会上传。</p>
 
@@ -46,7 +56,7 @@
     新工具 = 在 <code>tools/</code> 目录放一个 <code>xxx.html</code>，再把下方 <code>TOOLS</code> 数组加一行
     <code>{ name: "名字", desc: "一句话", href: "xxx.html" }</code>，刷新即上架，无需改别的。
   </p>
-</div>
+</main>
 
 <script>
 /* TOOLS 是工具箱唯一的清单——加工具只改这里，删工具删行即可 */

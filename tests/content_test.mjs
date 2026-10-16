@@ -130,6 +130,22 @@ console.log('\n=== media（追更）===');
   check('备注/日期/链接/封面正常保留',
         C.normalize('media', { ...base, note: '周五更新', date: '2026-10-14', url: 'https://bgm.tv/subject/1', cover: 'https://x.com/c.jpg' }).note === '周五更新');
   check('多传字段被丢掉', !('evil' in C.normalize('media', { ...base, evil: 1 })));
+
+  /* 进度（M13）：episodes = 总集数，progress = 看到第几集，两个都可空 */
+  const empty = C.normalize('media', base);
+  check('总集数/进度默认是 null', empty.episodes === null && empty.progress === null);
+  check('总集数接受数字字符串', C.normalize('media', { ...base, episodes: '28' }).episodes === 28);
+  check('总集数接受数字', C.normalize('media', { ...base, episodes: 28 }).episodes === 28);
+  check('进度接受数字字符串', C.normalize('media', { ...base, progress: '12' }).progress === 12);
+  check('进度为 0 合法（还没开始）', C.normalize('media', { ...base, progress: 0 }).progress === 0);
+  check('空串等于不填', C.normalize('media', { ...base, episodes: '', progress: '' }).progress === null);
+  check('总集数小数报错', code(() => C.normalize('media', { ...base, episodes: 28.5 })) === 'BAD_INPUT');
+  check('进度负数报错', code(() => C.normalize('media', { ...base, progress: -1 })) === 'BAD_INPUT');
+  check('进度非数字报错', code(() => C.normalize('media', { ...base, progress: '看到12话' })) === 'BAD_INPUT');
+  check('进度超上限报错', code(() => C.normalize('media', { ...base, progress: 999999 })) === 'BAD_INPUT');
+  /* PATCH 是「先合并再归一化」，所以只改 progress 不会把 episodes 冲掉 */
+  const merged = C.normalize('media', { ...C.normalize('media', { ...base, episodes: 28, progress: 12 }), progress: 13 });
+  check('合并语义：只改进度不会丢掉总集数', merged.episodes === 28 && merged.progress === 13);
 }
 
 console.log('\n=== learn_map（学习地图）===');

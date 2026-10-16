@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>全站搜索 · Eraser 小站</title>
+<title>全站搜索 · Eraser 的小站</title>
 <script>
 /* 尽早定主题，避免闪白；没存过就跟随系统偏好（切换按钮与命令面板见 shell.js） */
 (function(){try{var t=localStorage.getItem("eraser.theme");if(t!=="light"&&t!=="dark"){t=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";}document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();
@@ -14,6 +14,15 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
 <meta name="theme-color" content="#2563eb">
+<meta name="description" content="Eraser 的小站全站搜索：一处搜到导航链接、博客文章、追更记录和学习地图的标题与摘要。">
+<!-- 分享卡片（og / twitter）：贴到聊天工具里能出预览 -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Eraser 的小站">
+<meta property="og:title" content="全站搜索 · Eraser 的小站">
+<meta property="og:description" content="Eraser 的小站全站搜索：一处搜到导航链接、博客文章、追更记录和学习地图的标题与摘要。">
+<meta property="og:url" content="https://eraser.de5.net/">
+<meta property="og:image" content="https://eraser.de5.net/og.png">
+<meta name="twitter:card" content="summary_large_image">
 <style>
 /* 本页只写 style.css 里没有的样式；导航栏、容器基础一律交给 style.css */
 :root{
@@ -139,6 +148,7 @@ html[data-theme="dark"] .morebtn:hover{ background:var(--blue-l); }
 </style>
 </head>
 <body>
+<a class="skip-link" href="#main">跳到正文</a>
 
 <div class="navbar">
   <span class="logo">🧩 Eraser 的小站</span>
@@ -153,7 +163,7 @@ html[data-theme="dark"] .morebtn:hover{ background:var(--blue-l); }
   </nav>
 </div>
 
-<div class="container">
+<main class="container" id="main">
   <h1>全站搜索</h1>
   <p class="sub">搜导航链接、博客文章、追更、学习地图的标题和摘要</p>
 
@@ -175,7 +185,7 @@ html[data-theme="dark"] .morebtn:hover{ background:var(--blue-l); }
     <code>Enter</code> 搜索 · <code>↑</code><code>↓</code> 选结果再 <code>Enter</code> 打开 · <code>Esc</code> 清空<br>
     接口不可用时保留静态提示，不白屏；导航页有自己的离线搜索，断网也能用
   </p>
-</div>
+</main>
 
 <script>
 /* 全站搜索（现为首页）：输入关键词 → 同源 /api/search → 分组渲染。

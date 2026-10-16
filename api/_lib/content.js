@@ -34,7 +34,7 @@ const TYPES = {
   media: {
     public: true,
     needsParent: false,
-    fields: ['category', 'name', 'status', 'score', 'note', 'date', 'url', 'cover'],
+    fields: ['category', 'name', 'status', 'score', 'episodes', 'progress', 'note', 'date', 'url', 'cover'],
   },
   learn_map: {
     public: true,
@@ -73,6 +73,18 @@ function url(v, name) {
   if (!/^https?:\/\//i.test(s)) throw bad(`${name}要以 http:// 或 https:// 开头`);
   try { new URL(s); } catch { throw bad(`${name}不是有效的网址`); }
   return s;
+}
+
+/* 可选的非负整数（集数 / 进度这类）。空、null、'' 一律当「没填」→ null。
+   不接受小数、负数、非数字；上限兜一下防止离谱的值把进度条算炸。 */
+function count(v, name, max = 100000) {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0) {
+    throw bad(`${name}要填 0 或正整数，留空表示不填`);
+  }
+  if (n > max) throw bad(`${name}最多 ${max}`);
+  return n;
 }
 
 /* 标签：数组或逗号分隔的字符串都能接受，统一成去重后的数组 */
@@ -198,6 +210,10 @@ export function normalize(type, raw) {
       out.score = Math.round(n * 10) / 10;   // 最多一位小数
     }
     out.note = str(d.note, '备注', { max: 200, required: false });
+    /* 进度：episodes 是总集数（自动填充会带出来），progress 是「看到第几集」。
+       两个都可空——连载中 / 没追完的片子只知道看到哪、不知道总集数很正常。 */
+    out.episodes = count(d.episodes, '总集数');
+    out.progress = count(d.progress, '进度（看到第几集）');
     out.date = str(d.date, '日期', { max: 20, required: false });
     out.url = str(d.url, '链接', { max: 2000, required: false });
     out.cover = str(d.cover, '封面图地址', { max: 2000, required: false });

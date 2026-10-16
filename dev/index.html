@@ -55,12 +55,13 @@ html[data-theme="dark"] .steps li::before { color: #0d1117; }
 </style>
 </head>
 <body>
+<a class="skip-link" href="#main">跳到正文</a>
 <div class="doc-head">
   <span class="logo">🧩 Eraser 的小站</span>
   <a href="../index.html">← 回搜索</a>
-  <span class="tag">开发交接 · 最后更新 2026-10-14</span>
+  <span class="tag">开发交接 · 最后更新 2026-10-16</span>
 </div>
-<div class="container doc">
+<main class="container doc" id="main">
   <h1>开发交接</h1>
   <p class="muted">这一页写给「接手的下一个人 / 下一个 AI」：读完它，你就能接着开发这个小站，不踩坑、不断线。</p>
 
@@ -80,8 +81,8 @@ html[data-theme="dark"] .steps li::before { color: #0d1117; }
     <tr><th>托管</th><td>Vercel Hobby 免费档。push main → 自动部署，1~2 分钟生效</td></tr>
     <tr><th>数据库</th><td>Neon Postgres，四张表：content（七种内容共用，新增类型不用建表）/ todos / events / meta（键值小仓库，存 AI 令牌世代号等）</td></tr>
     <tr><th>后台</th><td><code>/admin/</code> 密码登录（站长持有），9 个标签：今天 / 待办 / 日程 / 导航 / 博客 / 追更 / 学习 / 页面 / 数据</td></tr>
-    <tr><th>测试</th><td>十套 1570 项，一条命令：<code>npm test</code>。提交前必须全绿</td></tr>
-    <tr><th>当前版本</th><td>main @ <code>ab6b648</code> · 最近批次 <b>M12 录入大提速（批量导入 + 按名字填充 + 后台列表可用性 + 前台快捷录入）</b>（PR #38，2026-10-16）</td></tr>
+    <tr><th>测试</th><td>十套 1667 项，一条命令：<code>npm test</code>。提交前必须全绿</td></tr>
+    <tr><th>当前版本</th><td>main @ <code>ab6b648</code> · 最近批次 <b>M13 门面与记录：追更进度 + 全站 meta/og + 无障碍 + 一致性收尾</b>（PR 待合，2026-10-16）</td></tr>
   </table>
 
   <h2>2. 工作流程（六步，别跳步）</h2>
@@ -97,7 +98,7 @@ html[data-theme="dark"] .steps li::before { color: #0d1117; }
   <h2>3. 本机环境特殊性（不遵守会卡死）</h2>
   <div class="callout amber">
     <b>这台机器的坑，先记住再动手：</b>
-    ① <code>git push</code> 直连不通（schannel 证书吊销检查，改配置也无解）→ 用 <code>dev/push-branch.sh</code> 脚本走 gh CLI 推送；<code>git fetch</code> 同样不通，看线上状态一律用 <code>gh api</code>；② Node 不能创建子进程（spawnSync 报 EBUSY）→ 别写需要子进程的脚本，截图用「Bash 起 Chrome + Node 连 CDP」模式；③ <b>禁止 <code>npm install</code></b>（会把 node_modules 里的假驱动冲成真包，测试全挂），只允许 <code>npm install --package-lock-only</code>；④ 测试用的假驱动在 <code>tests/stubs/</code>（Neon 与 Vercel Blob 的手写 stub），本地和 CI 都不连真服务；⑤ <b>PowerShell 常常拿不到 stdout</b> → 让命令把结果写进临时文件，再用 Read 读；⑥ <code>git hash-object</code> / <code>sha1sum</code> 在 Git Bash 里会被 SIGTERM → 在 PowerShell 里手搓 git blob SHA；⑦ 写 TSV/粘贴的清单容易带上 BOM → 用 Python 以 <code>utf-8-sig</code> 读、以 <code>utf-8</code>/LF 写回；⑧ <code>gh pr create</code> 有时会以 SIGTERM 退出但 <b>PR 其实已经建好了</b> → 别重试，先 <code>gh pr list --head &lt;分支&gt;</code> 确认。
+    ① <code>git push</code> 直连不通（schannel 证书吊销检查，改配置也无解）→ 用 <code>dev/push-branch.sh</code> 脚本走 gh CLI 推送；<code>git fetch</code> 同样不通，看线上状态一律用 <code>gh api</code>；② Node 不能创建子进程（spawnSync 报 EBUSY）→ 别写需要子进程的脚本，截图用「Bash 起 Chrome + Node 连 CDP」模式；③ <b>禁止 <code>npm install</code></b>（会把 node_modules 里的假驱动冲成真包，测试全挂），只允许 <code>npm install --package-lock-only</code>；④ 测试用的假驱动在 <code>tests/stubs/</code>（Neon 与 Vercel Blob 的手写 stub），本地和 CI 都不连真服务；⑤ <b>PowerShell 常常拿不到 stdout</b> → 让命令把结果写进临时文件，再用 Read 读；⑥ <code>git hash-object</code> / <code>sha1sum</code> 在 Git Bash 里会被 SIGTERM → 在 PowerShell 里手搓 git blob SHA；⑦ 写 TSV/粘贴的清单容易带上 BOM → 用 Python 以 <code>utf-8-sig</code> 读、以 <code>utf-8</code>/LF 写回；⑧ <code>gh pr create</code> 有时会以 SIGTERM 退出但 <b>PR 其实已经建好了</b> → 别重试，先 <code>gh pr list --head &lt;分支&gt;</code> 确认；⑨ <b><code>.gitattributes</code> 是纸老虎</b>——里面写的 <code>* text=auto eol=lf</code> <b>只管 <code>git add</code></b>，而 <code>dev/push-branch.sh</code> 走 GitHub API 直接建 blob，<b>完全绕过 git 的行尾规范化</b>，CRLF 能一路溜进仓库（M13 就抓到 <code>dev/index.html</code>、<code>README.md</code>、<code>tests/pages_audit.mjs</code> 三个文件被编辑工具写成了 CRLF）。<b>推送前逐文件查一遍</b>：用 Python 数 <code>b'\r'</code> 字节，<b>别信 <code>grep -c $'\r'</code></b>（Git Bash 里那个转义不可靠，会给出虚高的数）；⑩ 用 <code>gh api ... --jq</code> 探测文件是否存在时，<b>404 会输出字符串 <code>null</code> 而不是空</b>，<code>[ -n "$x" ]</code> 会误判成「存在」——判断文件在不在，用 <code>git/trees?recursive=1</code> 列出来数，别用 <code>contents</code> 探测。
   </div>
   <h3>推送与提交（第 4 步的具体做法）</h3>
   <pre><code># 1) 写提交清单 manifest.tsv（每行：A/M/D + Tab + 文件路径，相对仓库根）
@@ -198,6 +199,7 @@ done < /tmp/main_tree.tsv</code></pre>
     <tr><th>已排除的上游</th><td><code>api.bgm.tv</code>（Bangumi）、<code>api.themoviedb.org</code>（TMDB）、<code>api.jikan.moe</code>（Jikan）、<code>img9.doubanio.com</code>（豆瓣图）<b>在本机沙箱全部不可达</b>（HTTP 000 / 418）。要换源必须先确认部署环境能出去网。</td></tr>
     <tr><th>Vercel 函数数量上限（硬约束）</th><td>Hobby 档<b>每个部署最多 12 个 Serverless Function</b>。<code>api/</code> 目录现在正好 12 个（ai / auth / backup / content / events / favicon / learn / rss / search / sitemap / todos / upload），<b>再加第 13 个文件会让整个部署失败</b>（CI 的测试照过，只有 Vercel 那一步红）。要么并进现有路由（用 <code>?action=xxx</code>，照 <code>api/learn.js</code> 抄），要么升级 Pro。<code>api/_lib/</code> 下的文件不算函数，可以随便加。</td></tr>
     <tr><th>批量导入契约</th><td><code>POST /api/content?batch=1</code>，body <code>{items:[…]}</code>，一次 ≤500 条。<b>先全量预校验再写库</b>：任何一条不合法 → 整批 400、<b>一条都不写</b>，错误里点名「第 N 条：原因」；预检全过后逐条 insert（个别失败只报那条，不回滚全批）；批内 slug / page.key 会互相去重（查库看不出来的那种）。</td></tr>
+    <tr><th>追更的字段（M13 补全）</th><td><code>category / name / status / score / episodes / progress / note / date / url / cover</code>。其中 <code>episodes</code>（总集数）与 <code>progress</code>（看到第几集）是<b>可空的非负整数</b>，上限 100000，校验在 <code>api/_lib/content.js</code> 的 <code>count()</code>。<b>AniList 自动填充会带出 <code>episodes</code></b>，<code>progress</code> 靠前台「＋1 话」或手填。<b>PATCH 是「先合并再归一化」</b>，所以只传 <code>{progress: 13}</code> 不会把 <code>episodes</code> 冲掉——回归测试里专门钉了这条。</td></tr>
   </table>
 
   <h2>6. 批次记录（每批做完回来加一行）</h2>
@@ -229,6 +231,7 @@ done < /tmp/main_tree.tsv</code></pre>
     <div class="row latest"><span class="no">M10a</span><span class="what"><b>AI 闭环（主线A）</b>：① <b>AI 专用长效令牌</b>——365 天、独立签名密钥、带世代号，与 30 天后台令牌互不通用，一键吊销不影响站长的登录（<code>api/_lib/token.js</code>）；② <b>后台「一键接上 AI」面板</b>——生成令牌 / 复制可直接贴给 AI 的配置 / 展开完整说明书 / 吊销（<code>api/ai.js</code> + 后台「学习」标签）；③ <b>查漏补缺快照</b> <code>?gaps=1</code>——直接给「哪组从没动过 / 哪组落后 / 建议先补哪几个」；④ <b>重做 <code>/learn/</code> 交互页（仿 MapFlow）</b>——列表可搜可汇总、分组可折叠带进度条、节点就地改文字/改分组、<b>拖动排序</b>（同组内）、加删节点、<b>一键复制给 AI 的指令</b>、未登录只读保护；⑤ <b>大纲导入成图</b>——粘 Markdown/缩进列表，实时预览，一次建好整张图（PR #35）</span><span class="when">10-15</span></div>
     <div class="row latest"><span class="no">M11</span><span class="what"><b>追更页改海报墙（仿 dudulu.moe，配色沿用全站蓝）</b>：<code>/collect/</code> 从单列列表重做为海报墙——<b>3:4.1 竖版封面网格</b>（手机 2 列 / 560px 3 列 / 760px 5 列）、右上角状态角标（在追/搁置/已看）、左上角评分角标、<b>底部渐变压名</b>、悬停封面放大 1.05；<b>没封面自动渐变兜底 + 首字</b>；顶部 5 格统计条 + 状态筛选条（<b>纯前端即时过滤、不打接口</b>，带计数、零结果不显示按钮）；已看完/已读完折进可展开的「收纳栏」；手机端筛选条横向滚动不挤行。修掉一个真实暗色 bug：<code>style.css</code> 有全局 <code>html[data-theme="dark"] button{color:#0d1117}</code>（权重 0,1,2）会把筛选按钮刷成近黑色，选择器提权到 <code>.mg-filters .mg-filters button</code> 并补暗色专用覆盖（PR #37）</span><span class="when">10-16</span></div>
     <div class="row latest"><span class="no">M12</span><span class="what"><b>录入大提速（三条一起做）</b>——起因是线上只有 1 条追更、每次进后台都要翻列表，<b>问题在「录入口」不在页面</b>。① <b>批量导入 + 智能填充</b>：新增 <code>POST /api/content?batch=1</code>（一次最多 500 条，<b>先全量预校验再写库</b>，一条不合法整批 400 且零写入，批内 slug/key 去重，个别失败只报那条不回滚全批）；新增 <code>GET /api/content?action=lookup</code> 走 AniList GraphQL（免 key、可热链封面）自动带出<b>封面 / 评分 / 话数 / 年份 / 链接</b>，30 分钟进程内缓存，中文名搜不到时给提示。② <b>后台追更列表可用性</b>：搜索框 + 栏目 / 状态 / 排序三个下拉（纯前端即时过滤）、<b>行内直接改状态</b>（点胶囊即可，不用开表单）、封面缩略图（加载失败回落首字渐变）、导出 TSV。③ <b>前台快捷录入</b>：<code>/collect/</code> 页顶多了「＋ 快速添加」按钮（<b>认 <code>eraser.admin.token</code>，没令牌就整段不渲染</b>，同源共用后台登录态），弹层内可先「按名字补全」再保存，<b>DOM API + textContent</b> 拼装，不碰 innerHTML。中文名搜不到是上游限制，已内置提示。<b>按名字查没有单独开 <code>api/lookup.js</code></b>——Vercel Hobby 档每个部署最多 12 个 Serverless Function，<code>api/</code> 目录本来就已经 12 个在上限上，加第 13 个会直接让部署失败（实测报错 <code>No more than 12 Serverless Functions can be added to a Deployment on the Hobby plan</code>）。所以并到 <code>/api/content?action=lookup</code>，和 <code>api/learn.js</code> 的 <code>?action=xxx</code> 同一套写法。<b>下次要加新接口，先数一下 <code>api/</code> 下有几个 .js</b>（PR #38）</span><span class="when">10-16</span></div>
+    <div class="row latest"><span class="no">M13</span><span class="what"><b>门面与记录（四条一起做）</b>——起因是站长说「继续寻找可能存在的优化点并优化」，于是把整站从头扫了一遍。① <b>追更进度</b>：media 新增 <code>episodes</code>（总集数）与 <code>progress</code>（看到第几集）两个可选整数字段；海报墙在封面底部画进度条并显示 <code>12 / 28</code>（只有总集数就显示「共 28 话」，只有进度就显示「看到 12 话」）；<b>登录后「在看」的卡片右下角出现「＋1 话」小圆钮</b>，一点就 PATCH 前进一话、就地重画，不用开表单；后台列表同样显示进度并带 ＋1；批量导入认「总集数 / 集数 / 话数 / episodes」与「进度 / 看到 / progress」列，能从「28 话」「第 12 集」里抠出数字；「按名字自动填充」会把 AniList 的总集数一起填进去。<b>卡片从 <code>&lt;a&gt;</code> 改成 <code>&lt;div&gt;</code> + 覆盖式链接层</b>——<code>&lt;button&gt;</code> 不允许嵌在 <code>&lt;a&gt;</code> 里，这是为了能合法地放按钮。② <b>全站 meta / 分享卡片</b>：8 个公开页补上 <code>meta description</code> + <code>og:*</code> + <code>twitter:card</code>，新增一张 1200×630 的 <code>og.png</code>（无头 Chrome 截图生成），链接贴到聊天工具里能出预览卡片。③ <b>无障碍</b>：8 个公开页 + 交接页的内容容器由 <code>&lt;div class="container"&gt;</code> 改成 <code>&lt;main class="container" id="main"&gt;</code>，并加「跳到正文」链接（样式在 <code>style.css</code> 的 <code>.skip-link</code>，平时移出视口、聚焦才滑出）。④ <b>一致性收尾</b>：全站品牌名统一成 <code>Eraser 的小站</code>（原来 index / nav / admin 少一个「的」）、标题分隔符统一成 <code>·</code>（早期页用 <code>-</code>）；<b>删掉孤儿页 <code>/files/</code></b>（T10 就下架了，页面却一直留着：站内零链接、不在 sitemap、导航栏还是旧结构、缺防闪主题脚本与 shell.js、还教人去点一个已经不存在的「文件」标签）；<code>sw.js</code> 缓存版本号 <code>eraser-v1 → v2</code>（M11/M12/M13 都动过样式和页面，文件注释本来就要求 +1，之前一直没升，老访客会先看到一次旧 CSS）（PR 待合）</span><span class="when">10-16</span></div>
   </div>
 
   <h2>7. 当前待办 / 已知事项</h2>
@@ -242,7 +245,9 @@ done < /tmp/main_tree.tsv</code></pre>
     <li><b>旧 <code>home</code> 页面标识已下线</b>：首页欢迎语随首页改版（M5）移除，已无任何页面渲染它；若后台「页面」里还留着 home 记录，可自行删除。</li>
     <li><b>搜索范围已刻意收窄（M9）</b>：正文搜不到是<b>有意为之</b>，不是 bug。站长原话：「不要再让他直接搜索地图里的字」「博客文章里面的关键字都能搜出来那有点太乱了」。</li>
     <li>（可选后续）备用域名 eraser.888.moe 在 Vercel 添加后生效（配置记录见仓库 <code>domains.config.yaml</code>）。追更加更多分类暂缓（站长表示暂不需要）。</li>
-    <li><b>M12 之后该站长自己动手的一件事</b>：录入口已经通了（后台「📥 批量导入」/「✨ 按名字自动填充」，或直接去 <code>/collect/</code> 点「＋ 快速添加」），但<b>记哪些片子仍然只有站长自己知道</b>。建议挑个晚上把以前散落在各处的追更记录一次性导进来——导入用 <b>TSV 或 JSON</b>，带表头可以自动识别中英文列名（名称/栏目/状态/评分/备注/日期/链接/封面），不带头就按「名字、状态」逐行读。<b>中文名在 AniList 上基本搜不到</b>，用英文名或日文原名（如 Frieren / 葬送のフリーレン）命中率最高。</li>
+    <li><b>M12 之后该站长自己动手的一件事</b>：录入口已经通了（后台「📥 批量导入」/「✨ 按名字自动填充」，或直接去 <code>/collect/</code> 点「＋ 快速添加」），但<b>记哪些片子仍然只有站长自己知道</b>。建议挑个晚上把以前散落在各处的追更记录一次性导进来——导入用 <b>TSV 或 JSON</b>，带表头可以自动识别中英文列名（名称/栏目/状态/评分/总集数/进度/备注/日期/链接/封面），不带头就按「名字、状态」逐行读。<b>中文名在 AniList 上基本搜不到</b>，用英文名或日文原名（如 Frieren / 葬送のフリーレン）命中率最高。</li>
+    <li><b>追更进度怎么用（M13 新加）</b>：<code>episodes</code> = 总集数，<code>progress</code> = 看到第几集，两个都可空、都是非负整数。海报墙上「在看」的卡片右下角有个「＋1 话」小圆钮——<b>只有本机登录过后台才会出现</b>（读的是同一把 <code>eraser.admin.token</code>），点一下进度就前进一话，不用进后台开表单。后台列表行里也有同样的 ＋1。进度条只在两个数都有时才画；只有总集数就显示「共 28 话」，只有进度就显示「看到 12 话」（连载中不知道总数是常态，别硬凑）。</li>
+    <li><b>og 分享卡片（M13）</b>：8 个公开页都带了 <code>og:title / og:description / og:image</code>，图片是仓库根目录的 <code>og.png</code>（1200×630）。想换图就改它——它没有源文件，是当时用无头 Chrome 截一张临时 HTML 出来的；重做的话记得保持 1200×630，否则微信/Telegram 会裁切。</li>
   </ul>
 
   <h2>7.1 Vercel 项目速查（本机可直接用 REST API 操作）</h2>
@@ -266,7 +271,7 @@ CI 全绿合并 → 线上实测 → 回来更新交接页）。</code></pre>
   </div>
 
   <p class="muted" style="margin-top:28px">本页由每批工作的负责人（AI）维护：批次记录 +1 行、当前版本号与新待办同步更新。页面本身不进主站导航，地址固定：<code>eraser.de5.net/dev/</code></p>
-</div>
+</main>
 <script src="../shell.js"></script>
 </body>
 </html>

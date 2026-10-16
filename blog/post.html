@@ -7,12 +7,21 @@
 /* 尽早定主题，避免闪白；没存过就跟随系统偏好（切换按钮与命令面板见 shell.js） */
 (function(){try{var t=localStorage.getItem("eraser.theme");if(t!=="light"&&t!=="dark"){t=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";}document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();
 </script>
-<title>文章 - Eraser 的小站</title>
+<title>文章 · Eraser 的小站</title>
 <link rel="stylesheet" href="../style.css">
 <link rel="manifest" href="../manifest.webmanifest">
 <link rel="icon" href="../icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="../icon.svg">
 <meta name="theme-color" content="#2563eb">
+<meta name="description" content="Eraser 的小站博客文章。">
+<!-- 分享卡片（og / twitter）：贴到聊天工具里能出预览 -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Eraser 的小站">
+<meta property="og:title" content="文章 · Eraser 的小站">
+<meta property="og:description" content="Eraser 的小站博客文章。">
+<meta property="og:url" content="https://eraser.de5.net/blog/post.html">
+<meta property="og:image" content="https://eraser.de5.net/og.png">
+<meta name="twitter:card" content="summary_large_image">
 <style>
   .post-head{ margin-bottom:26px; }
   .post-head h1{ font-size:28px; line-height:1.35; margin:0 0 10px; }
@@ -39,6 +48,7 @@
 </style>
 </head>
 <body>
+<a class="skip-link" href="#main">跳到正文</a>
 <div class="navbar">
   <span class="logo">🧩 Eraser 的小站</span>
   <nav>
@@ -51,14 +61,14 @@
     <a href="../about/index.html">关于</a>
   </nav>
 </div>
-<div class="container" id="container">
+<main class="container" id="main">
   <div class="loading">正在加载…</div>
-</div>
+</main>
 
 <script src="../md.js"></script>
 <script>
 (function(){
-  var box = document.getElementById("container");
+  var box = document.getElementById("main");
 
   function esc(s){
     return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");

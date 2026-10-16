@@ -7,12 +7,21 @@
 /* 尽早定主题，避免闪白；没存过就跟随系统偏好（切换按钮与命令面板见 shell.js） */
 (function(){try{var t=localStorage.getItem("eraser.theme");if(t!=="light"&&t!=="dark"){t=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";}document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();
 </script>
-<title>关于 - Eraser 的小站</title>
+<title>关于 · Eraser 的小站</title>
 <link rel="stylesheet" href="../style.css">
 <link rel="manifest" href="../manifest.webmanifest">
 <link rel="icon" href="../icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="../icon.svg">
 <meta name="theme-color" content="#2563eb">
+<meta name="description" content="关于 Eraser 的小站：这个站是什么、用什么搭的、为什么做。">
+<!-- 分享卡片（og / twitter）：贴到聊天工具里能出预览 -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Eraser 的小站">
+<meta property="og:title" content="关于 · Eraser 的小站">
+<meta property="og:description" content="关于 Eraser 的小站：这个站是什么、用什么搭的、为什么做。">
+<meta property="og:url" content="https://eraser.de5.net/about/">
+<meta property="og:image" content="https://eraser.de5.net/og.png">
+<meta name="twitter:card" content="summary_large_image">
 <style>
   .article{ font-size:15.5px; line-height:1.85; overflow-wrap:break-word; }
   .article h1,.article h2,.article h3{ margin:26px 0 12px; line-height:1.4; }
@@ -33,6 +42,7 @@
 </style>
 </head>
 <body>
+<a class="skip-link" href="#main">跳到正文</a>
 <div class="navbar">
   <span class="logo">🧩 Eraser 的小站</span>
   <nav>
@@ -45,7 +55,7 @@
     <a href="index.html" class="active">关于</a>
   </nav>
 </div>
-<div class="container">
+<main class="container" id="main">
   <!-- 静态兜底：接口不可用时显示这些 -->
   <div class="article" id="article">
     <h1>关于我</h1>
@@ -56,7 +66,7 @@
   <!-- 运行徽章放在 article 外：后台用 Markdown 替换正文时不动它 -->
   <p class="runbadge"><span class="dot">●</span> 本站已稳定运行 <b id="runDays">—</b> 天 · 自 2026 年 10 月起</p>
   <p class="runbadge" style="margin-top:8px"><a href="../dev/index.html" style="color:var(--muted)">🎛️ 开发交接（给接手的 AI）→</a></p>
-</div>
+</main>
 
 <script src="../md.js"></script>
 <script>
@@ -86,7 +96,7 @@ var SITE_LAUNCH = "2026-10-13";
       }
       if (!page) return;   // 还没在后台写过，保留静态兜底
 
-      document.title = page.data.title + " - Eraser 的小站";
+      document.title = page.data.title + " · Eraser 的小站";
       /* MD.render 会先整体转义再生成标签 */
       art.innerHTML = window.MD ? MD.render(page.data.content) : "";
     })

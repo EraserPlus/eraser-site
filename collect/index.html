@@ -13,6 +13,15 @@
 <link rel="icon" href="../icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="../icon.svg">
 <meta name="theme-color" content="#2563eb">
+<meta name="description" content="Eraser 的追更留档：正在追的番剧与漫画，带评分、进度和状态，看完自动收进收纳栏。">
+<!-- 分享卡片（og / twitter）：贴到聊天工具里能出预览 -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Eraser 的小站">
+<meta property="og:title" content="追更 · Eraser 的小站">
+<meta property="og:description" content="Eraser 的追更留档：正在追的番剧与漫画，带评分、进度和状态，看完自动收进收纳栏。">
+<meta property="og:url" content="https://eraser.de5.net/collect/">
+<meta property="og:image" content="https://eraser.de5.net/og.png">
+<meta name="twitter:card" content="summary_large_image">
 <style>
 /* ===== 追更页：海报墙（参考 dudulu.moe 的版式，配色沿用全站蓝） ===== */
 
@@ -192,6 +201,35 @@ html[data-theme="dark"] .mg-tag.t-wish { background: #6b7480; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
+/* 进度：看到第几集 / 共几话。有总集数才画进度条，否则只显示文字 */
+.mg-prog { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.mg-prog .track {
+  flex: 1; min-width: 24px; height: 4px; border-radius: 999px;
+  background: rgba(255,255,255,.28); overflow: hidden;
+}
+.mg-prog .track i { display: block; height: 100%; border-radius: 999px; background: #fff; }
+.mg-prog .txt {
+  color: rgba(255,255,255,.88); font-size: 10.5px; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 覆盖整张卡的链接层（有外链时才有）。放在按钮之下，点卡片空白处照旧跳外链 */
+.mg-hit { position: absolute; inset: 0; z-index: 3; }
+
+/* 「＋1 话」：只在登录后、且状态是「在看」时出现，右下角小圆钮 */
+.mg-plus {
+  position: absolute; right: 6px; bottom: 6px; z-index: 4;
+  width: 30px; height: 30px; padding: 0; border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.5);
+  background: rgba(37,99,235,.94); color: #fff;
+  font: 700 12px/1 inherit; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.mg-plus:hover { background: var(--blue-d); }
+.mg-plus:disabled { opacity: .55; cursor: default; }
+/* 有按钮时给底部文字让出位置，别压在一起 */
+.mg-item.has-plus .mg-mask { padding-right: 42px; }
+
 /* 收纳栏（已看完 / 已读完） */
 .mg-fold {
   display: flex; align-items: center; justify-content: space-between;
@@ -223,6 +261,7 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
 </style>
 </head>
 <body>
+<a class="skip-link" href="#main">跳到正文</a>
 <div class="navbar">
   <span class="logo">🧩 Eraser 的小站</span>
   <nav>
@@ -235,7 +274,7 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
     <a href="../about/index.html">关于</a>
   </nav>
 </div>
-<div class="container">
+<main class="container" id="main">
   <div class="mg-top">
     <h1>追更</h1>
     <p class="muted">追番、漫画，看过的都留档在这。</p>
@@ -270,7 +309,7 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
     <div class="mg-grid" id="list-comic"></div>
     <div id="foldWrap-comic"></div>
   </section>
-</div>
+</main>
 
 <script>
 /* ===========================================================================
@@ -295,6 +334,7 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
   var STATUS_ORDER = ["watching", "wish", "paused", "finished"];
 
   var allItems = [];        /* 接口返回的原始列表 */
+  var canEdit = false;      /* 本机存过后台令牌 → 才渲染「＋1 话」等写入按钮 */
   var filter = "all";       /* 当前状态筛选 */
 
   function $(id) { return document.getElementById(id); }
@@ -314,19 +354,32 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
   }
 
   /* 一张海报 */
+  /* 进度：progress = 看到第几集，episodes = 总集数。两个都可空。
+     - 都有 → 画进度条 + 「12 / 28」
+     - 只有总集数 → 只显示「共 28 话」
+     - 只有进度   → 只显示「看到 12 话」（连载中不知道总数很正常） */
+  function progressOf(d) {
+    var hasCur = d.progress !== null && d.progress !== undefined && d.progress !== "";
+    var hasTot = d.episodes !== null && d.episodes !== undefined && d.episodes !== "";
+    if (!hasCur && !hasTot) return null;
+    var cur = hasCur ? Number(d.progress) : null;
+    var tot = hasTot ? Number(d.episodes) : null;
+    if (cur != null && tot != null && tot > 0) {
+      return { pct: Math.max(0, Math.min(100, Math.round(cur / tot * 100))), text: cur + " / " + tot };
+    }
+    if (tot != null) return { pct: null, text: "共 " + tot + " 话" };
+    return { pct: null, text: "看到 " + cur + " 话" };
+  }
+
   function makeCard(it, lab) {
     var d = it.data || {};
     var status = lab[d.status] ? d.status : "wish";
     var link = safeUrl(d.url);
     var cover = safeUrl(d.cover);
 
-    /* 有链接 → <a>；没链接 → <div>（保持同样的样子，但不可点） */
-    var card = link ? el("a", "mg-item") : el("div", "mg-item");
-    if (link) {
-      card.href = link;
-      card.target = "_blank";
-      card.rel = "noopener noreferrer";
-    }
+    /* 卡片永远是 <div> 容器：这样「＋1」按钮才能合法地放进来
+       （<button> 不允许嵌在 <a> 里）。有外链时另外铺一层覆盖全卡的 <a>。 */
+    var card = el("div", "mg-item");
 
     if (cover) {
       var img = el("img");
@@ -353,11 +406,74 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
 
     /* 底部渐变压名字 */
     var mask = el("div", "mg-mask");
+    var pg = progressOf(d);
+    if (pg) {
+      var bar = el("div", "mg-prog");
+      if (pg.pct != null) {
+        var track = el("span", "track");
+        var fill = el("i");
+        fill.style.width = pg.pct + "%";
+        track.appendChild(fill);
+        bar.appendChild(track);
+      }
+      bar.appendChild(el("span", "txt", pg.text));
+      mask.appendChild(bar);
+    }
     mask.appendChild(el("div", "nm", d.name || "(未命名)"));
     if (d.note) mask.appendChild(el("div", "sub", d.note));
     card.appendChild(mask);
 
+    /* 覆盖全卡的链接层。放在按钮之前，按钮才点得到 */
+    if (link) {
+      var hit = el("a", "mg-hit");
+      hit.href = link;
+      hit.target = "_blank";
+      hit.rel = "noopener noreferrer";
+      hit.setAttribute("aria-label", (d.name || "条目") + "（新窗口打开）");
+      card.appendChild(hit);
+    }
+
+    /* 登录后：状态是「在看」就给一个「＋1 话」——追更最高频的动作 */
+    if (canEdit && d.status === "watching") {
+      var plus = el("button", "mg-plus", "＋1");
+      plus.type = "button";
+      plus.title = "看到下一话";
+      plus.setAttribute("aria-label", "把「" + (d.name || "这条") + "」的进度 +1");
+      plus.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        bumpProgress(it, plus);
+      });
+      card.classList.add("has-plus");
+      card.appendChild(plus);
+    }
+
     return card;
+  }
+
+  /* 「＋1 话」：直接 PATCH 这一条的 progress，成功后就地重画整面墙 */
+  function bumpProgress(it, btn) {
+    var d = it.data || {};
+    var cur = (d.progress === null || d.progress === undefined || d.progress === "")
+      ? 0 : Number(d.progress);
+    var next = cur + 1;
+    btn.disabled = true;
+    fetch("/api/content", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + getToken() },
+      body: JSON.stringify({ id: it.id, data: { progress: next } }),
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        if (!r.ok) throw new Error((j && j.error) || ("请求失败（" + r.status + "）"));
+        return j;
+      });
+    }).then(function () {
+      d.progress = next;          /* 同一条对象，改完直接重画 */
+      apply(allItems);
+    }).catch(function (e) {
+      btn.disabled = false;
+      alert("没记上：" + e.message);
+    });
   }
 
   /* 渐变兜底块：按 id 取一个固定的配色，同一部作品每次进来颜色一样 */
@@ -600,10 +716,27 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
     two2.appendChild(dWrap);
     panel.appendChild(two2);
 
+    /* 总集数 + 看到第几集 */
+    var two3 = el("div", "two");
+    var epWrap = el("div");
+    epWrap.appendChild(el("label", null, "总集数（可空）"));
+    var epInput = document.createElement("input");
+    epInput.type = "text"; epInput.placeholder = "比如：28";
+    epWrap.appendChild(epInput);
+    two3.appendChild(epWrap);
+
+    var pgWrap = el("div");
+    pgWrap.appendChild(el("label", null, "看到第几集（可空）"));
+    var pgInput = document.createElement("input");
+    pgInput.type = "text"; pgInput.placeholder = "比如：12";
+    pgWrap.appendChild(pgInput);
+    two3.appendChild(pgWrap);
+    panel.appendChild(two3);
+
     /* 备注 */
     panel.appendChild(el("label", null, "备注（可空）"));
     var noteInput = document.createElement("input");
-    noteInput.type = "text"; noteInput.placeholder = "比如：周五更新 · 看到第 8 话";
+    noteInput.type = "text"; noteInput.placeholder = "比如：周五更新 · B站有删减";
     panel.appendChild(noteInput);
 
     /* 链接 + 封面 */
@@ -649,6 +782,7 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
           if (!hit) { setMsg(j && j.hint ? j.hint : "没找到，直接手填也行。", "err"); return; }
           if (hit.name) nameInput.value = hit.name;
           if (hit.score != null) scInput.value = String(hit.score);
+          if (hit.episodes != null) epInput.value = String(hit.episodes);
           if (hit.note) noteInput.value = hit.note;
           if (hit.url) urlInput.value = hit.url;
           if (hit.cover) covInput.value = hit.cover;
@@ -670,6 +804,8 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
           name: name,
           status: stSel.value,
           score: scInput.value.trim(),
+          episodes: epInput.value.trim(),
+          progress: pgInput.value.trim(),
           note: noteInput.value.trim(),
           date: dInput.value.trim(),
           url: urlInput.value.trim(),
@@ -716,6 +852,7 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
   fetch("/api/content?type=media", { headers: { Accept: "application/json" } })
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (j) {
+      canEdit = !!getToken();   /* 有令牌才画「＋1 话」，必须先于 apply */
       apply((j && j.items) || []);
       setupQuickAdd();   /* 数据到手后再决定是否显示按钮，避免闪一下 */
     })
