@@ -365,7 +365,7 @@ body: { items: [ {type:"media", data:{...}}, ... ] }     一次最多 500 条
 
 | 来源 | 认的链接 | 说明 |
 | --- | --- | --- |
-| B 站 | `bilibili.com/video/BV…`（可带 `?p=`） | 用官方 `player.bilibili.com/player.html`；`b23.tv` 短链**不解析**（拿不到 BV 号，不猜） |
+| B 站 | `bilibili.com/video/BV…`（可带 `?p=`）或番剧页 `/bangumi/play/ep…` / `ss…` | 用官方 `player.bilibili.com/player.html`；`b23.tv` 短链**不解析**（拿不到 BV 号，不猜） |
 | YouTube | `youtube.com/watch?v=…` / `youtu.be/…` / `youtube.com/shorts/…` | 用 `youtube-nocookie.com/embed`，带 `enablejsapi=1` |
 | Vimeo | `vimeo.com/<数字>` / `player.vimeo.com/video/<数字>` | 带 `api=1` |
 | 直链视频 | 以 `.mp4 / .m4v / .webm / .ogv / .ogg` 结尾 | 原生 `<video>` |
