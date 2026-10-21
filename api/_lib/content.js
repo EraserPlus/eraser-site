@@ -34,7 +34,8 @@ const TYPES = {
   media: {
     public: true,
     needsParent: false,
-    fields: ['category', 'name', 'status', 'score', 'episodes', 'progress', 'note', 'date', 'url', 'cover'],
+    fields: ['category', 'name', 'status', 'score', 'episodes', 'progress', 'note', 'date', 'url', 'cover',
+             'position', 'duration'],
   },
   learn_map: {
     public: true,
@@ -214,6 +215,10 @@ export function normalize(type, raw) {
        两个都可空——连载中 / 没追完的片子只知道看到哪、不知道总集数很正常。 */
     out.episodes = count(d.episodes, '总集数');
     out.progress = count(d.progress, '进度（看到第几集）');
+    /* 站内播放器的续播点，单位为秒。B 站播放器不开放读取时间，只有
+       YouTube / Vimeo / 直链视频会写这两个字段；其他来源保持 null。 */
+    out.position = count(d.position, '播放位置（秒）', 1000000);
+    out.duration = count(d.duration, '视频时长（秒）', 1000000);
     out.date = str(d.date, '日期', { max: 20, required: false });
     out.url = str(d.url, '链接', { max: 2000, required: false });
     out.cover = str(d.cover, '封面图地址', { max: 2000, required: false });

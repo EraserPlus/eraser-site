@@ -20,7 +20,8 @@
 /* v1 → v2：M11 修了 style.css 的暗色按钮、M12 改了页面、M13 又动了 style.css（跳转链接）与全站 head */
 /* v2 → v3：公开页接入站主就地编辑（owner.js / owner.css / 新版 content.js） */
 /* v3 → v4：M18 阅读便利（style.css 移动端顶栏、post.html 阅读增强、md.js 阅读统计） */
-const VERSION = 'eraser-v4';
+/* v4 → v5：M19 追更页站内播放（watch.js、collect 弹层、续播点字段） */
+const VERSION = 'eraser-v5';
 const CACHE = VERSION;
 
 /* 预缓存：离线时至少能打开首页外壳（页面本体走 network-first，这是兜底） */
@@ -28,6 +29,7 @@ const PRECACHE = [
   '/',
   '/style.css',
   '/shell.js',
+  '/watch.js',
   '/manifest.webmanifest',
   '/icon.svg',
 ];

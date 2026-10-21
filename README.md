@@ -16,6 +16,9 @@ eraser-site/
 ├── style.css             全站统一样式（改这里 = 公开页换肤）
 ├── md.js                 自研 Markdown 渲染器（内置转义，见「已知取舍」）
 ├── shell.js              全站公共交互层（主题切换按钮 / Ctrl+K 命令面板 / g 前缀跳转 / 注册 Service Worker）
+├── owner.js              站主就地编辑（Ctrl/⌘+Shift+L 登录；与后台共用 eraser.admin.token）
+├── owner.css             站主态样式（左下浮条 / 行内编辑按钮 / 登录弹层）
+├── watch.js              追更站内播放（B 站 / YouTube / Vimeo 官方嵌入 + mp4 直链续播）
 ├── sw.js                 Service Worker（HTML 网络优先带缓存兜底、静态资源缓存优先、接口不缓存、离线兜底页）
 ├── manifest.webmanifest  PWA 清单（可「添加到主屏幕」）
 ├── icon.svg              站点图标（可选作 maskable 的版本见 icon-maskable.svg）
@@ -54,11 +57,12 @@ eraser-site/
 │   ├── index.html        后台全部界面与逻辑（9 个标签，含「一键接上 AI」「数据」备份，追更列表带搜索/筛选/排序/行内改状态）
 │   └── content.js        导航/博客/页面/追更/学习地图 内容管理模块（SCHEMA 驱动，含批量导入解析与按名字自动填充）
 │
-├── tests/                十套测试 + 测试用假数据库驱动
+├── tests/                十一套测试 + 测试用假数据库驱动
 │   ├── api_test.mjs      令牌/密码/入参校验/favicon SSRF 与魔数识别/后台令牌与 AI 令牌互不通用（182 项）
-│   ├── content_test.mjs  七种内容类型归一化（含追更、学习地图）/ Markdown 渲染与安全（169 项）
-│   ├── api_routes_test.mjs 接口全流程：鉴权/CRUD/注入/限流/PATCH 合并语义/RSS/上传/favicon/追更/学习地图 gaps/sitemap/备份/批量导入（414 项）
-│   ├── pages_audit.mjs   8 个公开页面（含追更/交接页）：结构/零站外资源/静态兜底/注入防护/PWA/前台快捷录入（361 项）
+│   ├── content_test.mjs  七种内容类型归一化（含追更进度/播放位置、学习地图）/ Markdown 渲染与安全（184 项）
+│   ├── watch_test.mjs    站内播放器纯逻辑：四类源解析/嵌入地址/时间工具/续播语义 + collect 接入审计（68 项）
+│   ├── api_routes_test.mjs 接口全流程：鉴权/CRUD/注入/限流/PATCH 合并语义/RSS/上传/favicon/追更/学习地图 gaps/sitemap/备份/批量导入（417 项）
+│   ├── pages_audit.mjs   8 个公开页面（含追更/交接页）：结构/零站外资源/静态兜底/注入防护/PWA/前台快捷录入/站主态（410 项）
 │   ├── admin_audit.mjs   管理后台：主题/隐私/接口/安全/功能点/接上 AI 面板/批量导入与自动填充（217 项）
 │   ├── outline_check.mjs 大纲解析（从 learn 页抽函数跑）：Markdown 标记/缩进/Tab/CRLF/坏输入（11 项）
 │   ├── media_import_test.mjs  批量导入解析：TSV/JSON/中英表头/无表头/管道分隔/评分越界/坏 JSON（46 项）
@@ -78,7 +82,7 @@ eraser-site/
 │   ├── index.html        文章列表（读 /api/content?type=post）
 │   └── post.html         文章详情（?slug=xxx，用 md.js 渲染正文）
 ├── collect/
-│   └── index.html        追更页（追番/漫画留档，读 /api/content?type=media；登录后有「＋ 快速添加」快捷录入）
+│   └── index.html        追更页（追番/漫画留档，读 /api/content?type=media；登录后有「＋ 快速添加」快捷录入；可播的链接显示 ▶ 站内播放）
 ├── learn/
 │   └── index.html        学习地图（列表可搜可汇总 / 分组折叠 / 节点就地编辑 / 拖动排序 / 导入大纲成图）
 ├── dev/
@@ -134,7 +138,7 @@ eraser-site/
 npm test
 ```
 
-一条命令按顺序跑完十套测试，共 **1667 项**，全部通过即说明站点核心逻辑健康。
+一条命令按顺序跑完十一套测试，共 **1802 项**，全部通过即说明站点核心逻辑健康。
 
 - **不需要真数据库 / 真 Blob**：`tests/stubs/` 里有手写的假 Neon 驱动（全局 `__FAKE_DB__` 预设 SQL 返回值）和假 @vercel/blob 驱动（全局 `__FAKE_BLOB__` 预设 put 返回值），只验证逻辑不连外部服务。
 - CI 里也是同一套路：`npm ci` 装回真包后，用假驱动覆盖 `node_modules/@neondatabase/serverless`，再 `npm test`。
@@ -353,6 +357,51 @@ body: { items: [ {type:"media", data:{...}}, ... ] }     一次最多 500 条
 
 ---
 
+## 五之六、追更站内播放（M19）
+
+目标：在 `collect/` 海报墙上直接看，并把「看到哪一集 / 看到第几秒」记回同一条追更记录。**只嵌官方播放器**，不下载、不代理、不绕过任何限制。
+
+### 支持哪些链接
+
+| 来源 | 认的链接 | 说明 |
+| --- | --- | --- |
+| B 站 | `bilibili.com/video/BV…`（可带 `?p=`） | 用官方 `player.bilibili.com/player.html`；`b23.tv` 短链**不解析**（拿不到 BV 号，不猜） |
+| YouTube | `youtube.com/watch?v=…` / `youtu.be/…` / `youtube.com/shorts/…` | 用 `youtube-nocookie.com/embed`，带 `enablejsapi=1` |
+| Vimeo | `vimeo.com/<数字>` / `player.vimeo.com/video/<数字>` | 带 `api=1` |
+| 直链视频 | 以 `.mp4 / .m4v / .webm / .ogv / .ogg` 结尾 | 原生 `<video>` |
+
+其余链接（漫画页、网盘、未知站点）保持原来的「站外打开」。**漫画没有可嵌入的官方播放器**，所以漫画条目仍是外链，进度靠「＋1 话」手记。
+
+### 进度怎么记
+
+- `media` 新增 `position`（秒）与 `duration`（秒），可空非负整数，上限 1,000,000，校验在 `api/_lib/content.js` 的 `count()`。
+- 播放中每 15 秒（且位置变化 ≥8 秒）保存一次；关闭弹层、切后台、离开页面时再补一次（`keepalive`）。
+- 再次点开：未看完（`status !== "finished"`）且已存 ≥5 秒 → 从续播点开始；距结尾 5 秒内视为看完 → 从头开始；已看完的条目再看一遍也从头。
+- 「＋1 话」会同时把 `position` 归零，下一集不会跳到上一集的片尾；加完这一话后旧播放器停止保存，避免把上一集的时间写进新一集。
+- 没登录（没有 `eraser.admin.token`）可以看，但**不记录播放位置**，弹层里会直说。
+
+> ⚠️ **B 站拿不到播放时间**。官方 iframe 不向父页暴露 `currentTime`（实测 0 条 postMessage），所以 B 站只同步「第几集」（`progress`），秒级续播只对 YouTube / Vimeo / 直链生效。这不是本站能绕过的限制。
+>
+> ⚠️ **没有新开接口**。Vercel Hobby 最多 12 个函数，`api/` 已经满编；播放器读写全部复用 `PATCH /api/content`（JSONB 合并），`watch.js` 是纯前端文件。
+>
+> 建议：YouTube / Vimeo 在部分网络环境不可达；打不开时弹层 8 秒后会提示「站外打开」。B 站与直链是当前最稳的两条。
+
+### 缓存
+
+`sw.js` 版本升到 `eraser-v5`，预缓存加入 `/watch.js`。改 `watch.js` / `collect/index.html` / `style.css` 后记得再 +1。
+
+---
+
+## 五之七、M14–M18 速览（交接补充）
+
+- **M14 动效基座**：只改 `style.css` 与 `shell.js`——≤300ms 反馈型动效、`prefers-reduced-motion` 总开关、统一 `:focus-visible` 焦点环、卡片悬停上浮、命令面板开合、主题切换交叉淡化。布局零变化。
+- **M15 三态与触控**：博客列表 / 文章页 / 追更双栏 / 学习列表在接口失败时不再伪装成「空库」，改为「加载失败 + 重试」，空库与失败分开；全站 <24px 可点元素 63 → 1；移动导航链接与分类折叠按钮加大触控区。
+- **M16 正文阅读增强**：`blog/post.html` 自动目录（h2/h3、中文锚点、当前节高亮）、顶部阅读进度、代码块复制、阅读时长/字数；修掉 `main.container` 的 `transform` 造成的吸顶栏层叠 Bug（`elementFromPoint` 已回到导航链接）。
+- **M17 站主就地编辑**：`owner.js` + `owner.css`，任何可编辑页按 `Ctrl/⌘+Shift+L` 登录（与后台共用 `eraser.admin.token`），博客 / 文章 / 关于 / 导航 / 追更 / 学习地图直接长出「新建 / 编辑 / 删除」入口；访客看不到入口，草稿不会出现在公开列表与直链。表单、Markdown 预览、上传等全部复用 `admin/content.js`，没有第二套实现。
+- **M18 阅读便利**：正文续读（只存百分比，30 天过期）、字号 90%–130%、标题锚点复制、复制链接 / 打印、图片灯箱、回到顶部；博客列表显示「约 N 分钟 · 读到 55%」与 RSS 入口；移动端顶栏从 126px 收到 90px，列表「阅读」按钮不再竖排。
+
+---
+
 ## 五之三、加一个新工具（工具箱预留接口）
 
 工具箱页面（`tools/index.html`）是**数据驱动**的：页面里的 `TOOLS` 数组就是唯一清单。上架一个新工具只要两步：
@@ -376,16 +425,17 @@ T12 起密码生成器已下架（主人预留位置回头补内容），数组�
 | 套件 | 覆盖 | 项数 |
 | --- | --- | --- |
 | `tests/api_test.mjs` | 令牌签发/校验/过期/改密码失效、密码校验、safeEqual、requireAuth、后台令牌与 AI 令牌互不通用、配置自检、入参校验、favicon SSRF 防护与图片魔数识别、api/ 与 admin/ 源文件语法 | 182 |
-| `tests/content_test.mjs` | 七种内容类型归一化（含追更 media 的**进度字段与合并语义**、学习地图 learn_map）、Markdown 渲染 / 图片 / 安全性 / 边界、plain() 摘要 | 169 |
-| `tests/api_routes_test.mjs` | 接口全流程：未登录 401、CRUD、入参 400、404、405、优先级、SQL 注入、登录限流、缺配置 503、409 唯一性、级联删除、响应头、PATCH 合并语义、RSS 订阅源、文件上传、favicon 代理、追更、学习地图（节点粒度 action / 深链 / gaps 快照）、sitemap.xml、备份与还原、**批量导入（预校验零写入 / 上限 500 / 批内去重 / 个别失败 / 进度字段校验）**、**按名字查（AniList 打桩全流程，挂在 /api/content 上）**、**PATCH 只改进度不丢总集数** | 414 |
-| `tests/pages_audit.mjs` | 8 个公开页面（含追更海报墙/学习地图/开发交接页）：内联脚本语法、零站外资源、同源 fetch、导航栏统一、静态兜底、Markdown 安全、PWA（manifest/图标/sw 策略）、各页功能点、**追更页「＋ 快速添加」与进度条 / ＋1 话、交接页批次与套数同步**、**无障碍（main 地标 / 跳转链接）、分享卡片（description / og）、品牌与标题一致性** | 361 |
+| `tests/content_test.mjs` | 七种内容类型归一化（含追更 media 的**进度 / 播放位置字段与合并语义**、学习地图 learn_map）、Markdown 渲染 / 图片 / 安全性 / 边界、plain() 摘要 | 184 |
+| `tests/watch_test.mjs` | 站内播放器纯逻辑：B 站 / YouTube / Vimeo / 直链四类解析、拒绝 javascript / data / 漫画 / b23 短链、嵌入地址与起始秒、时间格式化、续播语义、无 innerHTML/eval、collect 接入与移动端样式审计 | 68 |
+| `tests/api_routes_test.mjs` | 接口全流程：未登录 401、CRUD、入参 400、404、405、优先级、SQL 注入、登录限流、缺配置 503、409 唯一性、级联删除、响应头、PATCH 合并语义、RSS 订阅源、文件上传、favicon 代理、追更、学习地图（节点粒度 action / 深链 / gaps 快照）、sitemap.xml、备份与还原、**批量导入（预校验零写入 / 上限 500 / 批内去重 / 个别失败 / 进度字段校验）**、**按名字查（AniList 打桩全流程，挂在 /api/content 上）**、**PATCH 只改进度不丢总集数 / 只改播放位置不丢其它字段** | 417 |
+| `tests/pages_audit.mjs` | 8 个公开页面（含追更海报墙/学习地图/开发交接页）：内联脚本语法、零站外资源、同源 fetch、导航栏统一、静态兜底、Markdown 安全、PWA（manifest/图标/sw 策略）、各页功能点、**追更页「＋ 快速添加」与进度条 / ＋1 话 / ▶ 站内播放、交接页批次与套数同步**、**无障碍（main 地标 / 跳转链接）、分享卡片（description / og）、品牌与标题一致性、站主就地编辑入口、三态与阅读增强** | 410 |
 | `tests/admin_audit.mjs` | 后台：结构、深浅色主题、隐私（noindex/零站外资源）、Bearer 令牌、XSS 防护、九个标签功能点（含追更表单、学习地图节点编辑、一键接上 AI、备份还原）、**追更列表搜索/筛选/排序、行内改状态、封面缩略图回落、批量导入弹层与失败上报、按名字自动填充、进度字段与行内 ＋1**、Markdown 实时预览与草稿自动保存 | 217 |
 | `tests/outline_check.mjs` | 大纲解析（直接从 `learn/index.html` 抽函数来跑）：四种 Markdown 标记、缩进与 Tab 等价、空格缩进、三层嵌套、CRLF、空/坏输入 | 11 |
 | `tests/media_import_test.mjs` | 批量导入解析（在 vm 沙箱里加载 `admin/content.js` 的真函数）：TSV 带表头、中文逗号表头、英文表头、无表头纯名字、无表头带状态、管道分隔、JSON 数组 / `{type,data}` / `{items:[…]}`、空名字行、评分越界（99 / -3 / 8.4 / abc）、坏 JSON 抛错、**总集数 / 进度列（含别名与从「28 话」抠数字）** | 46 |
 | `tests/lookup_test.mjs` | AniList 查询纯逻辑：空/超长入参、kind 归一化、perPage 夹取、**关键词只进 variables 不进查询串**、打分 0–100→0–10、name 取 native→romaji→english、episodes 回落 chapters、note 拼装、0 结果过滤 | 38 |
 | `tests/nav_test.cjs` | 导航核心逻辑：links.js 数据体检、hostOf/initialOf/hueOf、查询匹配、分类过滤（含侧栏 cat）、最近访问、标签收集、高亮区间、导入导出往返、真实数据全视图 | 145 |
 | `tests/nav_audit.cjs` | 导航静态审计：结构、零外部请求、DOM 接线、localStorage 键规范、功能点（含最近视图/密度切换/复制/回到顶部）、全站一致性 | 84 |
-| **合计** | | **1667** |
+| **合计** | | **1802** |
 
 > 注：`api_test.mjs` 的项数随 `api/` 与 `admin/` 下的 `.js` 文件数浮动（每个文件一条语法断言）。
 

@@ -276,6 +276,107 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
 
 /* 小提示行 */
 .mg-tip { font-size: 12.5px; color: var(--muted); margin-top: 12px; }
+
+/* ===== 站内播放（M19） ===== */
+/* 有官方播放器时，整张卡变成「播放按钮」，海报中央加一个 ▶ */
+button.mg-hit {
+  border: 0; padding: 0; background: transparent; cursor: pointer;
+  font: inherit; color: inherit;
+}
+button.mg-hit:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+.mg-play {
+  position: absolute; left: 50%; top: 50%; z-index: 3;
+  width: 50px; height: 50px; margin: -25px 0 0 -25px;
+  border-radius: 999px; pointer-events: none;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,.52); border: 1.5px solid rgba(255,255,255,.72);
+  box-shadow: 0 6px 22px rgba(0,0,0,.36);
+  transition: transform .2s ease, background .2s ease;
+}
+.mg-play::before {
+  content: ""; display: block; margin-left: 3px;
+  border-style: solid; border-width: 10px 0 10px 17px;
+  border-color: transparent transparent transparent #fff;
+}
+.mg-item:hover .mg-play { transform: scale(1.08); background: rgba(37,99,235,.92); }
+@media (prefers-reduced-motion: reduce) {
+  .mg-play { transition: none; }
+  .mg-item:hover .mg-play { transform: none; }
+}
+
+/* 播放器弹层 */
+.watch-mask {
+  position: fixed; inset: 0; z-index: 300;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px; background: rgba(3,7,18,.78);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+.watch-panel {
+  width: 100%; max-width: 1020px; max-height: 94vh;
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--bg); border: 1px solid var(--line);
+  border-radius: 14px; box-shadow: 0 24px 70px rgba(0,0,0,.45);
+}
+.watch-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 14px; border-bottom: 1px solid var(--line);
+}
+.watch-head h3 {
+  flex: 1; min-width: 0; margin: 0; font-size: 15px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.watch-x {
+  flex: 0 0 auto; width: 30px; height: 30px; padding: 0;
+  border: 1px solid var(--line2); border-radius: 8px;
+  background: var(--card); color: var(--ink2);
+  font: 14px/1 inherit; cursor: pointer;
+}
+.watch-x:hover { border-color: var(--blue); color: var(--blue); }
+html[data-theme="dark"] .watch-x { color: var(--ink); }
+
+.watch-stage {
+  position: relative; width: 100%; aspect-ratio: 16 / 9; max-height: 64vh;
+  background: #000; overflow: hidden;
+}
+.watch-stage iframe, .watch-stage video {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  border: 0; display: block; background: #000;
+}
+.watch-error {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 12px;
+  padding: 24px; color: #e6edf3; text-align: center; font-size: 13.5px;
+}
+.watch-error p { margin: 0; max-width: 460px; line-height: 1.6; }
+
+.watch-foot {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 10px 14px; padding: 10px 14px;
+}
+.watch-meta { flex: 1 1 220px; min-width: 0; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+.watch-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.watch-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 34px; padding: 6px 14px; border-radius: 9px;
+  border: 1px solid var(--line2); background: var(--card); color: var(--ink2);
+  font: 13px/1.2 inherit; text-decoration: none; cursor: pointer; white-space: nowrap;
+}
+.watch-btn:hover { border-color: var(--blue); color: var(--blue); text-decoration: none; }
+.watch-btn.primary { background: var(--blue); border-color: var(--blue); color: #fff; font-weight: 600; }
+.watch-btn.primary:hover { background: var(--blue-d); color: #fff; }
+.watch-btn:disabled { opacity: .55; cursor: default; }
+.watch-btn.hot { background: #2f9e56; border-color: #2f9e56; color: #fff; font-weight: 600; }
+html[data-theme="dark"] .watch-btn { color: var(--ink); }
+html[data-theme="dark"] .watch-btn.primary,
+html[data-theme="dark"] .watch-btn.hot { color: #fff; }
+
+@media (max-width: 640px) {
+  .watch-mask { padding: 0; align-items: flex-start; }
+  .watch-panel { max-height: 100dvh; border-radius: 0; border: 0; }
+  .watch-stage { max-height: none; }
+  .watch-head { padding-top: calc(9px + env(safe-area-inset-top)); }
+  .watch-foot { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+}
 </style>
 </head>
 <body>
@@ -299,7 +400,7 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
     <!-- 只有在本机登录过后台才会出现（读 localStorage 里的后台令牌）。
          没登录的访客看不到这个按钮，也不会发任何请求。 -->
     <button class="mg-add" id="mgAdd" type="button" style="display:none">＋ 快速添加</button>
-    <p class="muted" id="ownerHint" style="display:none">编辑模式：点海报上的 ✎ 就地改，✕ 删除。</p>
+    <p class="muted" id="ownerHint" style="display:none">编辑模式：点海报上的 ✎ 就地改，✕ 删除；视频页链接会自动变成 ▶ 站内播放。</p>
   </div>
 
   <!-- 顶部统计（有数据后才显示） -->
@@ -328,8 +429,11 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
     <div class="mg-grid" id="list-comic"></div>
     <div id="foldWrap-comic"></div>
   </section>
+
+  <p class="mg-tip">视频条目的链接如果是 B 站 / YouTube / Vimeo 官方视频页（或 mp4 直链），海报上会出现 ▶，可以直接在站内看；漫画等不支持嵌入的站点仍跳站外，进度照常记录。</p>
 </main>
 
+<script src="../watch.js"></script>
 <script src="../owner.js"></script>
 <script src="../admin/content.js"></script>
 <script>
@@ -398,6 +502,9 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
     var status = lab[d.status] ? d.status : "wish";
     var link = safeUrl(d.url);
     var cover = safeUrl(d.cover);
+    /* 只有能认出官方播放器（B 站 / YouTube / Vimeo / 直链）才变「播放」，
+       漫画站和其他不支持嵌入的链接继续走站外打开。 */
+    var play = link && window.Watch ? Watch.parse(link) : null;
 
     /* 卡片永远是 <div> 容器：这样「＋1」按钮才能合法地放进来
        （<button> 不允许嵌在 <a> 里）。有外链时另外铺一层覆盖全卡的 <a>。 */
@@ -445,8 +552,25 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
     if (d.note) mask.appendChild(el("div", "sub", d.note));
     card.appendChild(mask);
 
-    /* 覆盖全卡的链接层。放在按钮之前，按钮才点得到 */
-    if (link) {
+    /* 能站内播放的条目，海报中央加一个 ▶ */
+    if (play) {
+      card.classList.add("is-play");
+      var badge = el("span", "mg-play");
+      badge.setAttribute("aria-hidden", "true");
+      card.appendChild(badge);
+    }
+
+    /* 覆盖全卡的点击层。放在按钮之前，按钮才点得到。
+       能播放的用 <button> 开弹层；不能嵌入的仍是跳外链。 */
+    if (play) {
+      var playHit = el("button", "mg-hit");
+      playHit.type = "button";
+      playHit.title = "在站内播放";
+      playHit.setAttribute("aria-label",
+        "在站内播放「" + (d.name || "这个视频") + "」（" + play.label + "）");
+      playHit.addEventListener("click", function () { openWatch(it); });
+      card.appendChild(playHit);
+    } else if (link) {
       var hit = el("a", "mg-hit");
       hit.href = link;
       hit.target = "_blank";
@@ -503,29 +627,59 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
     return wrap;
   }
 
-  /* 「＋1 话」：直接 PATCH 这一条的 progress，成功后就地重画整面墙 */
-  function bumpProgress(it, btn) {
-    var d = it.data || {};
-    var cur = (d.progress === null || d.progress === undefined || d.progress === "")
-      ? 0 : Number(d.progress);
-    var next = cur + 1;
-    btn.disabled = true;
-    fetch("/api/content", {
+  /* 单条 PATCH：续播点、进度都走这里。
+     keepalive 用在页面关闭 / 切后台时，浏览器会尽量把请求发完。 */
+  function patchMedia(id, patch, opts) {
+    return fetch("/api/content", {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + getToken() },
-      body: JSON.stringify({ id: it.id, data: { progress: next } }),
+      body: JSON.stringify({ id: id, data: patch }),
+      keepalive: !!(opts && opts.keepalive),
     }).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (j) {
         if (!r.ok) throw new Error((j && j.error) || ("请求失败（" + r.status + "）"));
         return j;
       });
-    }).then(function () {
-      d.progress = next;          /* 同一条对象，改完直接重画 */
-      apply(allItems);
-    }).catch(function (e) {
-      btn.disabled = false;
-      alert("没记上：" + e.message);
     });
+  }
+
+  /* 「＋1 话」：直接 PATCH 这一条的 progress，成功后就地重画整面墙。
+     btn 可空（播放器里用），done / fail 用来更新播放器底部状态。 */
+  function bumpProgress(it, btn, done, fail) {
+    var d = it.data || {};
+    var cur = (d.progress === null || d.progress === undefined || d.progress === "")
+      ? 0 : Number(d.progress);
+    var next = cur + 1;
+    if (btn) btn.disabled = true;
+    /* 进入下一集时把上一集的续播点归零，否则新一集会直接跳到上一集结尾 */
+    return patchMedia(it.id, { progress: next, position: 0 }).then(function () {
+      d.progress = next;          /* 同一条对象，改完直接重画 */
+      d.position = 0;
+      if (typeof done === "function") done(next);
+      apply(allItems);
+      return next;
+    }).catch(function (e) {
+      if (btn) btn.disabled = false;
+      if (typeof fail === "function") fail(e.message);
+      else if (window.Owner) Owner.toast("没记上：" + e.message, "err");
+      else alert("没记上：" + e.message);
+      throw e;
+    });
+  }
+
+  /* 站内播放：watch.js 负责解析、iframe、续播点；这里只提供写入通道 */
+  function openWatch(it) {
+    var d = it.data || {};
+    if (!window.Watch) return;
+    var opened = Watch.open(it, {
+      canEdit: canEdit,
+      save: function (patch, o) { return patchMedia(it.id, patch, o); },
+      plus: function (done, fail) { bumpProgress(it, null, done, fail); },
+      toast: function (msg, kind) { if (window.Owner) Owner.toast(msg, kind); },
+    });
+    if (opened) return;
+    var link = safeUrl(d.url);
+    if (link) window.open(link, "_blank", "noopener");
   }
 
   /* 渐变兜底块：按 id 取一个固定的配色，同一部作品每次进来颜色一样 */

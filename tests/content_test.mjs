@@ -146,6 +146,17 @@ console.log('\n=== media（追更）===');
   /* PATCH 是「先合并再归一化」，所以只改 progress 不会把 episodes 冲掉 */
   const merged = C.normalize('media', { ...C.normalize('media', { ...base, episodes: 28, progress: 12 }), progress: 13 });
   check('合并语义：只改进度不会丢掉总集数', merged.episodes === 28 && merged.progress === 13);
+
+  /* 站内播放续播点（M19）：position / duration，秒，可空 */
+  check('播放位置/时长默认是 null', empty.position === null && empty.duration === null);
+  check('播放位置接受数字字符串', C.normalize('media', { ...base, position: '754' }).position === 754);
+  check('播放位置为 0 合法', C.normalize('media', { ...base, position: 0 }).position === 0);
+  check('时长按秒保存', C.normalize('media', { ...base, duration: 1440 }).duration === 1440);
+  check('播放位置小数报错', code(() => C.normalize('media', { ...base, position: 12.5 })) === 'BAD_INPUT');
+  check('播放位置负数报错', code(() => C.normalize('media', { ...base, position: -1 })) === 'BAD_INPUT');
+  check('播放位置超上限报错', code(() => C.normalize('media', { ...base, position: 1000001 })) === 'BAD_INPUT');
+  const resume = C.normalize('media', { ...C.normalize('media', { ...base, position: 100 }), position: 320 });
+  check('合并语义：只改续播点不影响其他字段', resume.position === 320 && resume.name === base.name);
 }
 
 console.log('\n=== learn_map（学习地图）===');

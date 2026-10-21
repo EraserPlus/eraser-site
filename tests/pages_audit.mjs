@@ -108,7 +108,8 @@ for (const f of PAGES) {
   check(`${f} 标题分隔符统一为 ·`, /<title>[^<]* · Eraser 的小站<\/title>/.test(html));
 }
 check('skip-link 样式在 style.css 里', /\.skip-link\s*\{/.test(read('style.css')));
-check('sw.js 缓存版本号已升级到 v4', /VERSION = 'eraser-v4'/.test(read('sw.js')));
+check('sw.js 缓存版本号已升级到 v5', /VERSION = 'eraser-v5'/.test(read('sw.js')));
+check('sw.js 预缓存站内播放器', /PRECACHE = \[[\s\S]*?'\/watch\.js'/.test(read('sw.js')));
 check('移动端顶栏：控件与品牌同排、导航整行下移',
       /@media \(max-width: 768px\)[\s\S]*?\.navbar nav\s*\{\s*order:\s*3;\s*flex-basis:\s*100%;/.test(read('style.css')));
 check('孤儿页 files/ 已删除（T10 已下架）',
@@ -309,7 +310,8 @@ console.log('\n=== 追更页 ===');
   check('「＋1 话」只在登录后且状态是在看时出现',
         /if \(canEdit && d\.status === "watching"\)/.test(html) && /classList\.add\("has-plus"\)/.test(html));
   check('＋1 走 PATCH 且带后台令牌',
-        /method: "PATCH"/.test(html) && /data: \{ progress: next \}/.test(html) &&
+        /function patchMedia[\s\S]*?method: "PATCH"/.test(html) &&
+        /patchMedia\(it\.id, \{ progress: next, position: 0 \}\)/.test(html) &&
         /Authorization: "Bearer " \+ getToken\(\)/.test(html));
   check('＋1 成功后就地改数据重画（不整页刷新）',
         /d\.progress = next;/.test(html) && /apply\(allItems\);/.test(html));
@@ -381,7 +383,9 @@ console.log('\n=== 开发交接页（dev/，给接手的 AI）===');
   check('M11 海报墙批次记录在', /M11/.test(html) && /dudulu/.test(html) && /mg-filters \.mg-filters button/.test(html));
   check('M12 批量导入批次记录在', /M12/.test(html) && /batch=1/.test(html) && /action=lookup/.test(html) && /eraser\.admin\.token/.test(html));
   check('追更数据上游取舍写进了交接页', /AniList/.test(html) && /中文名搜不到/.test(html) && /api\.bgm\.tv/.test(html));
-  check('测试套数已更新为十套', /十套/.test(html) && /outline_check/.test(html) && /media_import_test/.test(html) && /lookup_test/.test(html));
+  check('测试套数已更新为十一套', /十一套/.test(html) && /outline_check/.test(html) && /media_import_test/.test(html) && /lookup_test/.test(html) && /watch_test/.test(html));
+  check('M14–M18 批次记录在', /M14/.test(html) && /M16/.test(html) && /M17/.test(html) && /M18/.test(html));
+  check('M19 站内播放批次记录在', /M19/.test(html) && /watch\.js/.test(html) && /position/.test(html) && /B 站/.test(html));
   check('后台标签数已更新为 9', /9 个标签/.test(html) || /9 标签/.test(html));
   check('本机坑位补充了 BOM / PowerShell / gh PR 退出码', /BOM/.test(html) && /PowerShell/.test(html) && /SIGTERM/.test(html));
   check('待办里写明 M10 主线B 搁置原因', /主线 B/.test(html) && /(0 篇|博客 0)/.test(html));
