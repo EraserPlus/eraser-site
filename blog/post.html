@@ -9,6 +9,7 @@
 </script>
 <title>文章 · Eraser 的小站</title>
 <link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="../owner.css">
 <link rel="manifest" href="../manifest.webmanifest">
 <link rel="icon" href="../icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="../icon.svg">
@@ -28,7 +29,7 @@
   .post-meta{ color:var(--muted); font-size:13.5px; display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
   .tagline{ display:flex; gap:6px; flex-wrap:wrap; }
   .tagline span{ background:var(--sunk); color:var(--ink4); font-size:12px; border-radius:20px; padding:1px 9px; }
-  .article{ font-size:16px; line-height:1.85; color:var(--ink); overflow-wrap:break-word; }
+  .article{ font-size:calc(16px * var(--read-scale, 1)); line-height:1.85; color:var(--ink); overflow-wrap:break-word; }
   .article h1,.article h2,.article h3,.article h4{ margin:28px 0 12px; line-height:1.4; }
   .article h1{ font-size:23px; } .article h2{ font-size:20px; } .article h3{ font-size:17px; }
   .article p{ margin:14px 0; }
@@ -45,6 +46,117 @@
   .back{ display:inline-block; margin-top:34px; font-size:14px; }
   .post-nav{ display:flex; justify-content:space-between; gap:12px; margin-top:34px; flex-wrap:wrap; }
   .post-nav a{ font-size:14px; color:var(--blue); }
+
+  /* ===== 阅读增强（M16）：进度条 / 目录 / 代码复制 / 锚点 ===== */
+  /* z-index 95：盖住吸顶栏（40），但低于命令面板（100）与站主弹层，别在弹窗上压一条蓝线 */
+  #readbar{ position:fixed; top:0; left:0; height:3px; width:0; background:var(--blue);
+            z-index:95; pointer-events:none; transition:opacity .25s ease; }
+  /* 不足一屏的文章没有「读了多少」可言，整篇可见即算读完；满格蓝线会像卡住的进度，所以淡出 */
+  #readbar[data-idle="1"]{ opacity:0; }
+  .post-wrap{ display:grid; grid-template-columns:minmax(0,1fr); gap:26px; }
+  .post-col{ min-width:0; }
+  .article h2,.article h3{ scroll-margin-top:74px; }   /* 跳锚点别被吸顶栏盖住 */
+  .toc-side,.toc-mobile{ font-size:13.5px; color:var(--ink4); }
+  .toc-title{ font-size:12px; letter-spacing:.08em; color:var(--muted); margin-bottom:8px; }
+  .toc-list{ list-style:none; margin:0; padding:0; border-left:1px solid var(--line); }
+  .toc-list li{ margin:0; }
+  .toc-list a{ display:block; padding:4px 0 4px 11px; color:var(--ink4);
+               border-left:2px solid transparent; margin-left:-1px; line-height:1.45;
+               transition:color .15s, border-color .15s; }
+  .toc-list a:hover{ color:var(--blue); text-decoration:none; }
+  .toc-list a.on{ color:var(--blue); border-left-color:var(--blue); font-weight:600; }
+  .toc-list .lv3 a{ padding-left:22px; font-size:12.5px; }
+  .toc-mobile{ background:var(--card); border:1px solid var(--line); border-radius:10px;
+               padding:10px 14px; margin:0 0 20px; }
+  .toc-mobile summary{ cursor:pointer; font-size:14px; color:var(--ink3); font-weight:600; }
+  .toc-mobile .toc-list{ margin-top:8px; border-left:none; }
+  .toc-mobile .toc-list a{ padding-left:0; }
+  .toc-side{ display:none; }
+  @media (min-width:1080px){
+    main.container{ max-width:1120px; }
+    .post-wrap.has-toc{ grid-template-columns:minmax(0,780px) 220px; justify-content:center; gap:44px; }
+    .post-wrap:not(.has-toc){ max-width:780px; margin:0 auto; }
+    .toc-side{ display:block; position:sticky; top:76px; align-self:start;
+               max-height:calc(100vh - 96px); overflow:auto; }
+    .toc-mobile{ display:none; }
+  }
+  /* 代码复制：鼠标设备悬停出按钮，触屏常显 */
+  .code-wrap{ position:relative; }
+  .code-wrap pre{ padding-right:70px; }   /* 给按钮留出位置，别压住首行代码 */
+  .code-wrap .code-copy{ position:absolute; top:8px; right:8px; font-size:12px; padding:4px 9px;
+                         border-radius:6px; border:1px solid var(--line); background:var(--card);
+                         color:var(--ink4); cursor:pointer; opacity:0;
+                         transition:opacity .15s, color .15s, border-color .15s; }
+  .code-wrap:hover .code-copy,
+  .code-wrap .code-copy:focus-visible{ opacity:1; }
+  .code-wrap .code-copy.ok{ color:var(--blue); border-color:var(--blue); }
+  @media (hover:none){ .code-wrap .code-copy{ opacity:1; } }
+
+  /* ===== 阅读便利（M18） ===== */
+  /* 标题末尾的 #：平时隐去，悬停/键盘聚焦才出现 */
+  .article h2,.article h3{ position:relative; }
+  .article .hlink{ margin-left:8px; font-size:.8em; font-weight:400; color:var(--muted);
+                   text-decoration:none; opacity:0; transition:opacity .15s, color .15s; }
+  .article h2:hover .hlink,.article h3:hover .hlink,
+  .article .hlink:focus-visible{ opacity:1; }
+  .article .hlink:hover{ color:var(--blue); text-decoration:none; }
+  @media (hover:none){ .article .hlink{ opacity:.5; } }
+
+  /* 元信息右侧：字号 / 复制链接 / 打印 */
+  .meta-actions{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  @media (min-width:640px){ .meta-actions{ margin-left:auto; } }
+  .font-ctl{ display:inline-flex; align-items:center; gap:1px; padding:2px;
+             background:var(--card); border:1px solid var(--line); border-radius:8px; }
+  .font-ctl button{ width:30px; height:30px; padding:0; border:none; border-radius:6px;
+                    background:transparent; color:var(--ink4); font-size:13px; line-height:1; }
+  .font-ctl button:hover{ background:var(--sunk); color:var(--ink); }
+  .font-ctl button:disabled{ opacity:.35; cursor:default; background:transparent; color:var(--ink4); }
+  .font-ctl .pct{ width:auto; min-width:44px; padding:0 4px; font-size:12px; color:var(--muted); }
+  .meta-btn{ min-height:30px; padding:5px 10px; border:1px solid var(--line); border-radius:8px;
+             background:var(--card); color:var(--ink4); font-size:12.5px; }
+  .meta-btn:hover{ border-color:var(--blue); color:var(--blue); background:var(--card); }
+  .font-ctl button,.meta-btn,.read-fab,.code-copy,.lightbox-close{ font-family:inherit; }
+
+  /* 右下角浮动：续读提示 + 回到顶部（左下留给站主编辑浮条） */
+  .read-fabs{ position:fixed; right:16px; bottom:calc(16px + env(safe-area-inset-bottom, 0px));
+              z-index:85; display:flex; flex-direction:column; align-items:flex-end; gap:8px; }
+  .read-fab{ display:inline-flex; align-items:center; justify-content:center; gap:6px;
+             min-height:38px; padding:0 13px; border:1px solid var(--line2); border-radius:999px;
+             background:var(--card); color:var(--ink3); font-size:12.5px;
+             box-shadow:0 6px 20px rgba(15,23,42,.16); }
+  .read-fab:hover{ border-color:var(--blue); color:var(--blue); background:var(--card); }
+  .read-fab[hidden]{ display:none; }
+  .read-fab.round{ width:38px; padding:0; font-size:16px; }
+
+  /* 图片放大：原生 dialog，样式只管外观与层级 */
+  .article img{ max-width:100%; height:auto; border-radius:8px; cursor:zoom-in; }
+  /* 全站 *{margin:0} 会覆盖 dialog 的 UA 居中，这里必须把 margin:auto 写回来 */
+  .lightbox{ position:fixed; inset:0; margin:auto; width:fit-content; height:fit-content;
+             max-width:92vw; max-height:92vh; padding:0; border:none;
+             background:transparent; overflow:visible; color:#e2e8f0; }
+  .lightbox::backdrop{ background:rgba(8,12,20,.84); }
+  .lightbox img{ display:block; max-width:92vw; max-height:82vh; margin:0 auto;
+                 border-radius:10px; box-shadow:0 24px 70px rgba(0,0,0,.55); cursor:zoom-out; }
+  .lightbox-cap{ margin-top:10px; text-align:center; color:#cbd5e1; font-size:13px; }
+  .lightbox-close{ position:fixed; top:16px; right:16px; width:38px; height:38px; padding:0;
+                   border-radius:50%; border:1px solid rgba(255,255,255,.32);
+                   background:rgba(15,23,42,.55); color:#fff; font-size:16px; }
+  .lightbox-close:hover{ background:rgba(15,23,42,.8); }
+
+  /* 打印 / 存 PDF：只留标题、元信息和正文；pre 换行避免右侧被裁掉 */
+  @media print{
+    .navbar,.skip-link,.toc-side,.toc-mobile,.read-fabs,#readbar,.post-nav,.back,
+    .owner-tools,.owner-dock,.meta-actions,.code-copy,.hlink,.lightbox{ display:none !important; }
+    body{ background:#fff; }
+    main.container{ max-width:none !important; padding:0 !important; }
+    .post-wrap,.post-wrap.has-toc{ display:block !important; }
+    .article{ font-size:11.5pt !important; line-height:1.75; color:#000; }
+    .article a{ color:#000; text-decoration:underline; }
+    .article pre{ white-space:pre-wrap; page-break-inside:avoid; }
+    .article img{ page-break-inside:avoid; }
+    .post-head h1{ font-size:20pt; }
+  }
+  @page{ margin:16mm 15mm; }
 </style>
 </head>
 <body>
@@ -66,9 +178,15 @@
 </main>
 
 <script src="../md.js"></script>
+<script src="../owner.js"></script>
+<script src="../admin/content.js"></script>
 <script>
 (function(){
   var box = document.getElementById("main");
+
+  /* 站主身份：能看草稿，也能在文章页直接改这篇（保存后原地刷新） */
+  var OWNER = !!(window.Owner && Owner.hasToken());
+  if (OWNER && window.ContentAdmin) ContentAdmin.init({ api: Owner.api, say: Owner.say });
 
   function esc(s){
     return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
@@ -93,27 +211,445 @@
     return m ? decodeURIComponent(m[1].replace(/\+/g, " ")) : "";
   }
 
+  /* ===== 阅读增强（M16） ===== */
+
+  /* 中文标题也能做锚点：去掉空白与标点，保留中英文、数字、连字符 */
+  function slugify(text, used){
+    var base = String(text || "").trim().toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^\w\u4e00-\u9fa5-]/g, "")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "") || "section";
+    var id = base, n = 2;
+    while (used[id]) { id = base + "-" + n; n++; }
+    used[id] = true;
+    return id;
+  }
+
+  /* 给 h2/h3 补 id，顺便收集目录数据 */
+  function enhanceHeadings(art){
+    var used = {}, items = [];
+    var hs = art.querySelectorAll("h2, h3");
+    for (var i = 0; i < hs.length; i++){
+      var h = hs[i];
+      var text = (h.textContent || "").trim();
+      if (!text) continue;
+      var id = slugify(text, used);
+      h.id = id;
+      items.push({ id: id, text: text, level: h.tagName === "H3" ? 3 : 2 });
+    }
+    return items;
+  }
+
+  function buildToc(items, mobile){
+    var host = document.createElement(mobile ? "details" : "nav");
+    host.className = mobile ? "toc-mobile" : "toc-side";
+    if (mobile){
+      var sum = document.createElement("summary");
+      sum.textContent = "目录（" + items.length + " 节）";
+      host.appendChild(sum);
+    } else {
+      host.setAttribute("aria-label", "文章目录");
+      var title = document.createElement("div");
+      title.className = "toc-title";
+      title.textContent = "目录";
+      host.appendChild(title);
+    }
+    var ol = document.createElement("ol");
+    ol.className = "toc-list";
+    items.forEach(function(it){
+      var li = document.createElement("li");
+      li.className = "lv" + it.level;
+      var a = document.createElement("a");
+      a.href = "#" + it.id;
+      a.textContent = it.text;
+      a.setAttribute("data-target", it.id);
+      li.appendChild(a);
+      ol.appendChild(li);
+    });
+    host.appendChild(ol);
+    /* 手机上看完目录点了就走，自动收起 */
+    if (mobile){
+      ol.addEventListener("click", function(e){
+        if (e.target && e.target.tagName === "A") host.open = false;
+      });
+    }
+    return host;
+  }
+
+  /* 复制到剪贴板：Clipboard API 优先；被拒（无焦点/无权限/无头页）时退回 execCommand */
+  function copyText(text, done){
+    function legacyCopy(){
+      try {
+        var ta = document.createElement("textarea");
+        ta.value = text;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.top = "-1000px";
+        document.body.appendChild(ta);
+        ta.select();
+        var ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        return ok;
+      } catch (e) { return false; }
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(function(){ done(true); }, function(){ done(legacyCopy()); });
+      return;
+    }
+    done(legacyCopy());
+  }
+
+  function copyCode(code, btn){
+    copyText(code.textContent || "", function(ok){
+      btn.textContent = ok ? "已复制" : "复制失败";
+      if (ok) btn.classList.add("ok");
+      setTimeout(function(){ btn.textContent = "复制"; btn.classList.remove("ok"); }, 1600);
+    });
+  }
+
+  /* 标题末尾的 #：点击既跳到本节（默认行为），也把含 #id 的完整链接放进剪贴板 */
+  function addHeadingLinks(items){
+    items.forEach(function(it){
+      var h = document.getElementById(it.id);
+      if (!h) return;
+      var a = document.createElement("a");
+      a.className = "hlink";
+      a.href = "#" + it.id;
+      a.textContent = "#";
+      a.title = "复制本节链接";
+      a.setAttribute("aria-label", "复制「" + it.text + "」的小节链接");
+      a.addEventListener("click", function(){
+        var url = location.origin + location.pathname + location.search + "#" + it.id;
+        copyText(url, function(ok){
+          a.textContent = ok ? "✓" : "✗";
+          setTimeout(function(){ a.textContent = "#"; }, 1200);
+        });
+      });
+      h.appendChild(a);
+    });
+  }
+
+  /* 每个代码块右上角一个「复制」，按钮挂在 pre 外层，横向滚动时不跟着跑 */
+  function enhanceCodeBlocks(art){
+    var pres = art.querySelectorAll("pre");
+    for (var i = 0; i < pres.length; i++){
+      (function(pre){
+        var code = pre.querySelector("code");
+        if (!code) return;
+        var wrap = document.createElement("div");
+        wrap.className = "code-wrap";
+        pre.parentNode.insertBefore(wrap, pre);
+        wrap.appendChild(pre);
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "code-copy";
+        btn.textContent = "复制";
+        btn.setAttribute("aria-label", "复制这段代码");
+        btn.addEventListener("click", function(){ copyCode(code, btn); });
+        wrap.appendChild(btn);
+      })(pres[i]);
+    }
+  }
+
+  function motionOK(){
+    return !(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  }
+
+  /* 顶部阅读进度条。
+     口径：可滚动距离 max = scrollHeight - clientHeight；进度 = scrollY / max，钳在 0–100%。
+     滚到底时 scrollY 必然等于 max；但缩放/子像素会把 732.4 读成 732，所以距底 ≤1px 直接记 100%。
+     文档不足一屏时视为「整篇已读完」记 100%，同时 data-idle=1 让样式淡出——
+     否则短文章顶着一条永远 0% 的进度条，看着像卡死的加载条。
+     data-progress 是唯一判定值（一位小数），视觉宽度和验证脚本都读它，避免再去解析 style.width。 */
+  function initReadBar(onPct){
+    var bar = document.createElement("div");
+    bar.id = "readbar";
+    bar.setAttribute("aria-hidden", "true");
+    document.body.appendChild(bar);
+    var raf = 0, last = -1;
+    function upd(){
+      raf = 0;
+      var de = document.documentElement;
+      var max = Math.max(0, de.scrollHeight - de.clientHeight);
+      var y = window.scrollY != null ? window.scrollY : de.scrollTop;
+      var p = max <= 0 ? 1 : (max - y <= 1 ? 1 : Math.min(1, Math.max(0, y / max)));
+      var pct = Math.round(p * 1000) / 10;
+      bar.style.width = pct + "%";
+      bar.setAttribute("data-progress", pct);
+      bar.setAttribute("data-idle", max <= 0 ? "1" : "0");
+      if (pct !== last){ last = pct; if (onPct) onPct(pct); }
+    }
+    function onScroll(){ if (!raf) raf = requestAnimationFrame(upd); }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    window.addEventListener("scrollend", onScroll);   /* 平滑滚动停下补一次，别停在 99.6% */
+    window.addEventListener("load", upd);
+    /* 懒加载图片/改字号都会改变页面高度，分母要重算 */
+    if (window.ResizeObserver){ try { new ResizeObserver(onScroll).observe(document.body); } catch (e) {} }
+    upd();
+  }
+
+  /* 续读位置：按文章 slug 存百分比，换设备/改窗口宽度都能对上位置；30 天后失效 */
+  function posKey(){ return "eraser.read." + slug; }
+  function loadPos(){
+    try {
+      var j = JSON.parse(localStorage.getItem(posKey()));
+      if (!j || !(j.p >= 3 && j.p <= 97)) return null;
+      if (Date.now() - j.t > 30 * 864e5) return null;
+      return j;
+    } catch (e) { return null; }
+  }
+  function savePos(p){
+    try {
+      if (p >= 3 && p <= 97) localStorage.setItem(posKey(), JSON.stringify({ p: Math.round(p), t: Date.now() }));
+      else if (p >= 97) localStorage.removeItem(posKey());
+    } catch (e) {}
+  }
+
+  function initFabs(){
+    var host = document.createElement("div");
+    host.className = "read-fabs";
+    var top = document.createElement("button");
+    top.type = "button";
+    top.className = "read-fab round";
+    top.textContent = "↑";
+    top.title = "回到顶部";
+    top.setAttribute("aria-label", "回到顶部");
+    top.hidden = true;
+    top.addEventListener("click", function(){
+      window.scrollTo({ top: 0, behavior: motionOK() ? "smooth" : "auto" });
+    });
+    host.appendChild(top);
+    document.body.appendChild(host);
+    return { host: host, top: top };
+  }
+
+  function addResumeBtn(host, saved){
+    if (!saved || location.hash) return;    /* 从 #锚点 进来就按锚点走，不抢位置 */
+    var de = document.documentElement;
+    if (de.scrollHeight - de.clientHeight < 480) return;
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "read-fab";
+    b.textContent = "↩ 继续阅读 · " + saved.p + "%";
+    b.title = "跳到上次读到的位置";
+    b.addEventListener("click", function(){
+      var max = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+      window.scrollTo({ top: Math.round(max * saved.p / 100), behavior: motionOK() ? "smooth" : "auto" });
+      b.hidden = true;
+    });
+    host.insertBefore(b, host.firstChild);
+    /* 常驻会像广告，给 12 秒让站长看见；错过也不丢，下次进来还会提示 */
+    setTimeout(function(){ b.hidden = true; }, 12000);
+  }
+
+  /* 正文字号：90%–130%，存本地，只影响 .article，不改目录与正文之外的元素 */
+  function initFontCtl(art){
+    var KEY = "eraser.readSize";
+    var n = 100;
+    try { var v = parseInt(localStorage.getItem(KEY), 10); if (v >= 90 && v <= 130) n = v; } catch (e) {}
+
+    var wrap = document.createElement("span");
+    wrap.className = "font-ctl";
+    var minus = document.createElement("button");
+    minus.type = "button"; minus.textContent = "A−"; minus.setAttribute("aria-label", "减小正文字号");
+    var pct = document.createElement("button");
+    pct.type = "button"; pct.className = "pct"; pct.title = "恢复默认字号";
+    var plus = document.createElement("button");
+    plus.type = "button"; plus.textContent = "A+"; plus.setAttribute("aria-label", "增大正文字号");
+
+    function apply(v, save){
+      n = Math.max(90, Math.min(130, v));
+      art.style.setProperty("--read-scale", n / 100);
+      pct.textContent = n + "%";
+      pct.setAttribute("aria-label", "当前字号 " + n + "%，点击恢复默认");
+      minus.disabled = n <= 90;
+      plus.disabled = n >= 130;
+      if (save){ try { localStorage.setItem(KEY, n); } catch (e) {} }
+    }
+    minus.addEventListener("click", function(){ apply(n - 10, true); });
+    plus.addEventListener("click", function(){ apply(n + 10, true); });
+    pct.addEventListener("click", function(){ apply(100, true); });
+    apply(n, false);
+    wrap.appendChild(minus);
+    wrap.appendChild(pct);
+    wrap.appendChild(plus);
+    return wrap;
+  }
+
+  function initMetaActions(art){
+    var box = document.createElement("span");
+    box.className = "meta-actions";
+    box.appendChild(initFontCtl(art));
+
+    var copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "meta-btn";
+    copy.textContent = "复制链接";
+    copy.addEventListener("click", function(){
+      copyText(location.href, function(ok){
+        copy.textContent = ok ? "已复制" : "复制失败";
+        setTimeout(function(){ copy.textContent = "复制链接"; }, 1400);
+      });
+    });
+    box.appendChild(copy);
+
+    var pr = document.createElement("button");
+    pr.type = "button";
+    pr.className = "meta-btn";
+    pr.textContent = "打印";
+    pr.title = "打印或存为 PDF";
+    pr.addEventListener("click", function(){ window.print(); });
+    box.appendChild(pr);
+    return box;
+  }
+
+  /* 图片放大：原生 <dialog>，Esc / 点背景 / 点图都能关，焦点由浏览器还回原图 */
+  function enhanceImages(art){
+    var imgs = art.querySelectorAll("img");
+    if (!imgs.length) return;
+    var dlg = document.createElement("dialog");
+    dlg.className = "lightbox";
+    dlg.setAttribute("aria-label", "图片预览");
+    var big = document.createElement("img");
+    var cap = document.createElement("div");
+    cap.className = "lightbox-cap";
+    var close = document.createElement("button");
+    close.type = "button";
+    close.className = "lightbox-close";
+    close.textContent = "✕";
+    close.setAttribute("aria-label", "关闭预览");
+    dlg.appendChild(big);
+    dlg.appendChild(cap);
+    dlg.appendChild(close);
+    document.body.appendChild(dlg);
+
+    function open(src, alt){
+      if (!src) return;
+      big.src = src;
+      big.alt = alt || "";
+      cap.textContent = alt || "";
+      if (dlg.showModal) dlg.showModal(); else dlg.setAttribute("open", "");
+      close.focus();
+    }
+    function shut(){
+      if (dlg.close) dlg.close(); else dlg.removeAttribute("open");
+    }
+    close.addEventListener("click", shut);
+    big.addEventListener("click", shut);
+    dlg.addEventListener("click", function(e){ if (e.target === dlg) shut(); });
+
+    for (var i = 0; i < imgs.length; i++){
+      (function(im){
+        im.tabIndex = 0;
+        im.setAttribute("role", "button");
+        im.setAttribute("aria-label", "查看大图" + (im.alt ? "：" + im.alt : ""));
+        im.addEventListener("click", function(e){
+          e.preventDefault();            /* 图片被链接包着时，优先放大而不是跳走 */
+          open(im.getAttribute("src"), im.alt);
+        });
+        im.addEventListener("keydown", function(e){
+          if (e.key === "Enter" || e.key === " "){ e.preventDefault(); open(im.getAttribute("src"), im.alt); }
+        });
+      })(imgs[i]);
+    }
+  }
+
+  /* 目录高亮：高亮「最后一个越过阅读线的标题」 */
+  function initTocSpy(items){
+    var links = document.querySelectorAll(".toc-list a[data-target]");
+    if (!links.length) return;
+    var heads = [];
+    items.forEach(function(it){
+      var h = document.getElementById(it.id);
+      if (h) heads.push({ id: it.id, el: h });
+    });
+    if (!heads.length) return;
+    var current = "", raf = 0;
+    function upd(){
+      raf = 0;
+      var cur = "";
+      for (var i = 0; i < heads.length; i++){
+        if (heads[i].el.getBoundingClientRect().top <= 96) cur = heads[i].id;
+        else break;
+      }
+      if (cur === current) return;
+      current = cur;
+      for (var j = 0; j < links.length; j++){
+        var hit = links[j].getAttribute("data-target") === cur;
+        links[j].classList.toggle("on", hit);
+        if (hit) links[j].setAttribute("aria-current", "location");
+        else links[j].removeAttribute("aria-current");
+      }
+    }
+    function onScroll(){ if (!raf) raf = requestAnimationFrame(upd); }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    upd();
+  }
+
+  function fetchPosts(){
+    if (OWNER && window.Owner) return Owner.api("content?type=post");
+    return fetch("/api/content?type=post", { headers: { Accept: "application/json" } })
+      .then(function(r){
+        if (!r.ok) throw new Error("接口返回 " + r.status);   /* 5xx 是故障，不能冒充「文章不存在」 */
+        return r.json();
+      });
+  }
+
+  /* 站主工具条：编辑这篇 / 删除；保存后如果 slug 变了就跳到新地址 */
+  function ownerTools(found){
+    var bar = document.createElement("div");
+    bar.className = "owner-tools";
+
+    var ed = document.createElement("button");
+    ed.type = "button";
+    ed.className = "owner-btn primary";
+    ed.textContent = "✎ 编辑这篇";
+    ed.addEventListener("click", function(){
+      ContentAdmin.openItem("post", found, { afterSave: function(saved){
+        var next = saved && saved.data ? saved.data.slug : "";
+        if (next && next !== slug) location.href = "post.html?slug=" + encodeURIComponent(next);
+        else location.reload();
+      }});
+    });
+    bar.appendChild(ed);
+
+    var del = document.createElement("button");
+    del.type = "button";
+    del.className = "owner-btn danger";
+    del.textContent = "删除";
+    del.addEventListener("click", function(){
+      ContentAdmin.removeItem("post", found, {
+        afterDelete: function(){ location.href = "index.html"; }
+      });
+    });
+    bar.appendChild(del);
+    return bar;
+  }
+
   var slug = param("slug");
   if (!slug){ say("没有指定文章。", true); return; }
 
   if (!window.fetch){ say("这个浏览器不支持读取文章。", true); return; }
 
-  fetch("/api/content?type=post", { headers: { Accept: "application/json" } })
-    .then(function(r){ return r.ok ? r.json() : null; })
+  fetchPosts()
     .then(function(j){
       var items = (j && j.items) || [];
       var found = null;
       for (var i = 0; i < items.length; i++){
         if (items[i].data && items[i].data.slug === slug){ found = items[i]; break; }
       }
-      if (!found || found.data.published === false){
+      if (!found || (!OWNER && found.data.published === false)){
         say("找不到这篇文章。", true);
         return;
       }
 
-      /* 与博客列表同序：先过滤草稿，再按更新时间倒序，定位当前篇的位置 */
+      /* 与博客列表同序：先过滤草稿，再按更新时间倒序，定位当前篇的位置。
+         站主看得到草稿，就按全量算上一篇/下一篇。 */
       var posts = items.filter(function(p){
-        return p.data && p.data.published !== false;
+        return p.data && (OWNER || p.data.published !== false);
       });
       posts.sort(function(a, b){
         return String(b.updated_at || "").localeCompare(String(a.updated_at || ""));
@@ -127,11 +663,23 @@
       document.title = d.title + " - 博客";
 
       box.innerHTML = "";
+      var wrap = document.createElement("div");
+      wrap.className = "post-wrap";
+      var col = document.createElement("div");
+      col.className = "post-col";
+      wrap.appendChild(col);
+
       var head = document.createElement("div");
       head.className = "post-head";
 
       var h1 = document.createElement("h1");
       h1.textContent = d.title;
+      if (OWNER && d.published === false){
+        var badge = document.createElement("span");
+        badge.className = "owner-badge-draft";
+        badge.textContent = "草稿";
+        h1.appendChild(badge);
+      }
       head.appendChild(h1);
 
       var meta = document.createElement("div");
@@ -151,13 +699,32 @@
         meta.appendChild(tl);
       }
       head.appendChild(meta);
-      box.appendChild(head);
+      if (OWNER && window.ContentAdmin) head.appendChild(ownerTools(found));
+      col.appendChild(head);
 
       var art = document.createElement("div");
       art.className = "article";
       /* MD.render 会先把内容整体转义再生成标签，所以这里赋值是安全的 */
       art.innerHTML = window.MD ? MD.render(d.content) : esc(d.content);
-      box.appendChild(art);
+      var heads = enhanceHeadings(art);
+      enhanceCodeBlocks(art);
+      enhanceImages(art);
+
+      /* 阅读时长：中英混排按字/词分别估算，代码块不计入（见 md.js 的 MD.stats） */
+      var st = window.MD && MD.stats ? MD.stats(d.content) : { minutes: 1, chars: 0 };
+      var rt = document.createElement("span");
+      rt.className = "read-time";
+      rt.textContent = "约 " + st.minutes + " 分钟 · " + st.chars + " 字";
+      meta.appendChild(rt);
+      meta.appendChild(initMetaActions(art));
+
+      /* 只有一节时不生成目录：占一列却没有任何导航价值，短文章还会显得空 */
+      if (heads.length >= 2){
+        wrap.className += " has-toc";
+        col.appendChild(buildToc(heads, true));    /* 手机：折叠目录 */
+        wrap.appendChild(buildToc(heads, false));  /* 宽屏：右侧粘性目录 */
+      }
+      col.appendChild(art);
 
       /* 上一篇（更旧，下标 +1）/ 下一篇（更新，下标 -1）；
          边界篇对应方向的链接不渲染。用 DOM 拼，标题走 textContent。 */
@@ -173,13 +740,32 @@
         if (idx + 1 < posts.length) addNavLink(posts[idx + 1], "上一篇");
         if (idx - 1 >= 0) addNavLink(posts[idx - 1], "下一篇");
       }
-      if (nav.firstChild) box.appendChild(nav);
+      if (nav.firstChild) col.appendChild(nav);
 
       var back = document.createElement("a");
       back.className = "back";
       back.href = "index.html";
       back.textContent = "← 回到博客列表";
-      box.appendChild(back);
+      col.appendChild(back);
+
+      box.appendChild(wrap);
+
+      var saved = loadPos();
+      var fabs = initFabs();
+      var lastPct = 0, posTimer = 0;
+      initReadBar(function(pct){
+        lastPct = pct;
+        var max = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+        fabs.top.hidden = max <= 0 || pct < 15;   /* 不能滚动的页面没有「回到顶部」可言 */
+        clearTimeout(posTimer);
+        posTimer = setTimeout(function(){ savePos(pct); }, 700);
+      });
+      window.addEventListener("pagehide", function(){ if (lastPct) savePos(lastPct); });
+      addResumeBtn(fabs.host, saved);
+      if (heads.length){
+        addHeadingLinks(heads);
+        if (heads.length >= 2) initTocSpy(heads);
+      }
     })
     .catch(function(){
       say("加载失败，请稍后再试。", true);

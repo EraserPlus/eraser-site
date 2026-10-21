@@ -9,6 +9,7 @@
 </script>
 <title>学习地图 · Eraser 的小站</title>
 <link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="../owner.css">
 <link rel="manifest" href="../manifest.webmanifest">
 <link rel="icon" href="../icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="../icon.svg">
@@ -168,6 +169,7 @@
   font-size: 12.5px; color: #9a6700; background: rgba(154,103,0,.10);
   padding: 8px 12px; border-radius: 9px; margin-top: 12px;
 }
+.hide { display: none !important; }
 
 /* ---------- 大纲导入弹层 ---------- */
 .lm-modal {
@@ -230,10 +232,10 @@
     <div class="lm-sum" id="sumBox"></div>
 
     <!-- 数据库里还没内容时保留这段静态兜底，别删 -->
-    <p class="muted" id="listEmpty" style="margin-top:18px">数据库里还没内容。点上面的「新建地图」手搓一张，或者让 AI 助手帮你建。</p>
+    <p class="muted" id="listEmpty" style="margin-top:18px" aria-live="polite">数据库里还没内容。点上面的「新建地图」手搓一张，或者让 AI 助手帮你建。</p>
     <div id="listHost"></div>
 
-    <p class="lm-locked hide" id="lockNote">🔒 现在只能看，不能改。想勾选 / 编辑节点，请先去 <a href="../admin/index.html">管理后台</a> 登录一次（本浏览器会记住 30 天）。</p>
+    <p class="lm-locked hide" id="lockNote">🔒 现在只能看，不能改。想勾选 / 编辑节点，按 <b>Ctrl / ⌘ + Shift + L</b> 登录（本浏览器会记住 30 天），或者去 <a href="../admin/index.html">管理后台</a>。</p>
   </section>
 
   <!-- ============ 详情视图 ============ -->
@@ -245,6 +247,8 @@
   </section>
 </main>
 
+<script src="../owner.js"></script>
+<script src="../admin/content.js"></script>
 <script>
 /* 学习地图（仿 MapFlow 的交互）
    设计要点：
@@ -266,9 +270,14 @@
     return e;
   }
   function token() {
+    if (window.Owner) return Owner.token();   /* 与全站共用同一把钥匙和过期处理 */
     try { return localStorage.getItem("eraser.admin.token") || ""; } catch (e) { return ""; }
   }
   function canEdit() { return !!token(); }
+
+  if (window.Owner && window.ContentAdmin && canEdit()) {
+    ContentAdmin.init({ api: Owner.api, say: Owner.say });
+  }
 
   function api(path, opts) {
     opts = opts || {};
@@ -475,6 +484,14 @@
     addBtn.addEventListener("click", function () { addNodeInline(""); });
     host.appendChild(addBtn);
 
+    /* 地图标题 / 说明 / 状态也能就地改，不必回后台 */
+    var infoBtn = el("button", "lm-btn", "✎ 地图信息");
+    infoBtn.type = "button";
+    infoBtn.disabled = !canEdit();
+    infoBtn.title = "改标题、说明或状态";
+    infoBtn.addEventListener("click", editMapInfo);
+    host.appendChild(infoBtn);
+
     var copyBtn = el("button", "lm-btn", "复制给 AI 的指令");
     copyBtn.type = "button";
     copyBtn.addEventListener("click", function () { copyAiPrompt(); });
@@ -489,6 +506,58 @@
       setStatus(current.status === "archived" ? "active" : "archived");
     });
     host.appendChild(archBtn);
+
+    if (canEdit()) {
+      var delBtn = el("button", "lm-btn", "删除地图");
+      delBtn.type = "button";
+      delBtn.style.color = "var(--red, #d1242f)";
+      delBtn.style.borderColor = "var(--red, #d1242f)";
+      delBtn.addEventListener("click", deleteMap);
+      host.appendChild(delBtn);
+    }
+  }
+
+  /* 当前地图 → 通用表单需要的 {id, data}（节点一并带着，PATCH 合并时不会丢） */
+  function mapItemOf() {
+    return {
+      id: current.id,
+      data: {
+        title: current.title || "",
+        desc: current.desc || "",
+        status: current.status || "active",
+        nodes: current.nodes || []
+      }
+    };
+  }
+
+  function editMapInfo() {
+    if (!canEdit() || !current) return;
+    ContentAdmin.openItem("learn_map", mapItemOf(), {
+      title: "编辑地图信息",
+      afterSave: function (saved) {
+        if (saved && saved.data) {
+          current.title = saved.data.title;
+          current.desc = saved.data.desc;
+          current.status = saved.data.status;
+          current.nodes = saved.data.nodes || current.nodes;
+        }
+        paintDetailHead(progress);
+        paintDetailTools();
+        toast("已保存");
+        loadList();
+      }
+    });
+  }
+
+  function deleteMap() {
+    if (!canEdit() || !current) return;
+    ContentAdmin.removeItem("learn_map", mapItemOf(), {
+      afterDelete: function () {
+        toast("已删除");
+        showList();
+        loadList();
+      }
+    });
   }
 
   /* 把当前地图的缺口拼成一段可直接贴给 AI 的指令 */
@@ -874,19 +943,18 @@
   /* ================= 新建 / 导入大纲 ================= */
 
   function newMap() {
-    if (!canEdit()) { toast("请先在后台登录", "err"); return; }
-    var title = prompt("新地图叫什么？（比如：前端入门路线）", "");
-    if (title == null) return;
-    title = title.trim();
-    if (!title) return;
-    var desc = prompt("一句话说明学到哪（可空）", "") || "";
-    api("/api/learn", { method: "POST", body: { title: title, desc: desc.trim(), nodes: [] } })
-      .then(function (j) {
-        var id = j && j.item && j.item.id;
-        toast("已新建");
-        return loadList().then(function () { if (id) return openMap(id); });
-      })
-      .catch(function (e) { toast(e.message || "新建失败", "err"); });
+    if (!canEdit()) { toast("请先登录", "err"); return; }
+    if (!window.ContentAdmin) { toast("编辑器没加载出来，刷新再试", "err"); return; }
+    /* 用全站统一的表单弹层：标题 / 说明 / 状态，保存后直接打开这张图 */
+    ContentAdmin.openNew("learn_map", {
+      title: "新建学习地图",
+      initial: { title: "", desc: "", status: "active" },
+      afterSave: function (saved) {
+        return loadList().then(function () {
+          if (saved && saved.id) return openMap(saved.id);
+        });
+      }
+    });
   }
 
   /* 把缩进大纲 / Markdown 列表解析成 {group, text} 序列。
@@ -1047,13 +1115,39 @@
     if (ln) ln.classList.remove("hide");
   }
 
+  /* 列表首载三态：加载中 / 失败可重试 / 真空态。
+     原版接口挂了停在「数据库里还没内容」，把故障伪装成空库。 */
+  function showListState(text, retry) {
+    var e = $("listEmpty");
+    if (!e) return;
+    e.style.display = "";
+    e.textContent = text;
+    if (!retry) return;
+    var b = el("button", "ghost");
+    b.type = "button";
+    b.textContent = "重试";
+    b.style.marginLeft = "8px";
+    b.addEventListener("click", bootList);
+    e.appendChild(b);
+  }
+
+  function bootList() {
+    showListState("正在加载学习地图…");
+    loadList()
+      .then(function () {
+        var id = new URLSearchParams(location.search).get("id");
+        if (id) return openMap(id);
+      })
+      .catch(function (e) {
+        /* 网络层的 "Failed to fetch" 对访客没意义；只透出接口自己给的中文错误 */
+        var why = e && e.message && !/failed to fetch|networkerror|load failed/i.test(e.message)
+          ? e.message : "网络或接口出了问题";
+        showListState("地图列表暂时没拿到（" + why + "）。", true);
+      });
+  }
+
   if (!window.fetch) return;
-  loadList()
-    .then(function () {
-      var id = new URLSearchParams(location.search).get("id");
-      if (id) return openMap(id);
-    })
-    .catch(function () { /* 接口挂了：保持静态空状态，不白屏 */ });
+  bootList();
 })();
 </script>
 <script src="../shell.js"></script>

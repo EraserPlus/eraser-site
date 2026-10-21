@@ -319,5 +319,18 @@ console.log('\n=== 摘要提取 plain() ===');
   check('不超长不加省略号', MD.plain('abc', 10) === 'abc');
 }
 
+console.log('\n=== 阅读统计 stats() ===');
+{
+  check('中文 400 字约 1 分钟', MD.stats('字'.repeat(400)).minutes === 1, JSON.stringify(MD.stats('字'.repeat(400))));
+  check('中文 600 字约 2 分钟', MD.stats('字'.repeat(600)).minutes === 2);
+  check('英文按 220 词/分钟', MD.stats('word '.repeat(220)).minutes === 1, JSON.stringify(MD.stats('word '.repeat(220))));
+  check('中英混排分别计时', MD.stats('字'.repeat(400) + ' ' + 'word '.repeat(220)).minutes === 2);
+  check('代码块不计入时长与字数',
+        MD.stats('正文\n```\n' + 'x '.repeat(2000) + '\n```').chars === 2,
+        JSON.stringify(MD.stats('正文\n```\n' + 'x '.repeat(2000) + '\n```')));
+  check('空内容至少 1 分钟', MD.stats('').minutes === 1);
+  check('字数不含空白', MD.stats('一 二\n三').chars === 3, String(MD.stats('一 二\n三').chars));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -402,6 +402,21 @@ console.log('\n=== 内容接口 /api/content ===');
   res = await call(contentRoute, 'GET', { query: { type: 'post' } });
   check('未登录也能读文章列表 → 200', res.statusCode === 200 && res.json.items.length === 1);
 
+  /* 草稿只给站主看：公开 GET 过滤 published === false，带令牌才返回 */
+  fakeDb(() => [
+    row({ id: 1, type: 'post', data: { slug: 'pub', title: '公开', content: 'c', published: true } }),
+    row({ id: 2, type: 'post', data: { slug: 'draft', title: '草稿', content: 'c', published: false } }),
+  ]);
+  res = await call(contentRoute, 'GET', { query: { type: 'post' } });
+  check('访客读文章时过滤掉草稿',
+        res.statusCode === 200 && res.json.items.length === 1 && res.json.items[0].data.slug === 'pub',
+        JSON.stringify((res.json.items || []).map(i => i.data.slug)));
+  res = await call(contentRoute, 'GET', { query: { type: 'post' }, token: TOKEN });
+  check('带令牌的站主能读到草稿', res.statusCode === 200 && res.json.items.length === 2,
+        String((res.json.items || []).length));
+  check('伪造令牌按访客处理（看不到草稿）',
+        (await call(contentRoute, 'GET', { query: { type: 'post' }, token: 'fake.token' })).json.items.length === 1);
+
   fakeDb(() => [row({ id: 5, type: 'media', data: { category: 'anime', name: '葬送的芙莉莲', status: 'watching', score: 9 } })]);
   res = await call(contentRoute, 'GET', { query: { type: 'media' } });
   check('未登录也能读追更列表 → 200', res.statusCode === 200 && res.json.items.length === 1);

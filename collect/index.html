@@ -9,6 +9,7 @@
 </script>
 <title>追更 · Eraser 的小站</title>
 <link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="../owner.css">
 <link rel="manifest" href="../manifest.webmanifest">
 <link rel="icon" href="../icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="../icon.svg">
@@ -230,6 +231,23 @@ html[data-theme="dark"] .mg-tag.t-wish { background: #6b7480; }
 /* 有按钮时给底部文字让出位置，别压在一起 */
 .mg-item.has-plus .mg-mask { padding-right: 42px; }
 
+/* 站主：海报左上角的就地编辑 / 删除（压在链接层和「＋1」之上） */
+.mg-owner {
+  position: absolute; top: 30px; left: 6px; z-index: 5;
+  display: flex; gap: 4px;
+}
+.mg-owner button {
+  min-width: 24px; height: 24px; padding: 0 6px; border-radius: 6px;
+  border: 1px solid rgba(255,255,255,.42);
+  background: rgba(0,0,0,.62); color: #fff;
+  font: 12px/1 inherit; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+}
+.mg-owner button:hover { background: var(--blue); border-color: var(--blue); }
+.mg-owner button.del:hover { background: #d1242f; border-color: #d1242f; }
+html[data-theme="dark"] .mg-owner button { color: #fff; }
+
 /* 收纳栏（已看完 / 已读完） */
 .mg-fold {
   display: flex; align-items: center; justify-content: space-between;
@@ -281,6 +299,7 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
     <!-- 只有在本机登录过后台才会出现（读 localStorage 里的后台令牌）。
          没登录的访客看不到这个按钮，也不会发任何请求。 -->
     <button class="mg-add" id="mgAdd" type="button" style="display:none">＋ 快速添加</button>
+    <p class="muted" id="ownerHint" style="display:none">编辑模式：点海报上的 ✎ 就地改，✕ 删除。</p>
   </div>
 
   <!-- 顶部统计（有数据后才显示） -->
@@ -295,7 +314,7 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
       <span class="cnt" id="cnt-anime"></span>
     </div>
     <!-- 数据库里还没内容时保留这段静态兜底，别删 -->
-    <p class="muted" id="hint-anime">还没有记录。去管理后台的「追更」标签加第一条。</p>
+    <p class="muted" id="hint-anime" aria-live="polite">还没有记录。去管理后台的「追更」标签加第一条。</p>
     <div class="mg-grid" id="list-anime"></div>
     <div id="foldWrap-anime"></div>
   </section>
@@ -305,12 +324,14 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
       <h2><span class="dot"></span>漫画</h2>
       <span class="cnt" id="cnt-comic"></span>
     </div>
-    <p class="muted" id="hint-comic">还没有记录。去管理后台的「追更」标签加第一条。</p>
+    <p class="muted" id="hint-comic" aria-live="polite">还没有记录。去管理后台的「追更」标签加第一条。</p>
     <div class="mg-grid" id="list-comic"></div>
     <div id="foldWrap-comic"></div>
   </section>
 </main>
 
+<script src="../owner.js"></script>
+<script src="../admin/content.js"></script>
 <script>
 /* ===========================================================================
    追更：追番 / 漫画的留档（海报墙版式）
@@ -330,6 +351,7 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
     anime: { wish: "想看", watching: "在看", finished: "看完", paused: "搁置", done: "已看完" },
     comic: { wish: "想读", watching: "在读", finished: "读完", paused: "搁置", done: "已读完" }
   };
+  var EMPTY_HINT = "还没有记录。";
   /* 筛选顺序：在追的排前面，已完成的最后 */
   var STATUS_ORDER = ["watching", "wish", "paused", "finished"];
 
@@ -448,7 +470,37 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
       card.appendChild(plus);
     }
 
+    /* 站主：就地编辑 / 删除（不必再跳后台列表） */
+    if (canEdit && window.ContentAdmin) card.appendChild(ownerActions(it, d));
+
     return card;
+  }
+
+  function ownerActions(it, d) {
+    var wrap = el("div", "mg-owner");
+
+    var ed = el("button", null, "✎");
+    ed.type = "button";
+    ed.title = "编辑这条";
+    ed.setAttribute("aria-label", "编辑「" + (d.name || "这条") + "」");
+    ed.addEventListener("click", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      ContentAdmin.openItem("media", it, { afterSave: reloadMedia });
+    });
+    wrap.appendChild(ed);
+
+    var del = el("button", "del", "✕");
+    del.type = "button";
+    del.title = "删除这条";
+    del.setAttribute("aria-label", "删除「" + (d.name || "这条") + "」");
+    del.addEventListener("click", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      ContentAdmin.removeItem("media", it, { afterDelete: reloadMedia });
+    });
+    wrap.appendChild(del);
+    return wrap;
   }
 
   /* 「＋1 话」：直接 PATCH 这一条的 progress，成功后就地重画整面墙 */
@@ -505,7 +557,13 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
 
     list.innerHTML = "";
     foldWrap.innerHTML = "";
-    hint.style.display = items.length ? "none" : "";   // 数据库里还没内容，保留静态兜底
+    if (items.length) hint.style.display = "none";
+    else {
+      hint.style.display = "";
+      hint.textContent = canEdit
+        ? "还没有记录。点上面的「＋ 快速添加」加第一条。"
+        : EMPTY_HINT;
+    }
 
     active.forEach(function (it) { list.appendChild(makeCard(it, lab)); });
     if (!active.length && items.length) {
@@ -627,7 +685,12 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
   var TOKEN_KEY = "eraser.admin.token";
 
   function getToken() {
+    if (window.Owner) return Owner.token();   /* 与全站共用同一把钥匙和过期处理 */
     try { return localStorage.getItem(TOKEN_KEY) || ""; } catch (e) { return ""; }
+  }
+
+  if (window.Owner && window.ContentAdmin && getToken()) {
+    ContentAdmin.init({ api: Owner.api, say: Owner.say });
   }
 
   function apiPost(path, body) {
@@ -830,11 +893,15 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
     nameInput.focus();
   }
 
-  /* 重新拉一次数据并重绘（新增后用） */
+  /* 重新拉一次数据并重绘（新增后用）。失败时保持现有画面：
+     宁可显示旧数据，也不能因为一次刷新失败把已加载的内容清空。 */
   function reloadMedia() {
     if (!window.fetch) return;
     fetch("/api/content?type=media", { headers: { Accept: "application/json" } })
-      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);   /* 5xx 不是空库 */
+        return r.json();
+      })
       .then(function (j) { apply((j && j.items) || []); })
       .catch(function () {});
   }
@@ -846,17 +913,47 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
     if (!btn) return;
     btn.style.display = "";
     btn.addEventListener("click", openQuickAdd);
+    var oh = $("ownerHint");
+    if (oh) oh.style.display = "";
+  }
+
+  /* ==================== 首次加载：三态（加载中 / 失败可重试 / 真空态） ====================
+     原版接口挂了停在「还没有记录」，把故障伪装成空库，排查时误导人。 */
+  function setHint(key, text, retry) {
+    var h = $("hint-" + key);
+    if (!h) return;
+    h.style.display = "";
+    h.textContent = text;
+    if (!retry) return;
+    var b = el("button", "ghost");
+    b.type = "button";
+    b.textContent = "重试";
+    b.style.marginLeft = "8px";
+    b.addEventListener("click", loadMedia);
+    h.appendChild(b);
+  }
+
+  function loadMedia() {
+    ["anime", "comic"].forEach(function (k) { setHint(k, "正在加载…"); });
+    fetch("/api/content?type=media", { headers: { Accept: "application/json" } })
+      .then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      })
+      .then(function (j) {
+        canEdit = !!getToken();   /* 有令牌才画「＋1 话」，必须先于 apply */
+        apply((j && j.items) || []);
+        setupQuickAdd();   /* 数据到手后再决定是否显示按钮，避免闪一下 */
+      })
+      .catch(function () {
+        ["anime", "comic"].forEach(function (k) {
+          setHint(k, "记录暂时没拿到（网络或接口出了问题）。", true);
+        });
+      });
   }
 
   if (!window.fetch) return;
-  fetch("/api/content?type=media", { headers: { Accept: "application/json" } })
-    .then(function (r) { return r.ok ? r.json() : null; })
-    .then(function (j) {
-      canEdit = !!getToken();   /* 有令牌才画「＋1 话」，必须先于 apply */
-      apply((j && j.items) || []);
-      setupQuickAdd();   /* 数据到手后再决定是否显示按钮，避免闪一下 */
-    })
-    .catch(function () { /* 接口挂了：保持静态空状态，不白屏 */ });
+  loadMedia();
 })();
 </script>
 <script src="../shell.js"></script>

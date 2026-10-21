@@ -66,6 +66,34 @@ for (const f of PAGES) {
   check(`${f} 标了当前页 active`, /class="active"/.test(html));
 }
 
+console.log('\n=== 站主身份合并：公开页就地编辑 ===');
+{
+  const editable = ['nav/index.html', 'blog/index.html', 'blog/post.html',
+                    'about/index.html', 'collect/index.html', 'learn/index.html'];
+  for (const f of editable) {
+    const html = read(f);
+    check(`${f} 引入站主浮条样式`, /href="[^"]*owner\.css"/.test(html));
+    check(`${f} 引入站主层与共享编辑器`,
+          /src="[^"]*owner\.js"/.test(html) && /src="[^"]*admin\/content\.js"/.test(html));
+    check(`${f} 用后台同一把令牌判断身份`, /Owner\.(hasToken|token)\(\)/.test(html));
+    check(`${f} 编辑器请求走 Owner.api（自动带令牌）`,
+          /ContentAdmin\.init\(\{\s*api:\s*Owner\.api/.test(html));
+  }
+  for (const f of ['index.html', 'tools/index.html']) {
+    const html = read(f);
+    check(`${f} 纯浏览页不加载站主编辑器`, !/owner\.(css|js)|admin\/content\.js/.test(html));
+  }
+
+  const owner = read('owner.js');
+  check('owner.js 复用后台令牌键', /TOKEN_KEY = "eraser\.admin\.token"/.test(owner));
+  check('没有令牌时不画编辑浮条', /if \(!hasToken\(\)\) \{[\s\S]*removeChild\(dock\)/.test(owner));
+  check('401 时先清本地令牌再提示登录',
+        /r\.status === 401[\s\S]*expire\(\)/.test(owner) && /setToken\(""\)/.test(owner));
+  check('登录框不拼 innerHTML（密码与错误都走 textContent）', !/innerHTML\s*=/.test(owner));
+  check('页面里没有写死密码或令牌',
+        PAGES.every(f => !/(password|token)\s*[:=]\s*["'][^"']{8,}/i.test(read(f))));
+}
+
 console.log('\n=== 无障碍 / 分享 / 品牌一致性（M13）===');
 for (const f of PAGES) {
   const html = read(f);
@@ -80,7 +108,9 @@ for (const f of PAGES) {
   check(`${f} 标题分隔符统一为 ·`, /<title>[^<]* · Eraser 的小站<\/title>/.test(html));
 }
 check('skip-link 样式在 style.css 里', /\.skip-link\s*\{/.test(read('style.css')));
-check('sw.js 缓存版本号已升级到 v2', /VERSION = 'eraser-v2'/.test(read('sw.js')));
+check('sw.js 缓存版本号已升级到 v4', /VERSION = 'eraser-v4'/.test(read('sw.js')));
+check('移动端顶栏：控件与品牌同排、导航整行下移',
+      /@media \(max-width: 768px\)[\s\S]*?\.navbar nav\s*\{\s*order:\s*3;\s*flex-basis:\s*100%;/.test(read('style.css')));
 check('孤儿页 files/ 已删除（T10 已下架）',
       !fs.existsSync(path.join(REPO, 'files/index.html')));
 check('全站不再出现「Eraser 小站」这种少一个「的」的写法',
@@ -135,6 +165,26 @@ console.log('\n=== 博客文章页 ===');
   check('标签用 textContent 设置', /s\.textContent = t/.test(html));
   check('页面标题会跟着文章变', /document\.title = d\.title/.test(html));
   check('有返回博客列表的链接', /回到博客列表/.test(html));
+
+  /* 阅读进度条：到底判定必须同时有「≤1px 容差」和「不足一屏视为读完」两条 */
+  check('进度条用 data-progress 作唯一判定值', /data-progress/.test(html));
+  check('距底 1px 内直接记 100%', /max - y <= 1 \? 1/.test(html));
+  check('不足一屏视为读完并隐藏', /max <= 0 \? 1/.test(html) && /#readbar\[data-idle="1"\]/.test(html));
+  check('平滑滚动停止后补算一次', /addEventListener\("scrollend"/.test(html));
+  check('进度条对读屏隐藏（纯视觉）', /setAttribute\("aria-hidden", "true"\)/.test(html));
+
+  /* 个人阅读便利 */
+  check('字号调节持久化到本地', /eraser\.readSize/.test(html) && /--read-scale/.test(html));
+  check('续读位置按文章 slug 保存', /eraser\.read\./.test(html) && /localStorage\.setItem\(posKey\(\)/.test(html));
+  check('续读位置 30 天后失效', /30 \* 864e5/.test(html));
+  check('标题锚点可复制小节链接', /a\.className = "hlink"/.test(html) && /小节链接/.test(html));
+  check('图片放大用原生 dialog', /createElement\("dialog"\)/.test(html) && /showModal/.test(html));
+  check('打印时隐藏导航、目录与按钮',
+        /@media print/.test(html) && /\.navbar,\.skip-link,\.toc-side/.test(html));
+  check('浮动按钮尊重减弱动态', /prefers-reduced-motion/.test(html) && /motionOK\(\)/.test(html));
+  check('复制链接与打印入口都在元信息里', /复制链接/.test(html) && /window\.print\(\)/.test(html));
+  check('阅读时长走共用 MD.stats（不再只按字数除 400）',
+        /MD\.stats\(d\.content\)/.test(html) && !/Math\.round\(chars \/ 400\)/.test(html));
 }
 
 console.log('\n=== 博客列表页 ===');

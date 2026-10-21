@@ -46,10 +46,20 @@
   function themeNow() {
     return root.getAttribute("data-theme") === "dark" ? "dark" : "light";
   }
+  /* 系统开了「减弱动态效果」就不做视觉过渡（与 style.css 尾部的总开关口径一致） */
+  function motionOK() {
+    return !(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  }
   function applyTheme(t) {
-    root.setAttribute("data-theme", t);
-    try { localStorage.setItem(THEME_KEY, t); } catch (e) {}
-    paintThemeBtn();
+    var paint = function () {
+      root.setAttribute("data-theme", t);
+      try { localStorage.setItem(THEME_KEY, t); } catch (e) {}
+      paintThemeBtn();
+    };
+    /* 浏览器支持 View Transitions 时，深浅切换做一次全页交叉淡化，不再是生硬跳变；
+       不支持（或用户要求减弱动态）就照旧直接切，功能完全不变。 */
+    if (document.startViewTransition && motionOK()) document.startViewTransition(paint);
+    else paint();
   }
   function toggleTheme() { applyTheme(themeNow() === "dark" ? "light" : "dark"); }
   function paintThemeBtn() {
@@ -123,7 +133,7 @@
     out.push({ ic: "🔗", lb: "复制当前链接", hint: "剪贴板",
                run: function () { copyText(location.href, "已复制当前链接"); closePalette(); } });
     out.push({ ic: "↑", lb: "回到顶部", hint: "滚动",
-               run: function () { window.scrollTo({ top: 0, behavior: "smooth" }); closePalette(); } });
+               run: function () { window.scrollTo({ top: 0, behavior: motionOK() ? "smooth" : "auto" }); closePalette(); } });
     return out;
   }
 

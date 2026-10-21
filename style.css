@@ -15,23 +15,47 @@
   --blue:#2563eb;    /* 主题蓝 */
   --blue-d:#1d4ed8;  /* 主题蓝-加深（按钮悬停） */
   --blue-l:#eff6ff;  /* 主题蓝-极浅底（选中态/面板高亮） */
+  --sel:rgba(37,99,235,.20); /* 选中文本底色（半透明，两种主题都能用） */
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
   font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
   background: var(--bg); color: var(--ink); line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
 }
 a { color: var(--blue); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
+/* ===== 动效基座（M14）：全站统一的微交互 =====
+   原则：只做「反馈型」小动效（悬停/按下/入场/面板开合），不做装饰型大动画；
+   所有动效都在 300ms 内，且 prefers-reduced-motion 时整体归零（见文件尾部）。 */
+html { scroll-behavior: smooth; }
+::selection { background: var(--sel); }
+
+/* 键盘焦点环：此前只有输入框有 focus 样式，按钮/链接吃浏览器默认，观感不一 */
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 4px; }
+
+/* 首屏正文轻微上浮淡入，一次即止（.28s，不抢内容风头）。
+   不要加 fill-mode: both——动画结束后它会留下恒等 transform，
+   让 main 一直保持层叠上下文，滚动时正文会盖住吸顶导航并拦截点击。 */
+@keyframes pageIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+main.container { animation: pageIn .28s ease-out; }
+
 /* 顶部导航栏 */
 .navbar {
   background: var(--card); border-bottom: 1px solid var(--line);
+  box-shadow: 0 1px 2px rgba(0,0,0,.03);
   padding: 12px 24px; display: flex; align-items: center; gap: 20px;
   position: sticky; top: 0;
+  z-index: 40;   /* 压住正文里会层叠的东西（代码块按钮、粘性目录），低于学习页弹层 60 / 命令面板 100 */
 }
 .navbar .logo { font-weight: 700; font-size: 17px; color: var(--logo); }
-.navbar nav a { margin-right: 16px; color: var(--ink3); font-size: 15px; }
+/* 触控目标：inline 链接的可点区只有字体内容高（15px 字体约 20px），
+   用 inline-flex + min-height 撑到 28px（WCAG 2.5.8 要求 ≥24×24） */
+.navbar nav a {
+  margin-right: 16px; color: var(--ink3); font-size: 15px;
+  display: inline-flex; align-items: center; min-height: 28px;
+}
 .navbar nav a.active { color: var(--blue); font-weight: 600; }
 
 /* 无障碍：键盘用户跳过导航直达正文。平时移出视口（不占位、不被读屏重复念），
@@ -48,13 +72,13 @@ h1 { font-size: 26px; margin-bottom: 8px; }
 h2 { font-size: 20px; margin: 32px 0 12px; }
 .muted { color: var(--muted); font-size: 14px; }
 
-/* 首页卡片 */
+/* 首页卡片：悬停由「只加阴影」升级为「上浮 + 阴影」，反馈更明确 */
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; margin-top: 20px; }
 .card {
   background: var(--card); border: 1px solid var(--line); border-radius: 10px;
-  padding: 20px; transition: box-shadow .15s;
+  padding: 20px; transition: box-shadow .18s ease, transform .18s ease, border-color .18s ease;
 }
-.card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+.card:hover { box-shadow: 0 6px 20px rgba(0,0,0,.09); transform: translateY(-2px); }
 .card h3 { margin-bottom: 6px; font-size: 17px; }
 .card p { color: var(--ink4); font-size: 14px; }
 
@@ -62,12 +86,19 @@ h2 { font-size: 20px; margin: 32px 0 12px; }
 .tool-box { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 24px; margin-top: 20px; }
 input[type=number], input[type=text], textarea, select {
   padding: 8px 10px; border: 1px solid var(--line2); border-radius: 6px; font-size: 14px; width: 100%;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+input[type=number]:focus, input[type=text]:focus, textarea:focus, select:focus {
+  border-color: var(--blue); box-shadow: 0 0 0 3px var(--sel); outline: none;
 }
 button {
   background: var(--blue); color: #fff; border: none; border-radius: 6px;
   padding: 9px 18px; font-size: 14px; cursor: pointer;
+  transition: background .15s ease, transform .06s ease, border-color .15s ease,
+              color .15s ease, box-shadow .15s ease;
 }
 button:hover { background: var(--blue-d); }
+button:active { transform: translateY(1px); }   /* 按下的「压下去」手感 */
 button.ghost { background: var(--card); color: var(--blue); border: 1px solid var(--blue); }
 .row { display: flex; gap: 12px; align-items: center; margin: 12px 0; flex-wrap: wrap; }
 label { font-size: 14px; }
@@ -76,14 +107,19 @@ label { font-size: 14px; }
   padding: 12px; font-family: ui-monospace, monospace; word-break: break-all; min-height: 24px;
 }
 
-/* 文件列表 & 博文列表 */
+/* 文件列表 & 博文列表：行悬停描边提亮（不加位移，行列表上浮会晃眼） */
 .list-item {
   background: var(--card); border: 1px solid var(--line); border-radius: 8px;
   padding: 14px 18px; margin-bottom: 10px;
   display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  transition: border-color .18s ease, box-shadow .18s ease;
 }
+.list-item:hover { border-color: var(--line2); box-shadow: 0 2px 8px rgba(0,0,0,.05); }
 .list-item .name { font-weight: 600; }
 .list-item .desc { color: var(--muted); font-size: 13px; }
+/* 右侧「阅读 / 编辑」按钮不许被长标题挤压换行（中文按钮会一个字一行） */
+.list-item > a { flex: 0 0 auto; }
+.list-item > a button { white-space: nowrap; }
 
 /* 导航站分类 */
 .nav-group { margin-bottom: 24px; }
@@ -91,8 +127,9 @@ label { font-size: 14px; }
 .nav-links a {
   background: var(--card); border: 1px solid var(--line); border-radius: 8px;
   padding: 8px 16px; font-size: 14px; color: var(--ink2);
+  transition: border-color .15s ease, color .15s ease, transform .15s ease;
 }
-.nav-links a:hover { border-color: var(--blue); color: var(--blue); text-decoration: none; }
+.nav-links a:hover { border-color: var(--blue); color: var(--blue); text-decoration: none; transform: translateY(-1px); }
 
 /* ===== 暗色：手动切换（html[data-theme="dark"]）===== */
 /* 值参照 admin 后台成熟暗色方案；品牌蓝提亮，保证暗底上的链接/文字对比度。
@@ -108,12 +145,19 @@ html[data-theme="dark"] {
 }
 /* 主题蓝提亮后按钮改深色文字，保证对比度（ghost 按钮自带 var(--blue) 文字，不受影响） */
 html[data-theme="dark"] button { color: #0d1117; }
+html[data-theme="dark"] { --sel:rgba(96,165,250,.30); }
 
 /* ===== 移动端断点：纯 CSS 零 JS ===== */
 @media (max-width: 768px) {
   .navbar { flex-wrap: wrap; gap: 8px 16px; padding: 10px 14px; }
-  .navbar nav a { margin-right: 12px; }
+  /* 品牌和主题/命令按钮同排，导航整行下移：避免 7 个链接把控件挤到第三行 */
+  .navbar nav { order: 3; flex-basis: 100%; }
+  .navbar nav a { margin-right: 12px; min-height: 32px; }   /* 手指点击更从容 */
   .container { margin-top: 24px; }
+}
+/* 窄屏再收一档：7 个导航项在 320–360px 也放得下一行（点击高度仍是 32px） */
+@media (max-width: 380px) {
+  .navbar nav a { margin-right: 8px; font-size: 14px; }
 }
 
 /* ===== 顶栏右侧控件：主题切换 / 命令面板（由 shell.js 注入，样式全站共用） ===== */
@@ -131,16 +175,21 @@ html[data-theme="dark"] button { color: #0d1117; }
 }
 
 /* ===== Ctrl+K 命令面板 ===== */
+/* 开面板：遮罩淡入 + 面板轻微下落缩放（.hide 是 display:none，故用 :not(.hide) 触发动画） */
+@keyframes maskIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes cmdkIn { from { opacity: 0; transform: translateY(-8px) scale(.98); } to { opacity: 1; transform: none; } }
 .cmdk-mask {
   position: fixed; inset: 0; z-index: 100; display: flex; align-items: flex-start;
   justify-content: center; padding: 11vh 16px 16px; background: rgba(15, 23, 42, .42);
 }
+.cmdk-mask:not(.hide) { animation: maskIn .15s ease-out; }
 .cmdk-mask.hide { display: none; }
 .cmdk {
   width: 100%; max-width: 520px; background: var(--card); color: var(--ink);
   border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
   box-shadow: 0 16px 48px rgba(15, 23, 42, .28);
 }
+.cmdk-mask:not(.hide) .cmdk { animation: cmdkIn .16s ease-out; }
 .cmdk input {
   width: 100%; border: none; border-bottom: 1px solid var(--line); border-radius: 0;
   padding: 15px 16px; font-size: 15px; font-family: inherit; background: transparent; color: var(--ink);
@@ -157,14 +206,28 @@ html[data-theme="dark"] button { color: #0d1117; }
 .cmdk-item.on { background: var(--blue-l); color: var(--blue); }
 .cmdk-empty { padding: 18px; text-align: center; color: var(--muted); font-size: 13.5px; }
 
-/* ===== 轻提示（复制成功等） ===== */
+/* ===== 轻提示（复制成功等）：由纯淡入升级为「上滑 + 淡入」 ===== */
 .shell-toast {
-  position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+  position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 8px);
   background: var(--ink); color: var(--bg); font-size: 13px; padding: 9px 16px;
-  border-radius: 999px; z-index: 200; opacity: 0; transition: opacity .2s; pointer-events: none;
+  border-radius: 999px; z-index: 200; opacity: 0; pointer-events: none;
+  transition: opacity .2s ease, transform .2s ease;
 }
-.shell-toast.show { opacity: .95; }
+.shell-toast.show { opacity: .95; transform: translate(-50%, 0); }
 
 @media (max-width: 768px) {
   .cmdk-mask { padding-top: 8vh; }
+  /* 手机上没有物理键盘，⌘K 的按键提示是噪音，只留图标 */
+  #shellCmdkBtn kbd { display: none; }
+}
+
+/* ===== 动效总开关：系统开启「减弱动态效果」时，全站动画/过渡/平滑滚动一律归零 =====
+   前庭功能障碍用户会因大面积位移不适，这是无障碍硬要求（WCAG 2.3.3）。 */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
 }

@@ -17,9 +17,9 @@ const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]
 const external = [...html.matchAll(/<script[^>]*\ssrc\s*=\s*["']([^"']+)["']/gi)].map(m => m[1]);
 check('有 3 个内联 script（防闪主题 + 核心 + 界面）', inline.length === 3, `实际 ${inline.length}`);
 check('首个内联 script 是防闪主题脚本（读 eraser.theme）', /eraser\.theme/.test(inline[0] || ''));
-check('有 2 个外部 script（links.js + 全站 shell.js）', external.length === 2, external.join(', '));
-check('外部 script 指向 links.js 与 ../shell.js',
-      external[0] === 'links.js' && external[1] === '../shell.js', external.join(', '));
+check('有 4 个外部 script（links.js + 站主层 + 编辑器 + 全站 shell.js）', external.length === 4, external.join(', '));
+check('外部 script 顺序正确（数据 → 编辑能力 → 外壳）',
+      external.join('|') === 'links.js|../owner.js|../admin/content.js|../shell.js', external.join(', '));
 check('外部 script 指向 links.js', external[0] === 'links.js', external[0]);
 check('links.js 是相对路径（本地双击也能用）', external[0] && !/^[/.]/.test(external[0]), external[0]);
 check('links.js 在 index.html 之前加载',

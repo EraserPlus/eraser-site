@@ -9,6 +9,7 @@
 </script>
 <title>关于 · Eraser 的小站</title>
 <link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="../owner.css">
 <link rel="manifest" href="../manifest.webmanifest">
 <link rel="icon" href="../icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="../icon.svg">
@@ -56,6 +57,8 @@
   </nav>
 </div>
 <main class="container" id="main">
+  <!-- 登录后才显示：就地编辑这一页 -->
+  <div class="owner-tools" id="ownerTools" style="display:none"></div>
   <!-- 静态兜底：接口不可用时显示这些 -->
   <div class="article" id="article">
     <h1>关于我</h1>
@@ -65,10 +68,12 @@
   </div>
   <!-- 运行徽章放在 article 外：后台用 Markdown 替换正文时不动它 -->
   <p class="runbadge"><span class="dot">●</span> 本站已稳定运行 <b id="runDays">—</b> 天 · 自 2026 年 10 月起</p>
-  <p class="runbadge" style="margin-top:8px"><a href="../dev/index.html" style="color:var(--muted)">🎛️ 开发交接（给接手的 AI）→</a></p>
+  <p class="runbadge" style="margin-top:8px"><a href="../dev/index.html" style="color:var(--muted);display:inline-block;padding:4px 0">🎛️ 开发交接（给接手的 AI）→</a></p>
 </main>
 
 <script src="../md.js"></script>
+<script src="../owner.js"></script>
+<script src="../admin/content.js"></script>
 <script>
 /* 站点运行徽章：按首次上线日期算天数，改 SITE_LAUNCH 即可 */
 var SITE_LAUNCH = "2026-10-13";
@@ -86,6 +91,57 @@ var SITE_LAUNCH = "2026-10-13";
   var art = document.getElementById("article");
   if (!window.fetch) return;
 
+  /* 站主身份：这一页直接改，保存后就地重渲染，不用去后台 */
+  var OWNER = !!(window.Owner && Owner.hasToken());
+  var bar = document.getElementById("ownerTools");
+  if (OWNER && window.ContentAdmin) ContentAdmin.init({ api: Owner.api, say: Owner.say });
+
+  var STARTER = [
+    "你好，我是 Eraser。这个站是我的个人小角落，放点工具、文件和随笔。",
+    "",
+    "## 联系方式",
+    "",
+    "GitHub：[EraserPlus](https://github.com/EraserPlus)"
+  ].join("\n");
+
+  function applyPage(page) {
+    document.title = page.data.title + " · Eraser 的小站";
+    /* MD.render 会先整体转义再生成标签 */
+    art.innerHTML = window.MD ? MD.render(page.data.content) : "";
+  }
+
+  function renderTools(page) {
+    if (!OWNER || !window.ContentAdmin || !bar) return;
+    bar.innerHTML = "";
+    bar.style.display = "";
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "owner-btn primary";
+    b.textContent = page ? "✎ 编辑这一页" : "＋ 创建这一页";
+    b.title = "页面标识固定为 about，只改标题和正文";
+    b.addEventListener("click", function () {
+      ContentAdmin.openItem("page", page, {
+        fixed: { key: "about" },
+        initial: { key: "about", title: "关于我", content: STARTER },
+        title: page ? "编辑「关于」页" : "创建「关于」页",
+        afterSave: function (saved) {
+          if (saved && saved.data) {
+            applyPage(saved);
+            renderTools(saved);
+          }
+        }
+      });
+    });
+    bar.appendChild(b);
+    var tip = document.createElement("span");
+    tip.className = "muted";
+    tip.style.fontSize = "12.5px";
+    tip.textContent = page ? "改完保存即可，正文支持 Markdown。" : "数据库里还没有这一页，创建后访客看到的就是你写的内容。";
+    bar.appendChild(tip);
+  }
+
+  renderTools(null);
+
   fetch("/api/content?type=page", { headers: { Accept: "application/json" } })
     .then(function(r){ return r.ok ? r.json() : null; })
     .then(function(j){
@@ -94,11 +150,10 @@ var SITE_LAUNCH = "2026-10-13";
       for (var i = 0; i < items.length; i++){
         if (items[i].data && items[i].data.key === "about"){ page = items[i]; break; }
       }
+      renderTools(page);
       if (!page) return;   // 还没在后台写过，保留静态兜底
 
-      document.title = page.data.title + " · Eraser 的小站";
-      /* MD.render 会先整体转义再生成标签 */
-      art.innerHTML = window.MD ? MD.render(page.data.content) : "";
+      applyPage(page);
     })
     .catch(function(){ /* 接口挂了就保留静态兜底 */ });
 })();

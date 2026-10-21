@@ -1,0 +1,246 @@
+/* ===========================================================================
+   owner.css   站主就地编辑层（公开页按需引入，和 owner.js 配套）
+   ---------------------------------------------------------------------------
+   两段：
+     ① 登录后的轻量 UI：编辑模式浮条 / 登录框 / 提示 / 行内编辑按钮
+     ② 复用 admin/content.js 的表单弹层样式（以前内嵌在 admin/index.html）
+   访客没有令牌时这些元素根本不会出现在 DOM 里；这里只负责样子。
+   =========================================================================== */
+
+/* ---------------------------------------------------------- 编辑模式浮条 */
+.owner-dock {
+  position: fixed; left: 16px; bottom: 16px; z-index: 90;
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 6px 6px 11px;
+  background: var(--card); border: 1px solid var(--line2); border-radius: 999px;
+  box-shadow: 0 6px 22px rgba(15,23,42,.14);
+  font-size: 12.5px; line-height: 1; color: var(--ink2);
+  max-width: calc(100vw - 32px);
+}
+.owner-dock-mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--blue); color: #fff; font-size: 11px;
+}
+.owner-dock-text { font-weight: 600; white-space: nowrap; }
+.owner-dock-link {
+  color: var(--muted); text-decoration: none; padding: 5px 4px; white-space: nowrap;
+}
+.owner-dock-link:hover { color: var(--blue); text-decoration: none; }
+.owner-dock-exit {
+  border: 1px solid var(--line2); background: var(--card); color: var(--ink2);
+  border-radius: 999px; padding: 5px 10px; font-size: 12px; font-family: inherit;
+  cursor: pointer; line-height: 1;
+}
+.owner-dock-exit:hover { border-color: var(--blue); color: var(--blue); background: var(--card); }
+
+/* ---------------------------------------------------------------- 登录框 */
+.owner-login {
+  position: fixed; inset: 0; z-index: 160;
+  background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center;
+  padding: 18px;
+}
+.owner-panel {
+  width: 100%; max-width: 380px;
+  background: var(--card); border: 1px solid var(--line2); border-radius: 16px;
+  box-shadow: 0 22px 60px rgba(0,0,0,.28); padding: 18px 20px 20px;
+}
+.owner-login-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.owner-login-head h3 { margin: 0; font-size: 17px; color: var(--ink); }
+.owner-login-x {
+  border: none; background: transparent; color: var(--muted);
+  font-size: 16px; line-height: 1; padding: 6px 8px; border-radius: 8px; cursor: pointer;
+}
+.owner-login-x:hover { background: var(--sunk); color: var(--ink); }
+.owner-login-hint { font-size: 12.5px; line-height: 1.7; color: var(--muted); margin: 8px 0 14px; }
+.owner-login-input {
+  width: 100%; box-sizing: border-box; padding: 11px 12px;
+  border: 1px solid var(--line2); border-radius: 10px;
+  background: var(--sunk); color: var(--ink); font-size: 15px; font-family: inherit;
+}
+.owner-login-input:focus {
+  outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--sel);
+  background: var(--card);
+}
+.owner-login-msg { min-height: 18px; font-size: 12.5px; color: var(--muted); margin: 8px 0 2px; }
+.owner-login-msg.err { color: var(--red, #d1242f); }
+.owner-login-acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+
+/* ---------------------------------------------------------------- 提示 */
+.owner-toast {
+  position: fixed; left: 50%; bottom: 26px; z-index: 220;
+  transform: translate(-50%, 8px);
+  max-width: min(520px, calc(100vw - 32px));
+  background: var(--ink); color: var(--bg);
+  font-size: 13px; line-height: 1.5; padding: 9px 16px; border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.18);
+  opacity: 0; pointer-events: none;
+  transition: opacity .2s ease, transform .2s ease;
+}
+.owner-toast.show { opacity: .96; transform: translate(-50%, 0); }
+.owner-toast.err { background: var(--red, #d1242f); color: #fff; }
+.owner-toast.ok { background: var(--green, #16a34a); color: #fff; }
+
+/* ------------------------------------------------------------ 行内按钮 */
+.owner-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.owner-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  border: 1px solid var(--line2); background: var(--card); color: var(--ink2);
+  border-radius: 9px; padding: 7px 13px; font-size: 13px; font-family: inherit;
+  line-height: 1.2; cursor: pointer; white-space: nowrap;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.owner-btn:hover { border-color: var(--blue); color: var(--blue); background: var(--card); }
+.owner-btn.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+.owner-btn.primary:hover { background: var(--blue-d); border-color: var(--blue-d); color: #fff; }
+.owner-btn.danger { color: var(--red, #d1242f); border-color: var(--red, #d1242f); background: var(--card); }
+.owner-btn.danger:hover { background: var(--red, #d1242f); color: #fff; }
+.owner-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.owner-row-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.owner-row-actions .owner-btn { padding: 5px 10px; font-size: 12.5px; border-radius: 7px; }
+
+.owner-badge-draft {
+  display: inline-block; margin-left: 8px; padding: 1px 7px;
+  border-radius: 20px; background: var(--amber-l, #fffbeb); color: var(--amber, #b45309);
+  border: 1px solid var(--amber, #b45309); font-size: 11px; font-weight: 600;
+  vertical-align: 2px;
+}
+
+/* 卡片右上角那种很小的操作（导航页 / 学习页复用） */
+.owner-mini {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 24px; min-height: 24px; padding: 2px 6px;
+  border-radius: 6px; color: var(--muted); cursor: pointer; user-select: none;
+  font-size: 12px; line-height: 1;
+}
+.owner-mini:hover { color: var(--blue); background: var(--blue-l, #eff6ff); }
+.owner-mini.danger:hover { color: var(--red, #d1242f); background: var(--red-l, #fef2f2); }
+
+/* ===========================================================================
+   编辑器弹层：从 admin/index.html 抽出的通用表单样式
+   =========================================================================== */
+.cf-overlay {
+  position: fixed; inset: 0; z-index: 130; background: rgba(0,0,0,.45);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.cf-panel {
+  background: var(--bg); width: 100%; max-width: 640px; max-height: 92vh;
+  display: flex; flex-direction: column;
+  border-radius: 16px 16px 0 0; overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,.3);
+}
+.cf-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-bottom: 1px solid var(--line); background: var(--card);
+}
+.cf-head b { font-size: 15px; color: var(--ink); }
+.cf-body { padding: 16px; overflow: auto; flex: 1 1 auto; min-height: 0; }
+@media (min-width: 640px) {
+  .cf-overlay { align-items: center; padding: 20px; }
+  .cf-panel { border-radius: 16px; }
+}
+
+.cf-panel .btn {
+  border: none; border-radius: 10px; padding: 10px 16px; font-size: 14px;
+  font-family: inherit; cursor: pointer; background: var(--blue); color: #fff;
+  transition: background .15s, opacity .15s;
+}
+.cf-panel .btn:hover { background: var(--blue-d); }
+.cf-panel .btn:disabled { opacity: .5; cursor: not-allowed; }
+.cf-panel .btn.ghost { background: var(--sunk); color: var(--ink2); border: 1px solid var(--line2); }
+.cf-panel .btn.sm { padding: 6px 11px; font-size: 12.5px; border-radius: 8px; }
+.cf-panel .btn.icon {
+  background: transparent; color: var(--ink2); padding: 7px 10px;
+  font-size: 17px; line-height: 1; border-radius: 8px;
+}
+.cf-panel .btn.icon:hover { background: var(--sunk); }
+.cf-panel .btn.danger { color: var(--red, #d1242f); border-color: var(--red, #d1242f); }
+
+.cform { color: var(--ink2); }
+.cf-row { margin-bottom: 2px; }
+.cf-panel label.fl { display: block; font-size: 12.5px; color: var(--ink2); margin: 12px 0 5px; }
+.cf-panel label.fl.first { margin-top: 0; }
+.cf-panel input[type="text"],
+.cf-panel input[type="password"],
+.cf-panel textarea,
+.cf-panel select {
+  width: 100%; box-sizing: border-box; padding: 10px 12px;
+  border: 1px solid var(--line2); border-radius: 10px;
+  background: var(--card); color: var(--ink); font-size: 14px; font-family: inherit;
+}
+.cf-panel textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  line-height: 1.6; resize: vertical; min-height: 180px;
+}
+.cf-panel input[type="text"]:focus,
+.cf-panel input[type="password"]:focus,
+.cf-panel textarea:focus,
+.cf-panel select:focus {
+  outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--sel);
+}
+.cf-panel input[type="checkbox"] { width: auto; accent-color: var(--blue); }
+.cf-bool { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--ink2); }
+.cf-bool input { width: auto; }
+
+.mdprev {
+  margin-top: 10px; padding: 12px 14px; background: var(--sunk); border: 1px solid var(--line);
+  border-radius: 10px; font-size: 14px; line-height: 1.7; overflow-wrap: break-word;
+}
+.mdprev h1, .mdprev h2, .mdprev h3, .mdprev h4 { font-size: 1.05em; margin: 12px 0 6px; }
+.mdprev p { margin: 8px 0; }
+.mdprev ul, .mdprev ol { margin: 8px 0; padding-left: 22px; }
+.mdprev pre {
+  background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+  padding: 10px; overflow: auto; font-size: 12.5px;
+}
+.mdprev code { background: var(--sunk); border-radius: 4px; padding: 1px 5px; font-size: 12.5px; }
+.mdprev pre code { background: none; padding: 0; }
+.mdprev blockquote { border-left: 3px solid var(--line2); margin: 8px 0; padding-left: 12px; color: var(--ink2); }
+.mdprev a { color: var(--blue); }
+.mdcnt { font-size: 12px; color: var(--muted); text-align: right; margin: 8px 0 2px; }
+.draftbar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px;
+  background: var(--amber-l, #fffbeb); color: var(--amber, #b45309);
+  border: 1px solid var(--amber, #b45309); border-radius: 9px;
+  padding: 8px 12px; margin: 0 0 10px;
+}
+.draftbar span { flex: 1; min-width: 140px; }
+.form-acts { display: flex; gap: 8px; margin-top: 16px; }
+.form-acts .btn { flex: 1; }
+/* 表单很长时保存/取消钉在滚动区底部，不用先滚到底才能存 */
+.cf-panel .form-acts {
+  position: sticky; bottom: 0; z-index: 2;
+  padding-top: 12px;
+  background: var(--bg);
+  box-shadow: 0 -14px 18px -8px var(--bg);
+}
+
+/* ---------------------------------------------------------------- 移动端 */
+@media (max-width: 560px) {
+  .owner-dock { left: 10px; bottom: 10px; padding-left: 9px; gap: 6px; }
+  .owner-dock-link { display: none; }
+  .owner-toast { bottom: 62px; }
+}
+@media (max-width: 640px) {
+  .list-item:has(.owner-row-actions) { flex-wrap: wrap; }
+  .owner-row-actions { width: 100%; justify-content: flex-end; }
+}
+
+/* ===========================================================================
+   暗色：style.css 里 `html[data-theme="dark"] button { color:#0d1117 }` 是为了
+   给浅蓝底的主按钮配深色字，权重比单个 .owner-btn 高。这里逐个把站主按钮的
+   文字颜色拉回来，否则深色文字贴在深色卡片上几乎看不见。
+   =========================================================================== */
+html[data-theme="dark"] .owner-btn,
+html[data-theme="dark"] .owner-dock-exit,
+html[data-theme="dark"] .owner-login-x { color: var(--ink2); }
+html[data-theme="dark"] .owner-btn.primary { color: #0d1117; }
+html[data-theme="dark"] .owner-btn.danger { color: var(--red, #ff7b72); }
+html[data-theme="dark"] .owner-btn.danger:hover { color: #fff; }
+html[data-theme="dark"] .owner-mini { color: var(--muted); }
+html[data-theme="dark"] .owner-mini:hover { color: var(--blue); }
+html[data-theme="dark"] .owner-mini.danger:hover { color: var(--red, #ff7b72); }
+html[data-theme="dark"] .owner-badge-draft {
+  background: #2b2210; color: #d29922; border-color: #9e6a03;
+}

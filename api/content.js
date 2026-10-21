@@ -312,7 +312,19 @@ export default async function handler(req, res) {
       checkType(t);
       const rows = await sql`
         SELECT * FROM content WHERE type = ${t} ORDER BY sort_order ASC, id ASC`;
-      return ok(res, { ok: true, items: rows.map(shape) });
+      let items = rows.map(shape);
+
+      /* 文章草稿只给登录后的站主看：
+         公开 GET 不带令牌时把 published === false 的行过滤掉。
+         写接口本来就要求登录，这里补上读侧，避免草稿被前台接口直接读走。 */
+      if (t === 'post') {
+        let authed = false;
+        try { requireAuth(req); authed = true; } catch (e) { authed = false; }
+        if (!authed) {
+          items = items.filter(function (r) { return !r.data || r.data.published !== false; });
+        }
+      }
+      return ok(res, { ok: true, items: items });
     }
 
     /* 按名字查只认 GET。其它方法在这里明确挡掉，

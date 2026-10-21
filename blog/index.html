@@ -9,6 +9,7 @@
 </script>
 <title>博客 · Eraser 的小站</title>
 <link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="../owner.css">
 <link rel="manifest" href="../manifest.webmanifest">
 <link rel="icon" href="../icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="../icon.svg">
@@ -40,78 +41,179 @@
 </div>
 <main class="container" id="main">
   <h1>✏️ 博客</h1>
-  <p class="muted">文章在管理后台里用 Markdown 写，这里自动列出。</p>
+  <p class="muted">用 Markdown 写下的技术笔记与随笔，新的排在前面。 · <a href="/api/rss">RSS 订阅</a></p>
+
+  <!-- 登录后才显示：写文章入口 -->
+  <div class="owner-tools" id="ownerTools" style="display:none"></div>
 
   <!-- 空状态：还没有文章、或接口不可用时显示，页面不会白屏 -->
   <div id="list"></div>
-  <p class="muted" id="hint">还没有文章。去管理后台的「博客」标签写一篇。</p>
+  <p class="muted" id="hint" aria-live="polite">还没有文章。</p>
 </main>
 
+<script src="../md.js"></script>
+<script src="../owner.js"></script>
+<script src="../admin/content.js"></script>
 <script>
 (function(){
   var list = document.getElementById("list");
   var hint = document.getElementById("hint");
-  if (!window.fetch) return;
+  if (!window.fetch) return;   /* 无 JS：保留静态空态兜底 */
 
-  function esc(s){
-    return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  /* 有令牌就是站主：列表多出编辑入口、请求带上身份（能看到草稿） */
+  var OWNER = !!(window.Owner && Owner.hasToken());
+  if (OWNER && window.ContentAdmin) ContentAdmin.init({ api: Owner.api, say: Owner.say });
+
+  function setupOwner() {
+    if (!OWNER || !window.ContentAdmin) return;
+    var bar = document.getElementById("ownerTools");
+    if (!bar) return;
+    bar.style.display = "";
+    var add = document.createElement("button");
+    add.type = "button";
+    add.className = "owner-btn primary";
+    add.textContent = "＋ 写文章";
+    add.addEventListener("click", function () {
+      ContentAdmin.openNew("post", { title: "写新文章", afterSave: function(){ load(); } });
+    });
+    bar.appendChild(add);
+    var tip = document.createElement("span");
+    tip.className = "muted";
+    tip.style.fontSize = "12.5px";
+    tip.textContent = "新建默认是草稿，勾选「公开显示」才会出现在博客列表里。";
+    bar.appendChild(tip);
   }
 
-  fetch("/api/content?type=post", { headers: { Accept: "application/json" } })
-    .then(function(r){ return r.ok ? r.json() : null; })
-    .then(function(j){
-      var items = ((j && j.items) || []).filter(function(p){
-        return p.data && p.data.published !== false;
+  /* 三态：加载中 / 失败（可重试）/ 真空态。
+     原版接口挂了停在「还没有文章」，把故障伪装成空库；HTTP 500 也被当成空列表。 */
+  function showState(text, retry) {
+    hint.style.display = "";
+    hint.textContent = text;
+    if (!retry) return;
+    var b = document.createElement("button");
+    b.className = "ghost"; b.type = "button"; b.textContent = "重试";
+    b.style.marginLeft = "8px";
+    b.addEventListener("click", load);
+    hint.appendChild(b);
+  }
+
+  /* 站主身份下才能看到草稿；访客多一层客户端过滤兜底 */
+  function fetchPosts() {
+    if (OWNER && window.Owner) return Owner.api("content?type=post");
+    return fetch("/api/content?type=post", { headers: { Accept: "application/json" } })
+      .then(function(r){
+        if (!r.ok) throw new Error("接口返回 " + r.status);   /* 5xx 是故障，不是空库 */
+        return r.json();
       });
-      if (!items.length){ hint.style.display = ""; return; }   // 数据库里还没内容，保留静态兜底
+  }
 
-      /* 新的排前面 */
-      items.sort(function(a, b){
-        return String(b.updated_at || "").localeCompare(String(a.updated_at || ""));
-      });
+  function ownerActions(p) {
+    var acts = document.createElement("div");
+    acts.className = "owner-row-actions";
 
-      list.innerHTML = "";
-      items.forEach(function(p){
-        var d = p.data;
-        var row = document.createElement("div");
-        row.className = "list-item";
+    var ed = document.createElement("button");
+    ed.type = "button";
+    ed.className = "owner-btn";
+    ed.textContent = "✎ 编辑";
+    ed.title = "就地编辑这篇（保存后自动刷新列表）";
+    ed.addEventListener("click", function () {
+      ContentAdmin.openItem("post", p, { afterSave: function(){ load(); } });
+    });
+    acts.appendChild(ed);
 
-        var left = document.createElement("div");
-        var name = document.createElement("div");
-        name.className = "name";
-        name.textContent = d.title;
-        left.appendChild(name);
+    var del = document.createElement("button");
+    del.type = "button";
+    del.className = "owner-btn danger";
+    del.textContent = "✕";
+    del.title = "删除这篇文章";
+    del.addEventListener("click", function () {
+      ContentAdmin.removeItem("post", p, { afterDelete: load });
+    });
+    acts.appendChild(del);
+    return acts;
+  }
 
-        var desc = document.createElement("div");
-        desc.className = "desc";
-        var bits = [String(p.updated_at || "").slice(0, 10)];
-        var summary = d.summary || (window.MD ? MD.plain(d.content, 60) : "");
-        if (summary) bits.push(summary);
-        desc.textContent = bits.filter(Boolean).join(" · ");
-        left.appendChild(desc);
+  /* 正文页按 slug 存了续读百分比；列表里顺手显示，挑文章时知道哪篇读到一半 */
+  function savedPct(slug) {
+    try {
+      var j = JSON.parse(localStorage.getItem("eraser.read." + slug));
+      if (j && j.p >= 3 && j.p <= 97 && Date.now() - j.t < 30 * 864e5) return j.p;
+    } catch (e) {}
+    return 0;
+  }
 
-        if (d.tags && d.tags.length){
-          var tags = document.createElement("div");
-          tags.className = "desc";
-          tags.style.marginTop = "3px";
-          tags.textContent = d.tags.map(function(t){ return "#" + t; }).join(" ");
-          left.appendChild(tags);
+  function load() {
+    showState("正在加载文章…");
+    fetchPosts()
+      .then(function(j){
+        var items = ((j && j.items) || []).filter(function(p){
+          return p.data && (OWNER || p.data.published !== false);
+        });
+        if (!items.length){
+          showState(OWNER ? "还没有文章。点上面的「＋ 写文章」开始第一篇。" : "还没有文章。");
+          return;   // 数据库里确实还没内容
         }
-        row.appendChild(left);
 
-        var a = document.createElement("a");
-        a.href = "post.html?slug=" + encodeURIComponent(d.slug);
-        var b = document.createElement("button");
-        b.className = "ghost";
-        b.textContent = "阅读";
-        a.appendChild(b);
-        row.appendChild(a);
+        /* 新的排前面 */
+        items.sort(function(a, b){
+          return String(b.updated_at || "").localeCompare(String(a.updated_at || ""));
+        });
 
-        list.appendChild(row);
-      });
-      hint.style.display = "none";
-    })
-    .catch(function(){ hint.style.display = ""; });   // 接口挂了就显示空状态提示
+        list.innerHTML = "";
+        items.forEach(function(p){
+          var d = p.data;
+          var row = document.createElement("div");
+          row.className = "list-item";
+
+          var left = document.createElement("div");
+          var name = document.createElement("div");
+          name.className = "name";
+          name.textContent = d.title;
+          if (OWNER && d.published === false) {
+            var badge = document.createElement("span");
+            badge.className = "owner-badge-draft";
+            badge.textContent = "草稿";
+            name.appendChild(badge);
+          }
+          left.appendChild(name);
+
+          var desc = document.createElement("div");
+          desc.className = "desc";
+          var bits = [String(p.updated_at || "").slice(0, 10)];
+          if (window.MD && MD.stats) bits.push("约 " + MD.stats(d.content).minutes + " 分钟");
+          var pct = savedPct(d.slug);
+          if (pct) bits.push("读到 " + pct + "%");
+          var summary = d.summary || (window.MD ? MD.plain(d.content, 60) : "");
+          if (summary) bits.push(summary);
+          desc.textContent = bits.filter(Boolean).join(" · ");
+          left.appendChild(desc);
+
+          if (d.tags && d.tags.length){
+            var tags = document.createElement("div");
+            tags.className = "desc";
+            tags.style.marginTop = "3px";
+            tags.textContent = d.tags.map(function(t){ return "#" + t; }).join(" ");
+            left.appendChild(tags);
+          }
+          row.appendChild(left);
+
+          var a = document.createElement("a");
+          a.href = "post.html?slug=" + encodeURIComponent(d.slug);
+          var b = document.createElement("button");
+          b.className = "ghost";
+          b.textContent = "阅读";
+          a.appendChild(b);
+          row.appendChild(a);
+          if (OWNER && window.ContentAdmin) row.appendChild(ownerActions(p));
+
+          list.appendChild(row);
+        });
+        hint.style.display = "none";
+      })
+      .catch(function(){ showState("文章暂时没拿到（网络或接口出了问题）。", true); });
+  }
+  setupOwner();
+  load();
 })();
 </script>
 <script src="../shell.js"></script>

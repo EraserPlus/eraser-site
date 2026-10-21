@@ -332,11 +332,11 @@
   /* ---------------- 内容操作 ---------------- */
   function create(type, data, parentId, done) {
     return api("content", { method: "POST", body: { type: type, data: data, parent_id: parentId || undefined } })
-      .then(done).catch(function (e) { say("app", e.message, "err"); });
+      .then(done).catch(function (e) { say("app", e.message, "err"); throw e; });
   }
   function update(id, data, done) {
     return api("content", { method: "PATCH", body: { id: id, data: data } })
-      .then(done).catch(function (e) { say("app", e.message, "err"); });
+      .then(done).catch(function (e) { say("app", e.message, "err"); throw e; });
   }
   function remove(id, what, done) {
     if (!confirm("删除这个" + what + "？删了就找不回来了。")) return;
@@ -606,7 +606,8 @@
     var form = buildForm("nav_category", function (data, unlock) {
       var p = cat ? update(cat.id, data, unlock) : create("nav_category", data, null, unlock);
       p.then(function () { closeForm(); return refreshNav(); })
-       .then(function () { say("app", cat ? "已保存" : "已添加"); });
+       .then(function () { say("app", cat ? "已保存" : "已添加"); })
+       .catch(function () { unlock(); });
     }, closeForm);
     form.fill(cat ? cat.data : null);
     openForm(cat ? "编辑分类" : "新建分类", form);
@@ -616,7 +617,8 @@
     var form = buildForm("nav_link", function (data, unlock) {
       var p = link ? update(link.id, data, unlock) : create("nav_link", data, categoryId, unlock);
       p.then(function () { closeForm(); return refreshNav(); })
-       .then(function () { say("app", link ? "已保存" : "已添加"); });
+       .then(function () { say("app", link ? "已保存" : "已添加"); })
+       .catch(function () { unlock(); });
     }, closeForm);
     form.fill(link ? link.data : null);
     openForm(link ? "编辑链接" : "添加链接", form);
@@ -906,7 +908,7 @@
         if (d.status === o[0]) return;
         update(it.id, { status: o[0] }, function () {
           return reload("media").then(function () { say("app", "已改成「" + o[1] + "」"); refresh(); });
-        });
+        }).catch(function () {});
       });
       stWrap.appendChild(b);
     });
@@ -922,7 +924,7 @@
         var next = Number(d.progress || 0) + 1;
         update(it.id, { progress: next }, function () {
           return reload("media").then(function () { say("app", "进度 → 第 " + next + " 话"); refresh(); });
-        });
+        }).catch(function () {});
       });
       o.appendChild(e0);
     }
@@ -1188,7 +1190,8 @@
                 create("media", d, null, unlock).then(function () {
                   closeForm();
                   return reload("media");
-                }).then(function () { renderMedia("mediaHost"); say("app", "已添加：" + d.name); });
+                }).then(function () { renderMedia("mediaHost"); say("app", "已添加：" + d.name); })
+                  .catch(function () { unlock(); });
               }, closeForm);
               form.fill(data);
             });
@@ -1210,25 +1213,64 @@
     qi.focus();
   }
 
+  /* opts（都可选）：
+       parentId   新建 nav_link 时挂到哪个分类
+       initial    新建时的预填数据（比如 about 页固定 key）
+       fixed      保存前强制写入的字段（页面级编辑用来锁住 key）
+       title      自定义弹层标题
+       afterSave  保存成功后由调用方重绘（公开页用，传服务端返回的 item）
+       afterDelete 删除成功后由调用方重绘 */
   function editItem(type, item, hostId, opts) {
     opts = opts || {};
     var form = buildForm(type, function (data, unlock) {
-      var p = item ? update(item.id, data, unlock) : create(type, data, null, unlock);
-      p.then(function () {
+      if (opts.fixed) {
+        Object.keys(opts.fixed).forEach(function (k) { data[k] = opts.fixed[k]; });
+      }
+      var p = item
+        ? update(item.id, data, unlock)
+        : create(type, data, opts.parentId || null, unlock);
+      p.then(function (j) {
+        var saved = (j && j.item) ? j.item : null;
         if (form.clearDraft) form.clearDraft();
         closeForm();
-        return reload(type);
-      })
-       .then(function () {
-         /* 追更自己有更丰富的列表视图（带缩略图 / 行内改状态），
-            所以走 afterSave 交回给它自己重绘，而不是通用 renderList。 */
-         if (opts.afterSave) opts.afterSave();
-         else renderList(type, hostId, opts);
-         say("app", item ? "已保存" : "已添加");
-       });
+        if (opts.afterSave) {
+          opts.afterSave(saved);
+          say("app", item ? "已保存" : "已添加");
+          return;
+        }
+        return reload(type).then(function () {
+          /* 追更自己有更丰富的列表视图（带缩略图 / 行内改状态），
+             所以走 afterSave 交回给它自己重绘，而不是通用 renderList。 */
+          renderList(type, hostId, opts);
+          say("app", item ? "已保存" : "已添加");
+        });
+      }).catch(function () {
+        /* 错误已经由 say() 提示；保留弹层，让用户改完再存 */
+        unlock();
+      });
     }, closeForm);
-    form.fill(item ? item.data : null);
-    openForm(item ? "编辑" + SCHEMA[type].name : "新增" + SCHEMA[type].name, form);
+    var initial = item ? item.data : (opts.initial || null);
+    form.fill(initial);
+    var name = SCHEMA[type].name;
+    openForm(opts.title || (item ? "编辑" + name : "新增" + name), form);
+  }
+
+  /* 公开页用的单条编辑入口：不依赖后台列表 DOM */
+  function openItem(type, item, opts) {
+    if (!SCHEMA[type]) return;
+    editItem(type, item, null, opts);
+  }
+  function openNew(type, opts) {
+    if (!SCHEMA[type]) return;
+    editItem(type, null, null, opts);
+  }
+  function removeItem(type, item, opts) {
+    opts = opts || {};
+    if (!item || item.id == null) return;
+    var name = SCHEMA[type] ? SCHEMA[type].name : "内容";
+    remove(item.id, name, function () {
+      if (opts.afterDelete) opts.afterDelete();
+    });
   }
 
   var cache = { post: [], page: [], media: [], learn_map: [] };
@@ -1652,6 +1694,10 @@
       api = opts.api; say = opts.say; md = global.MD || null;
     },
     render: render,
+    /* 公开页就地编辑：直接开单条表单，不依赖后台列表 DOM */
+    openItem: openItem,
+    openNew: openNew,
+    removeItem: removeItem,
     types: Object.keys(SCHEMA),
     /* 追更批量导入的解析逻辑（纯函数，供测试直接调，避免「写一套测另一套」） */
     parseImport: parseImport,

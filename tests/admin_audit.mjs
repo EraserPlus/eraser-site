@@ -212,7 +212,7 @@ console.log('\n=== 内容管理（导航 / 博客 / 页面 / 追更 / 学习）=
     ['导航：分类可增删改', /function editCategory/],
     ['导航：链接可增删改', /function editLink/],
     ['删除前二次确认', /if \(!confirm\(/],
-    ['失败时提示不静默', /catch\(function \(e\) \{ say\("app", e\.message, "err"\); \}\)/],
+    ['失败时提示不静默，并把失败抛给调用方', /catch\(function \(e\) \{ say\("app", e\.message, "err"\); throw e; \}\)/],
     ['Markdown 预览用 MD.render', /md\.render\(ta\.value\)/],
     ['Markdown 实时预览（输入即渲染）', /ta\.addEventListener\("input", function \(\) \{ paint\(\)/],
     ['草稿自动保存', /function saveDraft/],

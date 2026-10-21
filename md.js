@@ -146,6 +146,19 @@
     return out.join("\n");
   }
 
+  /* 阅读统计：中文按 400 字/分钟、英文按 220 词/分钟估算。
+     先走 plain()，代码块因此不计入（读代码远比读正文慢，算进时长会把「约 3 分钟」估成 10 分钟）。 */
+  function stats(src) {
+    var text = plain(src);
+    var cjk = (text.match(/[\u3400-\u9fff]/g) || []).length;
+    var words = (text.match(/[A-Za-z0-9][A-Za-z0-9'’_-]*/g) || []).length;
+    var chars = text.replace(/\s+/g, "").length;
+    return {
+      minutes: Math.max(1, Math.round(cjk / 400 + words / 220)),
+      chars: chars, cjk: cjk, words: words
+    };
+  }
+
   /* 摘要：去掉 Markdown 记号，截断到 n 个字 */
   function plain(src, n) {
     var s = String(src == null ? "" : src)
@@ -160,5 +173,5 @@
     return s;
   }
 
-  global.MD = { render: render, plain: plain, esc: esc };
+  global.MD = { render: render, plain: plain, stats: stats, esc: esc };
 })(window);

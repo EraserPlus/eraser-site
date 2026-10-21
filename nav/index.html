@@ -9,6 +9,7 @@
 </script>
 <title>网址导航 · Eraser 的小站</title>
 <link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="../owner.css">
 <link rel="manifest" href="../manifest.webmanifest">
 <link rel="icon" href="../icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="../icon.svg">
@@ -114,7 +115,8 @@ h1{font-size:26px;margin:0 0 4px;letter-spacing:-.2px}
 .cath{display:flex;align-items:center;gap:8px;margin:0 0 10px}
 .cath button{
   font-family:inherit;font-size:16px;font-weight:600;color:var(--ink);
-  background:none;border:none;padding:0;cursor:pointer;display:flex;align-items:center;gap:7px;
+  background:none;border:none;padding:4px 0;margin:-4px 0;cursor:pointer;display:flex;align-items:center;gap:7px;
+  min-height:28px; /* 折叠按钮的可点区 ≥28px，负 margin 抵掉视觉位移 */
 }
 .cath .chev{color:var(--muted);font-size:12px;transition:transform .15s;display:inline-block}
 .cat.folded .chev{transform:rotate(-90deg)}
@@ -173,6 +175,30 @@ a.card .tg i:hover{background:var(--blue-l);color:var(--blue-d)}
 .acts .copy:hover{color:var(--blue);background:var(--blue-l)}
 .acts .star:hover{color:#f59e0b}
 .acts .star.on{color:#f59e0b}
+
+/* 站主：卡片右上角与分类标题上的就地编辑 / 删除 */
+.acts .own{
+  font-size:12px;color:#94a3b8;cursor:pointer;line-height:1;padding:3px 4px;border-radius:6px;
+  outline-offset:1px;
+}
+.acts .own:hover{color:var(--blue);background:var(--blue-l)}
+.acts .own.del:hover{color:var(--red);background:var(--red-l)}
+.cath .own-ops{display:inline-flex;align-items:center;gap:1px;margin-left:2px;opacity:0;transition:opacity .15s}
+.cath:hover .own-ops,.cath:focus-within .own-ops{opacity:1}
+.own-ops .own{
+  font-size:12.5px;color:var(--muted);cursor:pointer;line-height:1;
+  padding:4px 6px;border-radius:6px;
+}
+.own-ops .own:hover{color:var(--blue);background:var(--blue-l)}
+.own-ops .own.del:hover{color:var(--red);background:var(--red-l)}
+.right .owner-add{border-color:var(--blue);color:var(--blue)}
+html[data-theme="dark"] .acts .own{color:#4b5563}
+html[data-theme="dark"] .acts .own:hover{color:var(--blue);background:var(--blue-l)}
+html[data-theme="dark"] .acts .own.del:hover{color:var(--red);background:var(--red-l)}
+html[data-theme="dark"] .own-ops .own{color:var(--muted)}
+html[data-theme="dark"] .own-ops .own:hover{color:var(--blue);background:var(--blue-l)}
+html[data-theme="dark"] .own-ops .own.del:hover{color:var(--red);background:var(--red-l)}
+html[data-theme="dark"] .right .owner-add{color:var(--blue);border-color:var(--blue)}
 mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
 /* 最近访问的相对时间（仅「最近」视图显示） */
 a.card .tm{font-size:11px;color:#94a3b8;margin-top:1px}
@@ -314,7 +340,7 @@ html[data-theme="dark"] .btntop:hover{ color:var(--blue); border-color:#1e3a5f; 
       <div id="content"></div>
 
   <p class="footnote">
-    链接可在「后台 → 导航」标签里管理；<code>nav/links.js</code> 是断网兜底数据<br>
+    链接、分类都可以在页面上直接改；<code>nav/links.js</code> 是断网兜底数据<br>
     快捷键：<code>/</code> 搜索 · <code>↑</code><code>↓</code> 选择 · <code>Enter</code> 打开 · <code>Esc</code> 清空<br>
     桌面端拖拽分类标题可调整顺序（只保存在本机浏览器）<br>
     星标、常用、最近访问和分类顺序存在浏览器本地，换设备不会同步
@@ -326,6 +352,8 @@ html[data-theme="dark"] .btntop:hover{ color:var(--blue); border-color:#1e3a5f; 
 <button type="button" id="btnTop" class="btntop" aria-label="回到顶部" title="回到顶部">↑</button>
 
 <script src="links.js"></script>
+<script src="../owner.js"></script>
+<script src="../admin/content.js"></script>
 
 <script>
 /* ===== NAV-CORE-START ===== */
@@ -581,6 +609,10 @@ return {
 (function(){
 var C = NavCore;
 
+/* 站主身份：卡片和分类标题上会多出就地增删改的入口 */
+var OWNER = !!(window.Owner && Owner.hasToken());
+if (OWNER && window.ContentAdmin) ContentAdmin.init({ api: Owner.api, say: Owner.say });
+
 /* ---------- DOM 小工具 ---------- */
 function $(id){ return document.getElementById(id); }
 function el(tag, cls, text){
@@ -685,6 +717,50 @@ function copyText(text, done){
   }
 }
 
+/* ---------- 站主就地编辑的小按钮（卡片/分类标题共用一个 span 样式） ---------- */
+function ownerMini(text, title, handler, danger){
+  var s = el("span", "own" + (danger ? " del" : ""), text);
+  s.title = title;
+  s.setAttribute("role", "button");
+  s.setAttribute("tabindex", "0");
+  s.setAttribute("aria-label", title);
+  function fire(ev){
+    ev.preventDefault();
+    ev.stopPropagation();
+    handler();
+  }
+  s.addEventListener("click", fire);
+  s.addEventListener("keydown", function(ev){
+    if (ev.key === "Enter" || ev.key === " "){ fire(ev); }
+  });
+  return s;
+}
+
+/* 从原始数据里按显示用 id 找回带 api 信息的分类 */
+function catSource(id){
+  var found = null;
+  C.categoriesOf(state.data).forEach(function(c){ if (c.id === id) found = c; });
+  return found;
+}
+
+function catOwnerOps(src){
+  var ops = el("span", "own-ops");
+  ops.appendChild(ownerMini("＋", "在这个分类下加链接", function(){
+    ContentAdmin.openNew("nav_link", {
+      parentId: src.apiId,
+      title: "添加链接",
+      afterSave: reloadNav
+    });
+  }));
+  ops.appendChild(ownerMini("✎", "改分类名", function(){
+    ContentAdmin.openItem("nav_category", src.api, { afterSave: reloadNav });
+  }));
+  ops.appendChild(ownerMini("✕", "删除这个分类（里面的链接也会一起删）", function(){
+    ContentAdmin.removeItem("nav_category", src.api, { afterDelete: reloadNav });
+  }, true));
+  return ops;
+}
+
 /* ---------- 单张卡片 ---------- */
 function buildCard(link, terms, meta){
   var a = el("a", "card");
@@ -757,6 +833,16 @@ function buildCard(link, terms, meta){
     toggleStar(link.url);
   });
   acts.appendChild(star);
+
+  /* 站主：改 / 删这一条（只对数据库里的链接出现；links.js 静态数据不动） */
+  if (OWNER && window.ContentAdmin && link.apiId != null){
+    acts.appendChild(ownerMini("✎", "编辑这个链接", function(){
+      ContentAdmin.openItem("nav_link", link.api, { afterSave: reloadNav });
+    }));
+    acts.appendChild(ownerMini("✕", "删除这个链接", function(){
+      ContentAdmin.removeItem("nav_link", link.api, { afterDelete: reloadNav });
+    }, true));
+  }
   a.appendChild(acts);
 
   a.addEventListener("click", function(){
@@ -873,6 +959,15 @@ function render(){
     cat: state.cat, stars: state.stars, clicks: state.clicks,
     recents: state.recent, recentLimit: RECENT_SHOW
   });
+  /* 站主在「全部」视图下保留空分类：新建的分类还没加链接时也要看得见 */
+  var ownerMode = OWNER && !state.query && !state.tags.length && state.view === "all" && !state.cat;
+  if (ownerMode) {
+    var byId = {};
+    cats.forEach(function(c){ byId[c.id] = c; });
+    cats = C.categoriesOf(state.data).map(function(c){
+      return byId[c.id] || { id: c.id, name: c.name, links: [] };
+    });
+  }
   var shown = cats.reduce(function(n, c){ return n + c.links.length; }, 0);
   var total = C.countLinks(state.data);
 
@@ -899,7 +994,7 @@ function render(){
     });
   }
   content.textContent = "";
-  if (!shown){
+  if (!shown && !ownerMode){
     var empty = el("div", "empty");
     if (state.view === "star"){
       empty.innerHTML = "还没有星标站点。<br>把鼠标移到卡片右上角，点 ☆ 就能加星标。";
@@ -913,6 +1008,10 @@ function render(){
       empty.innerHTML = "没有匹配的链接。<br>试试换个词，或者点上面的「清除标签」。";
     }
     content.appendChild(empty);
+  } else if (!cats.length){
+    var empty2 = el("div", "empty");
+    empty2.textContent = OWNER ? "还没有分类。点上面的「＋ 分类」建第一个。" : "没有匹配的链接。";
+    content.appendChild(empty2);
   } else {
     cats.forEach(function(cat){
       var sec = el("section", "cat");
@@ -953,6 +1052,12 @@ function render(){
         syncFoldButton();
       });
       h.appendChild(btn);
+
+      /* 站主：分类级的「加链接 / 改名 / 删除」，鼠标移到标题或键盘聚焦时出现 */
+      var src = catSource(cat.id);
+      if (OWNER && window.ContentAdmin && src && src.apiId != null){
+        h.appendChild(catOwnerOps(src));
+      }
       sec.appendChild(h);
 
       var grid = el("div", "grid");
@@ -1099,15 +1204,41 @@ function navFromApi(j){
     categories: cats.map(function(c){
       return {
         id: "c" + c.id,
+        apiId: c.id,          /* 站主就地编辑用：数据库里的原始 id 与整条记录 */
+        api: c,
         name: c.data.name,
         links: links.filter(function(l){ return l.parent_id === c.id; })
           .map(function(l){
             return { name: l.data.name, url: l.data.url, desc: l.data.desc, tip: l.data.tip,
-                     tags: l.data.tags || [], keywords: l.data.keywords || [] };
+                     tags: l.data.tags || [], keywords: l.data.keywords || [],
+                     apiId: l.id, api: l };
           })
       };
-    }).filter(function(c){ return c.links.length; })
+    /* 访客不展示空分类；站主保留，才能在新建的空分类里继续加链接 */
+    }).filter(function(c){ return OWNER || c.links.length; })
   };
+}
+
+/* 编辑/删除成功后重新拉一次导航数据；失败保留当前画面并提示 */
+function reloadNav(){
+  if (!window.Owner) return;
+  return Owner.api("content?type=nav")
+    .then(function(j){ applyData(navFromApi(j || {})); })
+    .catch(function(e){ Owner.say("app", e.message || "刷新失败", "err"); });
+}
+
+/* 工具栏里加「＋ 分类」（只在站主身份下出现） */
+function setupOwnerBar(){
+  if (!OWNER || !window.ContentAdmin) return;
+  var right = document.querySelector(".toolbar .right");
+  if (!right || right.querySelector(".owner-add")) return;
+  var b = el("button", "owner-add", "＋ 分类");
+  b.type = "button";
+  b.title = "新建一个分类";
+  b.addEventListener("click", function(){
+    ContentAdmin.openNew("nav_category", { title: "新建分类", afterSave: reloadNav });
+  });
+  right.insertBefore(b, right.firstChild);
 }
 
 (function boot(){
@@ -1123,6 +1254,7 @@ function navFromApi(j){
   /* 先用静态数据渲染，避免等接口时白屏 */
   applyData(window.NAV_DATA);
   applyDensity();
+  setupOwnerBar();
 
   if (!window.fetch) return;
   fetch("/api/content?type=nav", { headers: { Accept: "application/json" } })
