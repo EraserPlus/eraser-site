@@ -35,7 +35,7 @@ const TYPES = {
     public: true,
     needsParent: false,
     fields: ['category', 'name', 'status', 'score', 'episodes', 'progress', 'note', 'date', 'url', 'cover',
-             'position', 'duration'],
+             'position', 'duration', 'airday', 'airtime'],
   },
   learn_map: {
     public: true,
@@ -86,6 +86,28 @@ function count(v, name, max = 100000) {
   }
   if (n > max) throw bad(`${name}最多 ${max}`);
   return n;
+}
+
+/* 更新日：1=周一 … 7=周日。空 = 不固定，不下发到放送表 */
+function airDay(v) {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 1 || n > 7) {
+    throw bad('更新日要填 1 到 7（周一=1，周日=7），留空表示不固定');
+  }
+  return n;
+}
+
+/* 更新时间：只收 HH:MM，顺手把 8:00 补成 08:00、全角冒号收成半角；空 = 只按日显示 */
+function airTime(v) {
+  if (v == null) return null;
+  const s = typeof v === 'string' ? v.trim().replace(/：/g, ':') : '';
+  if (!s) return null;
+  const m = s.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) throw bad('更新时间要写成 HH:MM，比如 20:00');
+  const h = Number(m[1]), mi = Number(m[2]);
+  if (h > 23 || mi > 59) throw bad('更新时间要在 00:00 到 23:59 之间');
+  return (h < 10 ? '0' + h : String(h)) + ':' + (mi < 10 ? '0' + mi : String(mi));
 }
 
 /* 标签：数组或逗号分隔的字符串都能接受，统一成去重后的数组 */
@@ -219,6 +241,9 @@ export function normalize(type, raw) {
        YouTube / Vimeo / 直链视频会写这两个字段；其他来源保持 null。 */
     out.position = count(d.position, '播放位置（秒）', 1000000);
     out.duration = count(d.duration, '视频时长（秒）', 1000000);
+    /* 放送表：更新日 / 更新时间，都可空；只有填了更新日的条目才进「本周放送」 */
+    out.airday = airDay(d.airday);
+    out.airtime = airTime(d.airtime);
     out.date = str(d.date, '日期', { max: 20, required: false });
     out.url = str(d.url, '链接', { max: 2000, required: false });
     out.cover = str(d.cover, '封面图地址', { max: 2000, required: false });

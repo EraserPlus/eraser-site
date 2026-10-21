@@ -163,5 +163,23 @@ console.log('\n=== 追更页接入 ===');
   check('页面有站内播放说明', /海报上会出现 ▶/.test(html));
 }
 
+console.log('\n=== M20 工作台接入 ===');
+{
+  const html = read('collect/index.html');
+  const js = read('watch.js');
+  check('引入 workbench.js，且在页内脚本之前',
+        html.indexOf('src="../workbench.js"') !== -1
+        && html.indexOf('src="../workbench.js"') < html.indexOf('追更：追番 / 漫画的留档'));
+  check('有「接着看」面板', /id="wbContinue"/.test(html) && /function renderContinue/.test(html));
+  check('有「本周放送」面板与 7 个星期格', /id="wbDays"/.test(html) && /Workbench\.days\.forEach/.test(html));
+  check('星期格有 aria-selected（键盘 / 读屏可达）', /setAttribute\("aria-selected"/.test(html));
+  check('放送行优先走站内播放', /function airRow/.test(html) && /openWatch\(it\)/.test(html));
+  check('接着看按最近更新排序（逻辑在 workbench.js）', /Workbench\.continueList\(items\)/.test(html));
+  check('保存回调交给 onSaved', /onSaved: function \(patch\)/.test(html) && /opts\.onSaved\(patch\)/.test(js));
+  check('关闭播放器后统一重画', /onClose: function \(\) \{ apply\(allItems\); \}/.test(html));
+  check('从「想看」点开自动转「在看」', /d\.status === "wish"/.test(html) && /status: "watching"/.test(html));
+  check('快速添加能填更新日 / 更新时间', /id.*airday|airday: daySel\.value/.test(html) && /airtime: tmInput\.value/.test(html));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

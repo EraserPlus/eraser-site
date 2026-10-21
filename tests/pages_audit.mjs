@@ -108,8 +108,8 @@ for (const f of PAGES) {
   check(`${f} 标题分隔符统一为 ·`, /<title>[^<]* · Eraser 的小站<\/title>/.test(html));
 }
 check('skip-link 样式在 style.css 里', /\.skip-link\s*\{/.test(read('style.css')));
-check('sw.js 缓存版本号已升级到 v5', /VERSION = 'eraser-v5'/.test(read('sw.js')));
-check('sw.js 预缓存站内播放器', /PRECACHE = \[[\s\S]*?'\/watch\.js'/.test(read('sw.js')));
+check('sw.js 缓存版本号已升级到 v6', /VERSION = 'eraser-v6'/.test(read('sw.js')));
+check('sw.js 预缓存站内播放器与工作台逻辑', /PRECACHE = \[[\s\S]*?'\/watch\.js'/.test(read('sw.js')) && /PRECACHE = \[[\s\S]*?'\/workbench\.js'/.test(read('sw.js')));
 check('移动端顶栏：控件与品牌同排、导航整行下移',
       /@media \(max-width: 768px\)[\s\S]*?\.navbar nav\s*\{\s*order:\s*3;\s*flex-basis:\s*100%;/.test(read('style.css')));
 check('孤儿页 files/ 已删除（T10 已下架）',
@@ -286,7 +286,7 @@ console.log('\n=== 追更页 ===');
   check('深浅色都处理了兜底块透明度', /html\[data-theme="dark"\] \.mg-fallback/.test(html));
   check(
     '筛选按钮权重压过全局暗色 button 规则（否则暗色下看不见）',
-    /\.mg-filters \.mg-filters button \{/.test(html) &&
+    /\.mg-filters\.mg-filters button \{/.test(html) &&
       !/^\s*\.mg-filters button \{/m.test(html)
   );
   check('暗色下收纳栏/次要统计不糊成禁用色', /html\[data-theme="dark"\] \.mg-fold/.test(html) && /html\[data-theme="dark"\] \.mg-stat\.mute b/.test(html));
@@ -321,6 +321,23 @@ console.log('\n=== 追更页 ===');
         /\.mg-plus \{[\s\S]{0,200}?z-index: 4/.test(html));
   check('快速添加表单也能填总集数 / 进度', /epInput/.test(html) && /pgInput/.test(html));
   check('按名字补全会带出总集数', /if \(hit\.episodes != null\) epInput\.value/.test(html));
+
+  /* --- M20 个人工作台：接着看 + 本周放送 --- */
+  check('工作台脚本 workbench.js 在页内引入', /src="\.\.\/workbench\.js"/.test(html));
+  check('顶栏有日期 / 问候，不是冷冰冰的标题', /id="wbDate"/.test(html) && /function renderHero/.test(html) && /Workbench\.greeting/.test(html));
+  check('两栏工作台布局（桌面 1.55fr + 300px 侧栏）',
+        /\.wb-grid\s*\{[\s\S]{0,120}?grid-template-columns:\s*minmax\(0, 1\.55fr\) minmax\(300px, \.9fr\)/.test(html));
+  check('接着看面板有明确下一步动作', /function continueAction/.test(html) && /接着看|开看/.test(html));
+  check('接着看只收在追 / 有进度的（逻辑在 workbench.js）', /Workbench\.continueList/.test(html));
+  check('本周放送 7 个星期格 + 当天列表', /id="wbDays"/.test(html) && /id="wbAirList"/.test(html) && /function renderAir/.test(html));
+  check('默认落在今天，可点别的天', /airDay == null\) airDay = today/.test(html) && /function \(\) \{\s*airDay = n;/.test(html));
+  check('星期格带每天更新数', /Workbench\.dayCounts/.test(html) && /el\("span", "n"/.test(html));
+  check('放送行显示时间 / 名称 / 下一话', /"wb-time"/.test(html) && /"wb-air-name"/.test(html) && /Workbench\.nextEpText/.test(html));
+  check('空放送日有说明，不留白框', /今天没有安排放送/.test(html));
+  check('快速添加能填更新日 / 更新时间', /daySel/.test(html) && /tmInput/.test(html) && /airday: daySel\.value/.test(html));
+  check('点开播放器自动把「想看」转「在看」', /d\.status === "wish"/.test(html) && /status: "watching"/.test(html));
+  check('工作台也走 textContent（不拼数据进 innerHTML）', !/innerHTML\s*=\s*[^"';]*d\.(name|note|cover|url)/.test(html));
+  check('手机端工作台收紧间距', /@media \(max-width: 480px\)[\s\S]{0,240}?\.wb-panel\s*\{/.test(html));
 }
 
 console.log('\n=== 学习地图页 ===');
@@ -380,12 +397,14 @@ console.log('\n=== 开发交接页（dev/，给接手的 AI）===');
   check('M10 主线C 批次记录在', /M10c/.test(html) && /sitemap/.test(html) && /sw\.js/.test(html));
   check('M10 主线A 批次记录在', /M10a/.test(html) && /一键接上 AI/.test(html) && /gaps=1/.test(html));
   check('两种令牌的说明在', /eraser-ai-token-v1::/.test(html) && /eraser-admin-token-v1::/.test(html));
-  check('M11 海报墙批次记录在', /M11/.test(html) && /dudulu/.test(html) && /mg-filters \.mg-filters button/.test(html));
+  check('M11 海报墙批次记录在', /M11/.test(html) && /dudulu/.test(html) && /mg-filters\.mg-filters button/.test(html));
+  check('M11 的选择器笔误已在交接页更正', /后代选择器/.test(html) && !/\.mg-filters \.mg-filters button\s*\{/.test(html));
   check('M12 批量导入批次记录在', /M12/.test(html) && /batch=1/.test(html) && /action=lookup/.test(html) && /eraser\.admin\.token/.test(html));
   check('追更数据上游取舍写进了交接页', /AniList/.test(html) && /中文名搜不到/.test(html) && /api\.bgm\.tv/.test(html));
-  check('测试套数已更新为十一套', /十一套/.test(html) && /outline_check/.test(html) && /media_import_test/.test(html) && /lookup_test/.test(html) && /watch_test/.test(html));
+  check('测试套数已更新为十二套', /十二套/.test(html) && /outline_check/.test(html) && /media_import_test/.test(html) && /lookup_test/.test(html) && /watch_test/.test(html) && /workbench_test/.test(html));
   check('M14–M18 批次记录在', /M14/.test(html) && /M16/.test(html) && /M17/.test(html) && /M18/.test(html));
   check('M19 站内播放批次记录在', /M19/.test(html) && /watch\.js/.test(html) && /position/.test(html) && /B 站/.test(html));
+  check('M20 工作台批次记录在', /M20/.test(html) && /workbench\.js/.test(html) && /airday/.test(html) && /接着看/.test(html) && /本周放送/.test(html));
   check('后台标签数已更新为 9', /9 个标签/.test(html) || /9 标签/.test(html));
   check('本机坑位补充了 BOM / PowerShell / gh PR 退出码', /BOM/.test(html) && /PowerShell/.test(html) && /SIGTERM/.test(html));
   check('待办里写明 M10 主线B 搁置原因', /主线 B/.test(html) && /(0 篇|博客 0)/.test(html));
