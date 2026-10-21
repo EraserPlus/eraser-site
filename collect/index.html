@@ -297,15 +297,41 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
   border-radius: 14px; padding: 14px 16px 10px;
 }
 .wb-head {
-  display: flex; align-items: baseline; justify-content: space-between;
+  display: flex; align-items: center; justify-content: space-between;
   gap: 10px; margin-bottom: 8px;
 }
 .wb-head h2 { margin: 0; font-size: 15.5px; display: flex; align-items: center; gap: 8px; }
 .wb-head h2 .dot {
-  width: 4px; height: 14px; border-radius: 2px;
-  background: var(--blue); display: inline-block;
+  width: 4px; height: 14px; border-radius: 2px; background: var(--blue); display: inline-block;
 }
+.wb-head-r { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .wb-count { font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+/* 「补全放送表」：自动补空字段，手动兜底。
+   注意全站暗色有 `html[data-theme="dark"] button{color:#0d1117}`（权重 0,1,2），
+   单个类名压不住，所以用同一元素双类名提权（不要写成后代选择器）。 */
+.wb-sync.wb-sync {
+  border: 1px solid var(--line2); background: var(--card); color: var(--blue);
+  border-radius: 7px; padding: 4px 9px; font: 600 11.5px/1.4 inherit;
+  cursor: pointer; white-space: nowrap;
+}
+.wb-sync.wb-sync:hover { border-color: var(--blue); background: var(--blue-l); }
+.wb-sync.wb-sync:disabled { opacity: .6; cursor: default; }
+html[data-theme="dark"] .wb-sync.wb-sync { color: var(--blue); }
+
+/* 接着追的栏目筛选（同时有番 / 漫时才出现） */
+.wb-cats { display: flex; flex-wrap: wrap; gap: 5px; margin: 0 0 8px; }
+.wb-cats.wb-cats button {
+  border: 1px solid var(--line); background: var(--card); color: var(--ink2);
+  border-radius: 7px; padding: 3px 9px; font: 12px/1.4 inherit; cursor: pointer;
+}
+.wb-cats.wb-cats button:hover { border-color: var(--blue); color: var(--blue); }
+.wb-cats.wb-cats button.on {
+  background: var(--blue); border-color: var(--blue); color: #fff; font-weight: 600;
+}
+html[data-theme="dark"] .wb-cats.wb-cats button { color: var(--ink2); }
+html[data-theme="dark"] .wb-cats.wb-cats button.on { color: #0d1117; }
+.wb-cats.wb-cats button .n { margin-left: 4px; font-size: 10.5px; opacity: .75; }
 
 /* 继续看：一行一部，缩略图 + 进度 + 一个明确动作 */
 .wb-continue { display: flex; flex-direction: column; }
@@ -355,6 +381,18 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
    ghost / mute 是卡片底，必须自己提亮文字，否则会被刷成近黑色。 */
 html[data-theme="dark"] .wb-go.ghost { color: var(--blue); }
 html[data-theme="dark"] .wb-go.mute { color: var(--muted); }
+
+/* 外链条目的两个动作：主按钮去站点 / 接着读，旁边小号「＋1」 */
+.wb-act { display: flex; flex: 0 0 auto; align-items: center; gap: 5px; }
+.wb-mini.wb-mini {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 30px; padding: 4px 8px; border-radius: 8px;
+  border: 1px solid var(--line2); background: var(--card); color: var(--blue);
+  font: 600 12px/1.2 inherit; cursor: pointer; white-space: nowrap;
+}
+.wb-mini.wb-mini:hover { border-color: var(--blue); background: var(--blue-l); }
+.wb-mini.wb-mini:disabled { opacity: .6; cursor: default; }
+html[data-theme="dark"] .wb-mini.wb-mini { color: var(--blue); }
 
 .wb-empty {
   color: var(--muted); font-size: 12.5px; text-align: center;
@@ -425,7 +463,10 @@ html[data-theme="dark"] .wb-air-row { color: var(--ink); }
   .wb-panel { padding: 12px 13px 8px; border-radius: 12px; }
   .wb-row { gap: 10px; }
   .wb-thumb { width: 38px; height: 51px; }
-  .wb-go { padding: 5px 10px; }
+  .wb-go { padding: 5px 9px; }
+  .wb-mini.wb-mini { min-height: 28px; padding: 4px 7px; font-size: 11.5px; }
+  .wb-act { gap: 4px; }
+  .wb-cats { gap: 4px; }
   .wb-days { gap: 3px; }
   .wb-day { font-size: 10.5px; }
   .wb-day .n { font-size: 9.5px; }
@@ -555,16 +596,17 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
     <!-- 只有在本机登录过后台才会出现（读 localStorage 里的后台令牌）。
          没登录的访客看不到这个按钮，也不会发任何请求。 -->
     <button class="mg-add" id="mgAdd" type="button" style="display:none">＋ 快速添加</button>
-    <p class="muted" id="ownerHint" style="display:none">编辑模式：点海报上的 ✎ 就地改，✕ 删除；视频页链接会自动变成 ▶ 站内播放。</p>
+    <p class="muted" id="ownerHint" style="display:none">编辑模式：点海报上的 ✎ 就地改，✕ 删除；视频页链接会自动变成 ▶ 站内播放；漫画点开即记「在读」，外链旁也能 ＋1。</p>
   </div>
 
   <!-- M20 个人工作台：接着看 + 本周放送（有数据后才显示） -->
   <div class="wb-grid" id="wbGrid" style="display:none">
     <section class="wb-panel" aria-labelledby="wbContinueTitle">
       <div class="wb-head">
-        <h2 id="wbContinueTitle"><span class="dot"></span>接着看</h2>
-        <span class="wb-count" id="wbContinueCount"></span>
+        <h2 id="wbContinueTitle"><span class="dot"></span>接着追</h2>
+        <div class="wb-head-r"><span class="wb-count" id="wbContinueCount"></span></div>
       </div>
+      <div class="wb-cats" id="wbCats" role="group" aria-label="接着追：按栏目筛选" style="display:none"></div>
       <div class="wb-continue" id="wbContinue"></div>
       <p class="wb-more" id="wbContinueMore" style="display:none"></p>
     </section>
@@ -572,11 +614,15 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
     <section class="wb-panel" aria-labelledby="wbAirTitle">
       <div class="wb-head">
         <h2 id="wbAirTitle"><span class="dot"></span>本周放送</h2>
-        <span class="wb-count" id="wbAirCount"></span>
+        <div class="wb-head-r">
+          <span class="wb-count" id="wbAirCount"></span>
+          <button class="wb-sync" id="wbSync" type="button" style="display:none"
+                  title="按 B 站番剧链接补全缺的更新日 / 更新时间">补全放送表</button>
+        </div>
       </div>
       <div class="wb-days" id="wbDays" role="tablist" aria-label="按更新日筛选"></div>
       <div class="wb-air" id="wbAirList" role="tabpanel"></div>
-      <p class="wb-legend" id="wbAirLegend">更新日和更新时间在条目编辑里填；B 站只同步到「第几话」，具体秒数由官方播放器自己记住。</p>
+      <p class="wb-legend" id="wbAirLegend">番剧贴 B 站番剧链接后，更新日 / 时间会自动补（只填空，不覆盖手填）；漫画和各站没有统一日历，手填一次即可。B 站播放器只同步到「第几话」，具体秒数由官方播放器自己记住。</p>
     </section>
   </div>
 
@@ -607,7 +653,7 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
     <div id="foldWrap-comic"></div>
   </section>
 
-  <p class="mg-tip">视频条目的链接如果是 B 站 / YouTube / Vimeo 官方视频页（或 mp4 直链），海报上会出现 ▶，可以直接在站内看；漫画等不支持嵌入的站点仍跳站外，进度照常记录。</p>
+  <p class="mg-tip">视频条目的链接如果是 B 站 / YouTube / Vimeo 官方视频页（或 mp4 直链），海报上会出现 ▶，可以直接在站内看；漫画等不支持嵌入的站点仍跳站外，点开就算「在读」，进度照常记录。番剧贴 B 站番剧页链接后，放送表会在登录状态下每天自动补一次。</p>
 </main>
 
 <script src="../watch.js"></script>
@@ -641,6 +687,9 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
   var canEdit = false;      /* 本机存过后台令牌 → 才渲染「＋1 话」等写入按钮 */
   var filter = "all";       /* 当前状态筛选 */
   var airDay = null;        /* 本周放送选中的星期；null = 今天 */
+  var wbCat = "all";        /* 接着追的栏目筛选：all / anime / comic */
+  var syncing = false;      /* 放送表正在补全，防止重复点 */
+  var SYNC_KEY = "eraser.airing.sync";
   var CAT_NAME = { anime: "追番", comic: "漫画" };
 
   function $(id) { return document.getElementById(id); }
@@ -653,6 +702,18 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
   function safeUrl(u) {
     u = String(u == null ? "" : u);
     return /^https?:\/\//i.test(u) ? u : "";
+  }
+  function hasValue(v) {
+    return v !== null && v !== undefined && v !== "";
+  }
+  /* 与服务端 api/_lib/airing.js 认的是同一类链接：B 站番剧 ss / ep / md 页。
+     只用来决定「要不要发补全请求」，真正能否解析仍以接口为准。 */
+  function isBiliUrl(u) {
+    try {
+      var x = new URL(u);
+      return /(^|\.)bilibili\.com$/i.test(x.hostname) &&
+        /\/bangumi\/(play\/(ss|ep)\d+|media\/md\d+)/i.test(x.pathname);
+    } catch (e) { return false; }
   }
   function firstChar(s) {
     s = String(s == null ? "" : s).trim();
@@ -756,6 +817,10 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
       hit.target = "_blank";
       hit.rel = "noopener noreferrer";
       hit.setAttribute("aria-label", (d.name || "条目") + "（新窗口打开）");
+      /* 漫画只能在站外读：点开就顺手把「想读」转「在读」，回来时进度不用再手动改 */
+      hit.addEventListener("click", function () {
+        markWatching(it, { silent: true, keepalive: true });
+      });
       card.appendChild(hit);
     }
 
@@ -810,10 +875,13 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
   /* 单条 PATCH：续播点、进度都走这里。
      keepalive 用在页面关闭 / 切后台时，浏览器会尽量把请求发完。 */
   function patchMedia(id, patch, opts) {
+    var body = { id: id, data: patch };
+    /* 自动补放送表时不动 updated_at，否则「接着追」的最近更新排序会被打乱 */
+    if (opts && opts.touch === false) body.touch = false;
     return fetch("/api/content", {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + getToken() },
-      body: JSON.stringify({ id: id, data: patch }),
+      body: JSON.stringify(body),
       keepalive: !!(opts && opts.keepalive),
     }).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (j) {
@@ -847,6 +915,23 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
     });
   }
 
+  /* 点开就记「在看」：站内播放、外链视频、漫画外链共用。
+     silent = 不重画（外链马上要跳走，重画没意义还可能与默认跳转抢元素）。 */
+  function markWatching(it, opts) {
+    var d = it.data || {};
+    if (!canEdit || d.status !== "wish") return Promise.resolve(false);
+    d.status = "watching";
+    return patchMedia(it.id, { status: "watching" }, {
+      keepalive: !!(opts && opts.keepalive),
+    }).then(function () {
+      if (!(opts && opts.silent)) apply(allItems);
+      return true;
+    }).catch(function () {
+      d.status = "wish";
+      return false;
+    });
+  }
+
   /* 站内播放：watch.js 负责解析、iframe、续播点；这里只提供写入通道 */
   function openWatch(it) {
     var d = it.data || {};
@@ -866,18 +951,11 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
     if (!opened) {
       var link = safeUrl(d.url);
       if (link) window.open(link, "_blank", "noopener");
+      markWatching(it, { silent: true, keepalive: true });
       return;
     }
     /* 点开就从「想看」转成「在看」：追更里最常见的一步不用手动改 */
-    if (canEdit && d.status === "wish") {
-      d.status = "watching";
-      patchMedia(it.id, { status: "watching" }).then(function () {
-        apply(allItems);
-      }).catch(function () {
-        d.status = "wish";
-        apply(allItems);
-      });
-    }
+    markWatching(it, {});
   }
 
   /* 渐变兜底块：按 id 取一个固定的配色，同一部作品每次进来颜色一样 */
@@ -1068,11 +1146,32 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
       return b;
     }
     if (link) {
-      var a = el("a", "wb-go ghost", "去站点");
+      /* 漫画 / 不能嵌入的视频：主按钮去站外，旁边给登录后的站主留一个 ＋1。
+         点主按钮会顺手把「想读 / 想看」转成「在读 / 在看」。 */
+      var wrap = el("div", "wb-act");
+      var read = d.category === "comic";
+      var a = el("a", "wb-go ghost",
+        read ? (Number(d.progress) > 0 ? "接着读" : "开读") : "去站点");
       a.href = link;
       a.target = "_blank";
       a.rel = "noopener noreferrer";
-      return a;
+      a.addEventListener("click", function () {
+        markWatching(it, { silent: true, keepalive: true });
+      });
+      wrap.appendChild(a);
+
+      if (canEdit && d.status === "watching") {
+        var quick = el("button", "wb-mini", "＋1");
+        quick.type = "button";
+        quick.title = "把进度 +1";
+        quick.setAttribute("aria-label", "把「" + (d.name || "这条") + "」的进度 +1");
+        quick.addEventListener("click", function (e) {
+          e.preventDefault();
+          bumpProgress(it, quick);
+        });
+        wrap.appendChild(quick);
+      }
+      return wrap;
     }
     if (canEdit) {
       var plus = el("button", "wb-go ghost", "＋1 话");
@@ -1114,18 +1213,66 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
     return row;
   }
 
+  /* 栏目筛选：番 / 漫都有时才出现；只有一类时不占地方 */
+  function renderCats(full) {
+    var box = $("wbCats");
+    if (!box) return;
+    var n = { anime: 0, comic: 0 };
+    full.forEach(function (it) {
+      var c = it.data && it.data.category;
+      if (n[c] != null) n[c]++;
+    });
+    if (!n.anime || !n.comic) {
+      wbCat = "all";
+      box.style.display = "none";
+      box.innerHTML = "";
+      return;
+    }
+    if (wbCat !== "all" && !n[wbCat]) wbCat = "all";
+    box.style.display = "";
+    box.innerHTML = "";
+    [["all", "全部", full.length], ["anime", "追番", n.anime], ["comic", "漫画", n.comic]]
+      .forEach(function (row) {
+        var key = row[0];
+        var b = el("button", wbCat === key ? "on" : "");
+        b.type = "button";
+        b.setAttribute("aria-pressed", wbCat === key ? "true" : "false");
+        b.appendChild(document.createTextNode(row[1]));
+        b.appendChild(el("span", "n", String(row[2])));
+        b.addEventListener("click", function () {
+          wbCat = key;
+          renderContinue(allItems);   /* 纯前端切换，不打接口 */
+        });
+        box.appendChild(b);
+      });
+  }
+
   function renderContinue(items) {
     var box = $("wbContinue"), cnt = $("wbContinueCount"), more = $("wbContinueMore");
     if (!box || !window.Workbench) return;
 
-    var list = Workbench.continueList(items);
+    var full = Workbench.continueList(items);
+    renderCats(full);
+    var list = wbCat === "all" ? full : full.filter(function (it) {
+      return it.data && it.data.category === wbCat;
+    });
+
     box.innerHTML = "";
     more.style.display = "none";
-    cnt.textContent = list.length ? "共 " + list.length + " 部" : "";
+    if (wbCat === "all") {
+      var na = full.filter(function (it) { return it.data && it.data.category === "anime"; }).length;
+      var nc = full.length - na;
+      cnt.textContent = full.length
+        ? (na && nc ? "共 " + full.length + " 部 · 番 " + na + " · 漫 " + nc : "共 " + full.length + " 部")
+        : "";
+    } else {
+      cnt.textContent = list.length ? CAT_NAME[wbCat] + " · " + list.length + " 部" : "";
+    }
 
     if (!list.length) {
-      box.appendChild(el("p", "wb-empty",
-        "没有在追的条目。把状态改成「在看」，或者带进度记一笔，就会出现在这里。"));
+      box.appendChild(el("p", "wb-empty", full.length
+        ? "这个栏目没有在追的。点「全部」看看别的。"
+        : "没有在追的条目。把状态改成「在看」，或者带进度记一笔，就会出现在这里。"));
       return;
     }
 
@@ -1150,6 +1297,9 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
       row.href = link;
       row.target = "_blank";
       row.rel = "noopener noreferrer";
+      row.addEventListener("click", function () {
+        markWatching(it, { silent: true, keepalive: true });
+      });
     }
 
     row.appendChild(el("span", "wb-time", d.airtime || "—"));
@@ -1204,6 +1354,139 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
     dayItems.forEach(function (it) { listBox.appendChild(airRow(it)); });
   }
 
+  /* ==================== 放送表自动补全（M21） ====================
+     数据源：B 站公开番剧资料（api/_lib/airing.js 解析，走 ?action=airing）。
+     原则：
+       - 只补「空」的字段，绝不覆盖手填的更新日 / 时间 / 封面 / 评分
+       - 写入时 touch:false，不改 updated_at，不打乱「接着追」的排序
+       - 登录状态下每天最多自动跑一次；手动按钮随时可再跑
+       - 漫画没有稳定的公开日历，不在这里瞎猜，保留手填 */
+  function syncCandidates(items) {
+    return (items || []).filter(function (it) {
+      var d = it.data || {};
+      if (d.category !== "anime") return false;
+      if (d.status === "finished" || d.status === "paused") return false;
+      if (!isBiliUrl(safeUrl(d.url))) return false;
+      return !hasValue(d.airday) || !hasValue(d.airtime);
+    });
+  }
+
+  function fetchAiring(url) {
+    return fetch("/api/content?action=airing&url=" + encodeURIComponent(url), {
+      headers: { Accept: "application/json", Authorization: "Bearer " + getToken() },
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        if (r.status === 401) {
+          var e = new Error("登录已过期");
+          e.code = 401;
+          throw e;
+        }
+        if (!r.ok) throw new Error((j && j.error) || ("请求失败（" + r.status + "）"));
+        return j || {};
+      });
+    });
+  }
+
+  function airingPatch(d, info) {
+    var patch = {};
+    if (!hasValue(d.airday) && info.airday) patch.airday = info.airday;
+    if (!hasValue(d.airtime) && info.airtime) patch.airtime = info.airtime;
+    if (!hasValue(d.cover) && info.cover) patch.cover = info.cover;
+    if (!hasValue(d.score) && info.score != null) patch.score = info.score;
+    return patch;
+  }
+
+  function updateSyncBtn() {
+    var btn = $("wbSync");
+    if (!btn) return;
+    var n = canEdit ? syncCandidates(allItems).length : 0;
+    if (!n) {
+      btn.style.display = "none";
+      btn.disabled = false;
+      btn.textContent = "补全放送表";
+      return;
+    }
+    btn.style.display = "";
+    btn.disabled = syncing;
+    btn.textContent = syncing ? "补全中…" : "补全 " + n + " 部";
+  }
+
+  function syncSchedules(opts) {
+    if (syncing) return;
+    var list = syncCandidates(allItems);
+    if (!list.length) {
+      if (opts && opts.manual && window.Owner) Owner.toast("放送表已经齐了", "ok");
+      return;
+    }
+    syncing = true;
+    updateSyncBtn();
+
+    var filled = 0, skipped = 0, failed = 0, authLost = false;
+    var i = 0;
+
+    function finish() {
+      syncing = false;
+      if (filled) apply(allItems);
+      else updateSyncBtn();
+      if (authLost) {
+        if (window.Owner) Owner.toast("登录已过期，先按 Ctrl/⌘+Shift+L 重新登录", "err");
+        return;
+      }
+      if (opts && opts.manual) {
+        if (filled) {
+          if (window.Owner) Owner.toast("已补全 " + filled + " 部放送时间", "ok");
+        } else if (failed) {
+          if (window.Owner) Owner.toast("有 " + failed + " 部没查到，稍后再试", "err");
+        } else {
+          if (window.Owner) Owner.toast("B 站没写更新时间的要手填", "");
+        }
+      } else if (filled && window.Owner) {
+        Owner.toast("已自动补全 " + filled + " 部放送时间", "ok");
+      }
+    }
+
+    function step() {
+      if (i >= list.length) return finish();
+      var it = list[i++];
+      var d = it.data || {};
+      fetchAiring(safeUrl(d.url)).then(function (j) {
+        if (!j.supported || !j.data) { skipped++; return step(); }
+        var patch = airingPatch(d, j.data);
+        if (!Object.keys(patch).length) { skipped++; return step(); }
+        return patchMedia(it.id, patch, { touch: false }).then(function () {
+          Object.keys(patch).forEach(function (k) { d[k] = patch[k]; });
+          filled++;
+          step();
+        }, function () {
+          failed++;
+          step();
+        });
+      }).catch(function (e) {
+        if (e && e.code === 401) { authLost = true; return finish(); }
+        failed++;
+        step();
+      });
+    }
+
+    step();
+  }
+
+  function todayStamp() {
+    var d = new Date();
+    return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
+  }
+
+  /* 每天最多自动跑一次。localStorage 不可写（隐私模式）时就不自动跑，
+     保留手动按钮，不因为存不了标记而反复请求。 */
+  function autoSyncSchedules() {
+    if (!canEdit || !syncCandidates(allItems).length) return;
+    try {
+      if (localStorage.getItem(SYNC_KEY) === todayStamp()) return;
+      localStorage.setItem(SYNC_KEY, todayStamp());
+    } catch (e) { return; }
+    syncSchedules({});
+  }
+
   function renderWorkbench(items) {
     var grid = $("wbGrid");
     if (!grid || !window.Workbench) return;   /* 脚本被缓存漏掉时宁可不出面板，也不报错 */
@@ -1211,6 +1494,7 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
     if (!items.length) return;
     renderContinue(items);
     renderAir(items);
+    updateSyncBtn();
   }
 
   function apply(items) {
@@ -1518,6 +1802,7 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
         canEdit = !!getToken();   /* 有令牌才画「＋1 话」，必须先于 apply */
         apply((j && j.items) || []);
         setupQuickAdd();   /* 数据到手后再决定是否显示按钮，避免闪一下 */
+        autoSyncSchedules();   /* 每天最多一次，只补空字段 */
       })
       .catch(function () {
         ["anime", "comic"].forEach(function (k) {
@@ -1527,6 +1812,10 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
   }
 
   renderHero();
+  var syncBtn = $("wbSync");
+  if (syncBtn) {
+    syncBtn.addEventListener("click", function () { syncSchedules({ manual: true }); });
+  }
 
   if (!window.fetch) return;
   loadMedia();

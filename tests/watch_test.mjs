@@ -177,8 +177,23 @@ console.log('\n=== M20 工作台接入 ===');
   check('接着看按最近更新排序（逻辑在 workbench.js）', /Workbench\.continueList\(items\)/.test(html));
   check('保存回调交给 onSaved', /onSaved: function \(patch\)/.test(html) && /opts\.onSaved\(patch\)/.test(js));
   check('关闭播放器后统一重画', /onClose: function \(\) \{ apply\(allItems\); \}/.test(html));
-  check('从「想看」点开自动转「在看」', /d\.status === "wish"/.test(html) && /status: "watching"/.test(html));
+  check('从「想看」点开自动转「在看」', /function markWatching/.test(html) && /d\.status !== "wish"/.test(html) && /status: "watching"/.test(html));
   check('快速添加能填更新日 / 更新时间', /id.*airday|airday: daySel\.value/.test(html) && /airtime: tmInput\.value/.test(html));
+}
+
+console.log('\n=== M21 漫画对等 / 放送表自动补全 ===');
+{
+  const html = read('collect/index.html');
+  check('漫画外链主按钮是「接着读 / 开读」', /read \? \(Number\(d\.progress\) > 0 \? "接着读" : "开读"\)/.test(html));
+  check('外链行旁有 ＋1（漫画也能直接记进度）', /el\("button", "wb-mini", "＋1"\)/.test(html));
+  check('打开外链就转「在看 / 在读」（keepalive 保住跳转前的写入）',
+        /markWatching\(it, \{ silent: true, keepalive: true \}\)/.test(html));
+  check('接着追有番 / 漫栏目筛选', /id="wbCats"/.test(html) && /function renderCats/.test(html));
+  check('放送表补全只认 B 站番剧页', /function isBiliUrl/.test(html) && /bilibili\\\.com/.test(html) && /bangumi/.test(html));
+  check('补全只填空字段，不覆盖手填', /function airingPatch/.test(html) && /!hasValue\(d\.airday\)/.test(html));
+  check('补全不动 updated_at', /patchMedia\(it\.id, patch, \{ touch: false \}\)/.test(html));
+  check('每天自动补一次 + 手动按钮', /function autoSyncSchedules/.test(html) && /id="wbSync"/.test(html));
+  check('漫画写明手填（没有稳定公开日历）', /漫画和各站没有统一日历，手填一次即可/.test(html));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
