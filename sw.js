@@ -21,7 +21,8 @@
 /* v2 → v3：公开页接入站主就地编辑（owner.js / owner.css / 新版 content.js） */
 /* v3 → v4：M18 阅读便利（style.css 移动端顶栏、post.html 阅读增强、md.js 阅读统计） */
 /* v4 → v5：M19 追更页站内播放（watch.js、collect 弹层、续播点字段） */
-const VERSION = 'eraser-v5';
+/* v5 → v6：M20 个人追更工作台（workbench.js、collect 接着看 / 本周放送、airday/airtime） */
+const VERSION = 'eraser-v6';
 const CACHE = VERSION;
 
 /* 预缓存：离线时至少能打开首页外壳（页面本体走 network-first，这是兜底） */
@@ -30,6 +31,7 @@ const PRECACHE = [
   '/style.css',
   '/shell.js',
   '/watch.js',
+  '/workbench.js',
   '/manifest.webmanifest',
   '/icon.svg',
 ];

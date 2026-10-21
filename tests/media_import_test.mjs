@@ -157,6 +157,53 @@ console.log('\n=== 总集数 / 进度列（M13）===');
   check('normCount 空 → 空', CA.normCount('') === '' && CA.normCount(null) === '');
 }
 
+console.log('\n=== 更新日 / 更新时间列（M20）===');
+{
+  check('ContentAdmin 暴露了 normDay / normTime',
+    typeof CA.normDay === 'function' && typeof CA.normTime === 'function');
+
+  check('normDay「周三」→ 3', CA.normDay('周三') === '3', CA.normDay('周三'));
+  check('normDay「星期三」→ 3', CA.normDay('星期三') === '3', CA.normDay('星期三'));
+  check('normDay「周日」→ 7', CA.normDay('周日') === '7', CA.normDay('周日'));
+  check('normDay「周天」→ 7', CA.normDay('周天') === '7', CA.normDay('周天'));
+  check('normDay 数字字符串原样', CA.normDay('3') === '3');
+  check('normDay 混着时间也先认星期词', CA.normDay('周五 20:00') === '5', CA.normDay('周五 20:00'));
+  check('normDay 认不出 → 空', CA.normDay('乱写') === '' && CA.normDay('') === '' && CA.normDay(null) === '');
+
+  check('normTime「20:00」原样', CA.normTime('20:00') === '20:00');
+  check('normTime「8:05」补零', CA.normTime('8:05') === '08:05', CA.normTime('8:05'));
+  check('normTime 全角冒号', CA.normTime('20：30') === '20:30', CA.normTime('20：30'));
+  check('normTime「20点」→ 20:00', CA.normTime('20点') === '20:00');
+  check('normTime「20点30」→ 20:30', CA.normTime('20点30') === '20:30');
+  check('normTime「2000」→ 20:00', CA.normTime('2000') === '20:00', CA.normTime('2000'));
+  check('normTime 越界 → 空', CA.normTime('25:00') === '' && CA.normTime('20:60') === '');
+  check('normTime 认不出 → 空', CA.normTime('晚上') === '' && CA.normTime(null) === '');
+
+  const tsv = '名称\t更新日\t更新时间\n葬送的芙莉莲\t周三\t20:00\n迷宫饭\t星期五\t8:30';
+  const r = CA.parseImport(tsv);
+  check('TSV：识别「更新日 / 更新时间」表头', r.hasHead === true && r.items.length === 2, String(r.items.length));
+  check('TSV：更新日 / 更新时间各自归位',
+    r.items[0].airday === '3' && r.items[0].airtime === '20:00',
+    r.items[0].airday + '/' + r.items[0].airtime);
+  check('TSV：中文星期和单数字时间也能归一',
+    r.items[1].airday === '5' && r.items[1].airtime === '08:30',
+    r.items[1].airday + '/' + r.items[1].airtime);
+
+  const alias = CA.parseImport('名称\t放送日\t放送时间\nA\t周二\t晚上 20 点');
+  check('别名「放送日 / 放送时间」也认', alias.items[0].airday === '2', alias.items[0].airday);
+  check('时间从文字里抠数字', alias.items[0].airtime === '20:00', alias.items[0].airtime);
+
+  const en = CA.parseImport('name\tweekday\tairtime\nB\tSun\t21:00');
+  check('英文表头 weekday / airtime 也认',
+    en.items[0].airday === '7' && en.items[0].airtime === '21:00',
+    en.items[0].airday + '/' + en.items[0].airtime);
+
+  const js = CA.parseImport(JSON.stringify([{ name: 'C', airday: 4, airtime: '19:30' }]));
+  check('JSON 里的 airday / airtime 保留',
+    js.items[0].airday === '4' && js.items[0].airtime === '19:30',
+    js.items[0].airday + '/' + js.items[0].airtime);
+}
+
 console.log('\n=== 脏数据 ===');
 {
   const r = CA.parseImport('名称\t状态\n\t在看\n好的\t看完');

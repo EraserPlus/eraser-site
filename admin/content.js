@@ -59,6 +59,12 @@
         { k: "score", l: "评分（可空，0-10）", t: "text", ph: "比如：9.0 或 8.5，留空不显示" },
         { k: "episodes", l: "总集数（可空）", t: "text", ph: "比如：28。「按名字自动填充」会帮你填" },
         { k: "progress", l: "看到第几集（可空）", t: "text", ph: "比如：12。填了才显示进度条" },
+        { k: "airday", l: "更新日（可空）", t: "select", opts: [
+            ["", "不固定"],
+            ["1", "周一"], ["2", "周二"], ["3", "周三"], ["4", "周四"],
+            ["5", "周五"], ["6", "周六"], ["7", "周日"]
+        ] },
+        { k: "airtime", l: "更新时间（可空）", t: "text", ph: "比如：20:00，留空就只按日显示" },
         { k: "note", l: "备注（可空）", t: "text", ph: "一句话，比如：周五更新 · B站有删减" },
         { k: "date", l: "日期（可空）", t: "text", ph: "比如：2026-10-14" },
         { k: "url", l: "链接（可空）", t: "text", ph: "https://…（豆瓣 / B站 / bgm 页面）" },
@@ -285,8 +291,9 @@
         else if (f.t === "tags") inputs[f.k].value = tagsToText(v);
         else if (f.t === "select") {
           var opts = f.opts || [];
-          var has = opts.some(function (o) { return o[0] === v; });
-          inputs[f.k].value = has ? v : (opts[0] ? opts[0][0] : "");
+          var sv = v == null ? "" : String(v);
+          var has = opts.some(function (o) { return String(o[0]) === sv; });
+          inputs[f.k].value = has ? sv : (opts[0] ? String(opts[0][0]) : "");
         }
         else inputs[f.k].value = v == null ? "" : v;
       });
@@ -363,6 +370,7 @@
     return { wish: "想看", watching: "在看", finished: "看完", paused: "搁置" }[s] || s || "";
   }
   function mediaCatLabel(c) { return c === "comic" ? "漫画" : "追番"; }
+  var MEDIA_DAY = { 1: "周一", 2: "周二", 3: "周三", 4: "周四", 5: "周五", 6: "周六", 7: "周日" };
 
   /* 把「栏目/状态」的各种写法统一到内部值，容错中文、英文、简写 */
   function normCategory(v) {
@@ -389,6 +397,39 @@
     return mm ? String(Number(mm[0])) : "";
   }
 
+  /* 更新日：周一=1 … 周日=7。认「周三」「星期三」「3」「周天」和英文缩写 */
+  function normDay(v) {
+    var s = String(v == null ? "" : v).trim();
+    if (!s) return "";
+    /* 先认明确的星期词，避免「周五 20:00」里的 2 被当成周二 */
+    var c = s.match(/[一二三四五六日天]/);
+    if (c) {
+      if (c[0] === "日" || c[0] === "天") return "7";
+      return String({ "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6 }[c[0]]);
+    }
+    var en = { mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6, sun: 7 };
+    var e = s.toLowerCase().match(/^([a-z]{3})/);
+    if (e && en[e[1]]) return String(en[e[1]]);
+    var d = s.match(/[1-7]/);
+    return d ? d[0] : "";
+  }
+
+  /* 更新时间：20:00 / 20：00 / 20点 / 晚上 20 点 / 2000 → HH:MM；认不出留空 */
+  function normTime(v) {
+    var s = String(v == null ? "" : v).trim();
+    if (!s) return "";
+    var m = s.match(/(\d{1,2})\s*[:：点时]\s*(\d{1,2})?/);
+    if (!m) {
+      m = s.match(/^(\d{3,4})$/);
+      if (!m) return "";
+      s = m[1];
+      m = [s, s.slice(0, s.length - 2), s.slice(-2)];
+    }
+    var h = Number(m[1]), mi = m[2] == null || m[2] === "" ? 0 : Number(m[2]);
+    if (h > 23 || mi > 59) return "";
+    return (h < 10 ? "0" + h : String(h)) + ":" + (mi < 10 ? "0" + mi : String(mi));
+  }
+
   /* 一行文本按分隔符切成格子。支持 Tab / 逗号（中英） / 竖线 / 多个空格 */
   function splitRow(line) {
     if (line.indexOf("\t") >= 0) return line.split("\t").map(function (x) { return x.trim(); });
@@ -405,6 +446,8 @@
     score: ["评分", "分数", "打分", "score", "rating"],
     episodes: ["总集数", "集数", "话数", "总话数", "episodes", "eps", "total"],
     progress: ["进度", "看到", "看到第几集", "已看", "progress", "current"],
+    airday: ["更新日", "放送日", "星期", "周几", "airday", "weekday"],
+    airtime: ["更新时间", "放送时间", "airtime"],
     note: ["备注", "说明", "note", "remark", "desc"],
     date: ["日期", "时间", "date"],
     url: ["链接", "网址", "地址", "url", "link"],
@@ -462,6 +505,8 @@
         score: "",
         episodes: normCount(o.episodes),
         progress: normCount(o.progress),
+        airday: normDay(o.airday),
+        airtime: normTime(o.airtime),
         note: String(o.note == null ? "" : o.note).trim(),
         date: String(o.date == null ? "" : o.date).trim(),
         url: String(o.url == null ? "" : o.url).trim(),
@@ -495,6 +540,8 @@
         score: (d.score == null || d.score === "") ? "" : String(d.score),
         episodes: normCount(d.episodes),
         progress: normCount(d.progress),
+        airday: normDay(d.airday),
+        airtime: normTime(d.airtime),
         note: String(d.note == null ? "" : d.note).trim(),
         date: String(d.date == null ? "" : d.date).trim(),
         url: String(d.url == null ? "" : d.url).trim(),
@@ -888,6 +935,9 @@
       sub.appendChild(el("span", "pill", "看到 " + d.progress + " 话"));
     }
     if (d.date) sub.appendChild(el("span", "pill", d.date));
+    if (MEDIA_DAY[d.airday]) {
+      sub.appendChild(el("span", "pill", MEDIA_DAY[d.airday] + (d.airtime ? " " + d.airtime : "")));
+    }
     if (d.url) {
       var a = document.createElement("a");
       a.href = d.url; a.target = "_blank"; a.rel = "noopener";
@@ -959,10 +1009,11 @@
 
   /* ---------- 导出 TSV（当前全部，方便备份或搬到别处） ---------- */
   function exportMedia() {
-    var rows = ["名称\t栏目\t状态\t评分\t备注\t日期\t链接\t封面"];
+    var rows = ["名称\t栏目\t状态\t评分\t备注\t日期\t更新日\t更新时间\t链接\t封面"];
     (cache.media || []).forEach(function (i) {
       var d = i.data || {};
-      rows.push([d.name, d.category, d.status, d.score, d.note, d.date, d.url, d.cover]
+      rows.push([d.name, d.category, d.status, d.score, d.note, d.date,
+        MEDIA_DAY[d.airday] || "", d.airtime || "", d.url, d.cover]
         .map(function (x) { return String(x == null ? "" : x).replace(/[\t\r\n]/g, " "); }).join("\t"));
     });
     var text = rows.join("\n");
@@ -985,7 +1036,7 @@
     box.appendChild(p);
 
     var fmt = el("p", "hintline small");
-    fmt.textContent = "有表头会按表头认列（名称 / 栏目 / 状态 / 评分 / 备注 / 日期 / 链接 / 封面）；没有表头就按顺序认「名称」。";
+    fmt.textContent = "有表头会按表头认列（名称 / 栏目 / 状态 / 评分 / 备注 / 日期 / 更新日 / 更新时间 / 链接 / 封面）；没有表头就按顺序认「名称」。";
     box.appendChild(fmt);
 
     var ta = el("textarea", "mta");
@@ -1706,5 +1757,7 @@
     normCategory: normCategory,
     normStatus: normStatus,
     normCount: normCount,
+    normDay: normDay,
+    normTime: normTime,
   };
 })(window);

@@ -7,19 +7,19 @@
 /* 尽早定主题，避免闪白；没存过就跟随系统偏好（切换按钮与命令面板见 shell.js） */
 (function(){try{var t=localStorage.getItem("eraser.theme");if(t!=="light"&&t!=="dark"){t=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";}document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();
 </script>
-<title>追更 · Eraser 的小站</title>
+<title>追更工作台 · Eraser 的小站</title>
 <link rel="stylesheet" href="../style.css">
 <link rel="stylesheet" href="../owner.css">
 <link rel="manifest" href="../manifest.webmanifest">
 <link rel="icon" href="../icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="../icon.svg">
 <meta name="theme-color" content="#2563eb">
-<meta name="description" content="Eraser 的追更留档：正在追的番剧与漫画，带评分、进度和状态，看完自动收进收纳栏。">
+<meta name="description" content="Eraser 的个人追番工作台：接着看、本周放送、追番与漫画进度，全部聚合在自己的站里。">
 <!-- 分享卡片（og / twitter）：贴到聊天工具里能出预览 -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Eraser 的小站">
-<meta property="og:title" content="追更 · Eraser 的小站">
-<meta property="og:description" content="Eraser 的追更留档：正在追的番剧与漫画，带评分、进度和状态，看完自动收进收纳栏。">
+<meta property="og:title" content="追更工作台 · Eraser 的小站">
+<meta property="og:description" content="Eraser 的个人追番工作台：接着看、本周放送、追番与漫画进度，全部聚合在自己的站里。">
 <meta property="og:url" content="https://eraser.de5.net/collect/">
 <meta property="og:image" content="https://eraser.de5.net/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -97,19 +97,21 @@ html[data-theme="dark"] .mg-stat.mute b { color: var(--ink2); }
 }
 /* 注意：style.css 里有一条全局 `html[data-theme="dark"] button { color:#0d1117 }`
    （给品牌蓝按钮配深色文字用），它的权重是 (0,1,2)，比单个 `.mg-filters button` (0,1,1) 高。
-   所以这里必须写成 `.mg-filters .mg-filters button` (0,2,1) 才压得住，
-   否则暗色下筛选按钮会被刷成近黑色、贴在深色卡片上看不见。 */
-.mg-filters .mg-filters button {
+   所以这里必须写成 `.mg-filters.mg-filters button` (0,2,1) 才压得住——同一个元素上
+   重复写一次类名来提权；不能写成空格，空格会变成后代选择器，反而一个按钮都匹配不到。 */
+.mg-filters.mg-filters button {
   border: 1px solid var(--line); background: var(--card); color: var(--ink2);
   border-radius: 8px; padding: 6px 13px; font-size: 13px; font-family: inherit;
   cursor: pointer; white-space: nowrap; transition: background .15s, color .15s, border-color .15s;
 }
-.mg-filters .mg-filters button:hover { background: var(--sunk); color: var(--ink); }
-.mg-filters .mg-filters button.on {
+.mg-filters.mg-filters button:hover { background: var(--sunk); color: var(--ink); }
+.mg-filters.mg-filters button.on {
   background: var(--blue); border-color: var(--blue);
   color: #fff; font-weight: 600; box-shadow: 0 1px 6px rgba(37,99,235,.28);
 }
-.mg-filters .mg-filters button .n { opacity: .72; font-size: 11.5px; margin-left: 4px; }
+/* 暗色下品牌蓝变浅，白字对比度不够：选中态改用深色字（与全站按钮规则一致） */
+html[data-theme="dark"] .mg-filters.mg-filters button.on { color: #0d1117; }
+.mg-filters.mg-filters button .n { opacity: .72; font-size: 11.5px; margin-left: 4px; }
 
 /* 区块 */
 .mg-sec { margin-top: 30px; }
@@ -277,6 +279,158 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
 /* 小提示行 */
 .mg-tip { font-size: 12.5px; color: var(--muted); margin-top: 12px; }
 
+/* ===== 个人工作台（M20）：继续看 + 本周放送 ===== */
+.collect-main { max-width: 1080px; }
+.wb-date {
+  font-size: 12.5px; color: var(--muted); margin-top: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.wb-grid { display: grid; gap: 14px; margin-top: 18px; }
+@media (min-width: 900px) {
+  .wb-grid {
+    grid-template-columns: minmax(0, 1.55fr) minmax(300px, .9fr);
+    align-items: start;
+  }
+}
+.wb-panel {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 14px; padding: 14px 16px 10px;
+}
+.wb-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 10px; margin-bottom: 8px;
+}
+.wb-head h2 { margin: 0; font-size: 15.5px; display: flex; align-items: center; gap: 8px; }
+.wb-head h2 .dot {
+  width: 4px; height: 14px; border-radius: 2px;
+  background: var(--blue); display: inline-block;
+}
+.wb-count { font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+/* 继续看：一行一部，缩略图 + 进度 + 一个明确动作 */
+.wb-continue { display: flex; flex-direction: column; }
+.wb-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 0; border-top: 1px solid var(--line);
+}
+.wb-row:first-child { border-top: 0; padding-top: 2px; }
+.wb-thumb {
+  position: relative; flex: 0 0 auto; width: 42px; height: 56px;
+  border-radius: 7px; overflow: hidden;
+  background: linear-gradient(140deg, var(--blue), var(--blue-d));
+}
+.wb-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.wb-thumb .fb {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 16px; font-weight: 700;
+}
+.wb-info { flex: 1; min-width: 0; }
+.wb-name { display: flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 600; line-height: 1.35; }
+.wb-name .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wb-src {
+  flex: 0 0 auto; font-size: 10px; font-weight: 600; line-height: 1.6;
+  color: var(--blue); background: var(--blue-l); border-radius: 4px; padding: 0 5px;
+}
+.wb-meta {
+  font-size: 11.5px; color: var(--muted); margin-top: 1px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.wb-bar { height: 4px; border-radius: 999px; background: var(--sunk); overflow: hidden; margin-top: 6px; }
+.wb-bar i { display: block; height: 100%; border-radius: 999px; background: var(--blue); }
+.wb-go {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  min-height: 32px; padding: 5px 12px; border-radius: 8px;
+  border: 1px solid var(--blue); background: var(--blue); color: #fff;
+  font: 600 12.5px/1.2 inherit; text-decoration: none; cursor: pointer; white-space: nowrap;
+}
+.wb-go:hover { background: var(--blue-d); border-color: var(--blue-d); text-decoration: none; }
+.wb-go.ghost { background: var(--card); color: var(--blue); }
+.wb-go.ghost:hover { background: var(--blue-l); }
+.wb-go.mute {
+  background: var(--sunk); border-color: var(--line2); color: var(--muted);
+  cursor: default; font-weight: 500;
+}
+.wb-go:disabled { opacity: .6; cursor: default; }
+/* 暗色下品牌蓝变浅：主按钮让全局规则落深色字（对比度更好）；
+   ghost / mute 是卡片底，必须自己提亮文字，否则会被刷成近黑色。 */
+html[data-theme="dark"] .wb-go.ghost { color: var(--blue); }
+html[data-theme="dark"] .wb-go.mute { color: var(--muted); }
+
+.wb-empty {
+  color: var(--muted); font-size: 12.5px; text-align: center;
+  padding: 16px 8px; line-height: 1.65;
+}
+.wb-more {
+  font-size: 11.5px; color: var(--muted); padding: 7px 0 2px;
+  border-top: 1px dashed var(--line); margin-top: 2px;
+}
+
+/* 本周放送：7 个日期格 + 当天列表 */
+.wb-days { display: flex; gap: 4px; margin-bottom: 4px; }
+.wb-day {
+  position: relative; flex: 1 1 0; min-width: 0;
+  padding: 5px 0 4px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--card); color: var(--ink2);
+  font: 11.5px/1.25 inherit; cursor: pointer; text-align: center;
+}
+.wb-day .n {
+  display: block; margin-top: 1px; font-size: 10px; color: var(--muted);
+  font-variant-numeric: tabular-nums; font-weight: 500;
+}
+.wb-day:hover { border-color: var(--blue); color: var(--blue); }
+.wb-day.on { background: var(--blue); border-color: var(--blue); color: #fff; }
+.wb-day.on .n { color: rgba(255,255,255,.82); }
+.wb-day.today::after {
+  content: ""; position: absolute; top: 4px; right: 4px;
+  width: 4px; height: 4px; border-radius: 50%; background: currentColor; opacity: .7;
+}
+html[data-theme="dark"] .wb-day { color: var(--ink2); }
+html[data-theme="dark"] .wb-day.on { color: #0d1117; }
+html[data-theme="dark"] .wb-day.on .n { color: rgba(13,17,23,.7); }
+
+.wb-air { display: flex; flex-direction: column; }
+.wb-air-row {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 8px 6px; border: 0; border-top: 1px solid var(--line); border-radius: 0;
+  background: transparent; color: var(--ink);
+  font: inherit; text-align: left; text-decoration: none; cursor: pointer;
+}
+.wb-air-row:first-child { border-top: 0; }
+.wb-air-row:hover { background: var(--sunk); text-decoration: none; }
+.wb-air-row.is-static { cursor: default; }
+.wb-air-row.is-static:hover { background: transparent; }
+html[data-theme="dark"] .wb-air-row { color: var(--ink); }
+.wb-time {
+  flex: 0 0 auto; width: 34px; font-size: 10.5px; color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.wb-air-main { flex: 1; min-width: 0; }
+.wb-air-name {
+  font-size: 12.5px; font-weight: 600; line-height: 1.4;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.wb-air-sub {
+  font-size: 10.5px; color: var(--muted); line-height: 1.5;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.wb-air-go { flex: 0 0 auto; font-size: 11px; color: var(--blue); white-space: nowrap; }
+.wb-air-go.mute { color: var(--muted); }
+.wb-legend {
+  font-size: 10.5px; color: var(--muted); border-top: 1px dashed var(--line);
+  padding-top: 7px; margin-top: 2px; line-height: 1.55;
+}
+.collect-main .mg-stats { margin-top: 20px; }
+
+@media (max-width: 480px) {
+  .wb-panel { padding: 12px 13px 8px; border-radius: 12px; }
+  .wb-row { gap: 10px; }
+  .wb-thumb { width: 38px; height: 51px; }
+  .wb-go { padding: 5px 10px; }
+  .wb-days { gap: 3px; }
+  .wb-day { font-size: 10.5px; }
+  .wb-day .n { font-size: 9.5px; }
+}
+
 /* ===== 站内播放（M19） ===== */
 /* 有官方播放器时，整张卡变成「播放按钮」，海报中央加一个 ▶ */
 button.mg-hit {
@@ -393,14 +547,37 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
     <a href="../about/index.html">关于</a>
   </nav>
 </div>
-<main class="container" id="main">
+<main class="container collect-main" id="main">
   <div class="mg-top">
-    <h1>追更</h1>
-    <p class="muted">追番、漫画，看过的都留档在这。</p>
+    <h1>追更工作台</h1>
+    <p class="muted">今天想看点什么？追番、漫画和进度都在这。</p>
+    <p class="wb-date" id="wbDate"></p>
     <!-- 只有在本机登录过后台才会出现（读 localStorage 里的后台令牌）。
          没登录的访客看不到这个按钮，也不会发任何请求。 -->
     <button class="mg-add" id="mgAdd" type="button" style="display:none">＋ 快速添加</button>
     <p class="muted" id="ownerHint" style="display:none">编辑模式：点海报上的 ✎ 就地改，✕ 删除；视频页链接会自动变成 ▶ 站内播放。</p>
+  </div>
+
+  <!-- M20 个人工作台：接着看 + 本周放送（有数据后才显示） -->
+  <div class="wb-grid" id="wbGrid" style="display:none">
+    <section class="wb-panel" aria-labelledby="wbContinueTitle">
+      <div class="wb-head">
+        <h2 id="wbContinueTitle"><span class="dot"></span>接着看</h2>
+        <span class="wb-count" id="wbContinueCount"></span>
+      </div>
+      <div class="wb-continue" id="wbContinue"></div>
+      <p class="wb-more" id="wbContinueMore" style="display:none"></p>
+    </section>
+
+    <section class="wb-panel" aria-labelledby="wbAirTitle">
+      <div class="wb-head">
+        <h2 id="wbAirTitle"><span class="dot"></span>本周放送</h2>
+        <span class="wb-count" id="wbAirCount"></span>
+      </div>
+      <div class="wb-days" id="wbDays" role="tablist" aria-label="按更新日筛选"></div>
+      <div class="wb-air" id="wbAirList" role="tabpanel"></div>
+      <p class="wb-legend" id="wbAirLegend">更新日和更新时间在条目编辑里填；B 站只同步到「第几话」，具体秒数由官方播放器自己记住。</p>
+    </section>
   </div>
 
   <!-- 顶部统计（有数据后才显示） -->
@@ -434,6 +611,7 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
 </main>
 
 <script src="../watch.js"></script>
+<script src="../workbench.js"></script>
 <script src="../owner.js"></script>
 <script src="../admin/content.js"></script>
 <script>
@@ -462,6 +640,8 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
   var allItems = [];        /* 接口返回的原始列表 */
   var canEdit = false;      /* 本机存过后台令牌 → 才渲染「＋1 话」等写入按钮 */
   var filter = "all";       /* 当前状态筛选 */
+  var airDay = null;        /* 本周放送选中的星期；null = 今天 */
+  var CAT_NAME = { anime: "追番", comic: "漫画" };
 
   function $(id) { return document.getElementById(id); }
   function el(tag, cls, text) {
@@ -676,10 +856,28 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
       save: function (patch, o) { return patchMedia(it.id, patch, o); },
       plus: function (done, fail) { bumpProgress(it, null, done, fail); },
       toast: function (msg, kind) { if (window.Owner) Owner.toast(msg, kind); },
+      /* 播放中每 15 秒写一次续播点：只更新本地数据，不重画整页（播放器还开着） */
+      onSaved: function (patch) {
+        Object.keys(patch || {}).forEach(function (k) { d[k] = patch[k]; });
+      },
+      /* 关掉播放器再统一重画，顺便把进度/续播点带回来 */
+      onClose: function () { apply(allItems); },
     });
-    if (opened) return;
-    var link = safeUrl(d.url);
-    if (link) window.open(link, "_blank", "noopener");
+    if (!opened) {
+      var link = safeUrl(d.url);
+      if (link) window.open(link, "_blank", "noopener");
+      return;
+    }
+    /* 点开就从「想看」转成「在看」：追更里最常见的一步不用手动改 */
+    if (canEdit && d.status === "wish") {
+      d.status = "watching";
+      patchMedia(it.id, { status: "watching" }).then(function () {
+        apply(allItems);
+      }).catch(function () {
+        d.status = "wish";
+        apply(allItems);
+      });
+    }
   }
 
   /* 渐变兜底块：按 id 取一个固定的配色，同一部作品每次进来颜色一样 */
@@ -820,10 +1018,206 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
     });
   }
 
+  /* ==================== M20 个人工作台：接着看 + 本周放送 ====================
+     纯计算都在 workbench.js 里（可单测），这里只负责画 DOM。
+     原则：面板只做「下一步该干嘛」，完整留档仍由下面的海报墙负责。 */
+  function catName(key) { return CAT_NAME[key] || "追番"; }
+
+  function sourceLabel(d) {
+    var link = safeUrl(d && d.url);
+    var play = link && window.Watch ? Watch.parse(link) : null;
+    return play ? play.label : "";
+  }
+
+  function renderHero() {
+    var t = $("wbDate");
+    if (!t || !window.Workbench) return;
+    var now = new Date();
+    t.textContent = Workbench.dateText(now) + " · " + Workbench.greeting(now.getHours());
+  }
+
+  /* 缩略图：加载失败就退回首字渐变块，和海报墙同一套兜底 */
+  function wbThumb(d) {
+    var box = el("div", "wb-thumb");
+    var cover = safeUrl(d.cover);
+    if (cover) {
+      var img = el("img");
+      img.src = cover;
+      img.alt = "";
+      img.loading = "lazy";
+      img.addEventListener("error", function () {
+        if (img.parentNode) img.parentNode.removeChild(img);
+        box.appendChild(el("span", "fb", firstChar(d.name)));
+      });
+      box.appendChild(img);
+    } else {
+      box.appendChild(el("span", "fb", firstChar(d.name)));
+    }
+    return box;
+  }
+
+  function continueAction(it) {
+    var d = it.data || {};
+    var link = safeUrl(d.url);
+    var play = link && window.Watch ? Watch.parse(link) : null;
+
+    if (play) {
+      var b = el("button", "wb-go", Number(d.position) > 0 ? "接着看" : "开看");
+      b.type = "button";
+      b.addEventListener("click", function () { openWatch(it); });
+      return b;
+    }
+    if (link) {
+      var a = el("a", "wb-go ghost", "去站点");
+      a.href = link;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      return a;
+    }
+    if (canEdit) {
+      var plus = el("button", "wb-go ghost", "＋1 话");
+      plus.type = "button";
+      plus.title = "把进度 +1";
+      plus.addEventListener("click", function () { bumpProgress(it, plus); });
+      return plus;
+    }
+    return el("span", "wb-go mute", "还没链接");
+  }
+
+  function continueRow(it) {
+    var d = it.data || {};
+    var row = el("div", "wb-row");
+    row.appendChild(wbThumb(d));
+
+    var info = el("div", "wb-info");
+    var name = el("div", "wb-name");
+    name.appendChild(el("span", "t", d.name || "(未命名)"));
+    var src = sourceLabel(d);
+    if (src) name.appendChild(el("span", "wb-src", src));
+    info.appendChild(name);
+
+    var meta = catName(d.category) + " · " + Workbench.watchedText(d);
+    var rest = Workbench.remainingText(d);
+    if (rest) meta += " · " + rest;
+    info.appendChild(el("div", "wb-meta", meta));
+
+    var pct = Workbench.epPct(d);
+    if (pct != null) {
+      var bar = el("div", "wb-bar");
+      var fill = el("i");
+      fill.style.width = pct + "%";
+      bar.appendChild(fill);
+      info.appendChild(bar);
+    }
+    row.appendChild(info);
+    row.appendChild(continueAction(it));
+    return row;
+  }
+
+  function renderContinue(items) {
+    var box = $("wbContinue"), cnt = $("wbContinueCount"), more = $("wbContinueMore");
+    if (!box || !window.Workbench) return;
+
+    var list = Workbench.continueList(items);
+    box.innerHTML = "";
+    more.style.display = "none";
+    cnt.textContent = list.length ? "共 " + list.length + " 部" : "";
+
+    if (!list.length) {
+      box.appendChild(el("p", "wb-empty",
+        "没有在追的条目。把状态改成「在看」，或者带进度记一笔，就会出现在这里。"));
+      return;
+    }
+
+    var SHOW = 6;
+    list.slice(0, SHOW).forEach(function (it) { box.appendChild(continueRow(it)); });
+    if (list.length > SHOW) {
+      more.style.display = "";
+      more.textContent = "还有 " + (list.length - SHOW) + " 部，在下面的海报墙里。";
+    }
+  }
+
+  function airRow(it) {
+    var d = it.data || {};
+    var link = safeUrl(d.url);
+    var play = link && window.Watch ? Watch.parse(link) : null;
+    var row = el(play ? "button" : (link ? "a" : "div"),
+      "wb-air-row" + (play || link ? "" : " is-static"));
+    if (play) {
+      row.type = "button";
+      row.addEventListener("click", function () { openWatch(it); });
+    } else if (link) {
+      row.href = link;
+      row.target = "_blank";
+      row.rel = "noopener noreferrer";
+    }
+
+    row.appendChild(el("span", "wb-time", d.airtime || "—"));
+    var main = el("div", "wb-air-main");
+    main.appendChild(el("div", "wb-air-name", d.name || "(未命名)"));
+    var sub = catName(d.category) + " · " + Workbench.nextEpText(d);
+    if (d.note) sub += " · " + d.note;
+    main.appendChild(el("div", "wb-air-sub", sub));
+    row.appendChild(main);
+
+    if (play) row.appendChild(el("span", "wb-air-go", "播放"));
+    else if (link) row.appendChild(el("span", "wb-air-go", "打开"));
+    else row.appendChild(el("span", "wb-air-go mute", "待补链接"));
+    return row;
+  }
+
+  function renderAir(items) {
+    var tabs = $("wbDays"), listBox = $("wbAirList"), cnt = $("wbAirCount");
+    if (!tabs || !listBox || !window.Workbench) return;
+
+    var today = Workbench.dayOf(new Date());
+    if (airDay == null) airDay = today;
+    var counts = Workbench.dayCounts(items);
+
+    tabs.innerHTML = "";
+    Workbench.days.forEach(function (label, i) {
+      var n = i + 1;
+      var b = el("button", "wb-day" + (n === airDay ? " on" : "") + (n === today ? " today" : ""));
+      b.type = "button";
+      b.setAttribute("role", "tab");
+      b.setAttribute("aria-selected", n === airDay ? "true" : "false");
+      b.setAttribute("aria-label", label + "，更新 " + counts[n] + " 部" + (n === today ? "，今天" : ""));
+      b.appendChild(document.createTextNode(label));
+      b.appendChild(el("span", "n", counts[n] ? String(counts[n]) : "—"));
+      b.addEventListener("click", function () {
+        airDay = n;
+        renderAir(allItems);
+      });
+      tabs.appendChild(b);
+    });
+
+    var dayItems = Workbench.scheduleFor(items, airDay);
+    cnt.textContent = (airDay === today ? "今天" : Workbench.dayLabel(airDay)) +
+      " · " + dayItems.length + " 部";
+    listBox.innerHTML = "";
+    if (!dayItems.length) {
+      listBox.appendChild(el("p", "wb-empty", airDay === today
+        ? "今天没有安排放送。点上面的日期看看别的天。"
+        : "这天没有要追的放送。"));
+      return;
+    }
+    dayItems.forEach(function (it) { listBox.appendChild(airRow(it)); });
+  }
+
+  function renderWorkbench(items) {
+    var grid = $("wbGrid");
+    if (!grid || !window.Workbench) return;   /* 脚本被缓存漏掉时宁可不出面板，也不报错 */
+    grid.style.display = items.length ? "" : "none";
+    if (!items.length) return;
+    renderContinue(items);
+    renderAir(items);
+  }
+
   function apply(items) {
     allItems = items;
     renderStats(items);
     renderFilters(items);
+    renderWorkbench(items);
     ["anime", "comic"].forEach(function (key) {
       renderSection(key, filtered(items, key));
     });
@@ -950,6 +1344,30 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
     two3.appendChild(pgWrap);
     panel.appendChild(two3);
 
+    /* 更新日 + 更新时间：填了才会进「本周放送」 */
+    var two4 = el("div", "two");
+    var dayWrap = el("div");
+    dayWrap.appendChild(el("label", null, "更新日（可空）"));
+    var daySel = document.createElement("select");
+    [["", "不固定"], ["1", "周一"], ["2", "周二"], ["3", "周三"], ["4", "周四"],
+     ["5", "周五"], ["6", "周六"], ["7", "周日"]].forEach(function (o) {
+      var op = document.createElement("option");
+      op.value = o[0];
+      op.textContent = o[1];
+      daySel.appendChild(op);
+    });
+    dayWrap.appendChild(daySel);
+    two4.appendChild(dayWrap);
+
+    var tmWrap = el("div");
+    tmWrap.appendChild(el("label", null, "更新时间（可空）"));
+    var tmInput = document.createElement("input");
+    tmInput.type = "text";
+    tmInput.placeholder = "20:00";
+    tmWrap.appendChild(tmInput);
+    two4.appendChild(tmWrap);
+    panel.appendChild(two4);
+
     /* 备注 */
     panel.appendChild(el("label", null, "备注（可空）"));
     var noteInput = document.createElement("input");
@@ -1023,6 +1441,8 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
           score: scInput.value.trim(),
           episodes: epInput.value.trim(),
           progress: pgInput.value.trim(),
+          airday: daySel.value,
+          airtime: tmInput.value.trim(),
           note: noteInput.value.trim(),
           date: dInput.value.trim(),
           url: urlInput.value.trim(),
@@ -1105,6 +1525,8 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
         });
       });
   }
+
+  renderHero();
 
   if (!window.fetch) return;
   loadMedia();

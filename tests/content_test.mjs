@@ -157,6 +157,24 @@ console.log('\n=== media（追更）===');
   check('播放位置超上限报错', code(() => C.normalize('media', { ...base, position: 1000001 })) === 'BAD_INPUT');
   const resume = C.normalize('media', { ...C.normalize('media', { ...base, position: 100 }), position: 320 });
   check('合并语义：只改续播点不影响其他字段', resume.position === 320 && resume.name === base.name);
+
+  /* 放送表（M20）：airday 1–7，airtime HH:MM，都可空 */
+  check('更新日/更新时间默认是 null', empty.airday === null && empty.airtime === null);
+  check('更新日接受 1–7', [1, 2, 3, 4, 5, 6, 7].every(n => C.normalize('media', { ...base, airday: n }).airday === n));
+  check('更新日接受数字字符串', C.normalize('media', { ...base, airday: '3' }).airday === 3);
+  check('更新日空串等于不填', C.normalize('media', { ...base, airday: '' }).airday === null);
+  check('更新日 0 报错', code(() => C.normalize('media', { ...base, airday: 0 })) === 'BAD_INPUT');
+  check('更新日 8 报错', code(() => C.normalize('media', { ...base, airday: 8 })) === 'BAD_INPUT');
+  check('更新日小数报错', code(() => C.normalize('media', { ...base, airday: 3.5 })) === 'BAD_INPUT');
+  check('更新时间正常保留', C.normalize('media', { ...base, airtime: '20:00' }).airtime === '20:00');
+  check('更新时间补零成 HH:MM', C.normalize('media', { ...base, airtime: '8:05' }).airtime === '08:05');
+  check('更新时间接受全角冒号', C.normalize('media', { ...base, airtime: '20：30' }).airtime === '20:30');
+  check('更新时间空串等于不填', C.normalize('media', { ...base, airtime: '  ' }).airtime === null);
+  check('更新时间 24:00 报错', code(() => C.normalize('media', { ...base, airtime: '24:00' })) === 'BAD_INPUT');
+  check('更新时间 20:60 报错', code(() => C.normalize('media', { ...base, airtime: '20:60' })) === 'BAD_INPUT');
+  check('更新时间乱写报错', code(() => C.normalize('media', { ...base, airtime: '八点' })) === 'BAD_INPUT');
+  const sched = C.normalize('media', { ...C.normalize('media', { ...base, airday: 3, airtime: '20:00' }), airtime: '21:30' });
+  check('合并语义：只改更新时间不会丢掉更新日', sched.airday === 3 && sched.airtime === '21:30');
 }
 
 console.log('\n=== learn_map（学习地图）===');

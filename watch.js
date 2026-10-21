@@ -327,7 +327,10 @@
         return;
       }
       if (p && typeof p.then === "function") {
-        p.then(function () { saving = false; }).catch(function (err) {
+        p.then(function () {
+          saving = false;
+          if (typeof opts.onSaved === "function") opts.onSaved(patch);
+        }).catch(function (err) {
           saving = false;
           if (saveErrorShown) return;
           saveErrorShown = true;
@@ -337,6 +340,7 @@
         });
       } else {
         saving = false;
+        if (typeof opts.onSaved === "function") opts.onSaved(patch);
       }
     }
 
