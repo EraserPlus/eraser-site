@@ -25,7 +25,9 @@ const W = sandbox.Watch;
 
 console.log('\n=== watch.js 入口 ===');
 check('挂到 window.Watch', !!W);
-check('暴露 parse / open / embedUrl', typeof W.parse === 'function' && typeof W.open === 'function' && typeof W.embedUrl === 'function');
+check('暴露 parse / open / embedUrl / endedPlan',
+      typeof W.parse === 'function' && typeof W.open === 'function' &&
+      typeof W.embedUrl === 'function' && typeof W.endedPlan === 'function');
 check('白名单只有四类来源', JSON.stringify(W.providers) === JSON.stringify(['bilibili', 'youtube', 'vimeo', 'video']));
 
 console.log('\n=== B 站 ===');
@@ -194,6 +196,64 @@ console.log('\n=== M21 漫画对等 / 放送表自动补全 ===');
   check('补全不动 updated_at', /patchMedia\(it\.id, patch, \{ touch: false \}\)/.test(html));
   check('每天自动补一次 + 手动按钮', /function autoSyncSchedules/.test(html) && /id="wbSync"/.test(html));
   check('漫画写明手填（没有稳定公开日历）', /漫画和各站没有统一日历，手填一次即可/.test(html));
+}
+
+console.log('\n=== M22 播完提示：只建议，不自动写 ===');
+{
+  check('没进度时建议第一话', JSON.stringify(W.endedPlan({})) === JSON.stringify({ next: 1, latest: null, caughtUp: false }),
+        JSON.stringify(W.endedPlan({})));
+  check('看到 12 → 下一话 13', JSON.stringify(W.endedPlan({ progress: 12 })) === JSON.stringify({ next: 13, latest: null, caughtUp: false }),
+        JSON.stringify(W.endedPlan({ progress: 12 })));
+  check('字符串进度也认', W.endedPlan({ progress: '8', latest: '12' }).next === 9);
+  check('有最新集但没追平', W.endedPlan({ progress: 8, latest: 12 }).caughtUp === false);
+  check('刚好追平最新集 → caughtUp', W.endedPlan({ progress: 12, latest: 12 }).caughtUp === true);
+  check('进度超过最新集也算追平', W.endedPlan({ progress: 13, latest: 12 }).caughtUp === true);
+  check('进度 0、最新 1：下一话就是第 1 话', JSON.stringify(W.endedPlan({ progress: 0, latest: 1 })) === JSON.stringify({ next: 1, latest: 1, caughtUp: false }),
+        JSON.stringify(W.endedPlan({ progress: 0, latest: 1 })));
+  check('只有最新集没有进度', W.endedPlan({ latest: 12 }).next === 1);
+  check('null 不炸', JSON.stringify(W.endedPlan(null)) === JSON.stringify({ next: 1, latest: null, caughtUp: false }));
+  check('负数 / 小数进度归整', W.endedPlan({ progress: -3 }).next === 1 && W.endedPlan({ progress: 4.9 }).next === 5);
+  check('非法 latest 当作没有', W.endedPlan({ progress: 3, latest: 'x' }).latest === null && W.endedPlan({ progress: 3, latest: 0 }).latest === null);
+  check('空字符串进度按 0 算', W.endedPlan({ progress: '' }).next === 1);
+}
+
+console.log('\n=== M22 播完提示：接入与边界 ===');
+{
+  const js = read('watch.js');
+  const html = read('collect/index.html');
+  check('播放器里有播完提示条', /el\("div", "watch-ended"\)/.test(js) && /endedYes/.test(js) && /endedNo/.test(js));
+  check('提示条样式在页内，hidden 时真正隐藏', /\.watch-ended\s*\{/.test(html) && /\.watch-ended\[hidden\]\s*\{\s*display:\s*none/.test(html));
+  check('YouTube 播放结束会提示', /i\.playerState === 0\) showEndPrompt\(\)/.test(js)
+        && /data\.info === 0\) showEndPrompt\(\)/.test(js));
+  check('Vimeo / 直链视频结束都会提示', /data\.event === "ended"[\s\S]{0,200}?showEndPrompt\(\)/.test(js)
+        && /video\.addEventListener\("ended"[\s\S]{0,120}?showEndPrompt\(\)/.test(js));
+  check('B 站不提示（播放器只同步到第几话）', /info\.provider === "bilibili"\) return/.test(js));
+  check('追平后只说明情况，不再劝 +1', /已经追平最新第/.test(js));
+  check('提示文案点名下一话的集数', /记到第 " \+ plan\.next/.test(js));
+  check('确认后才写进度：按钮绑定 advanceEpisode', /endedYes\.addEventListener\("click", advanceEpisode\)/.test(js));
+  check('「先不记」只收起提示', /endedNo\.addEventListener\("click", function \(\) \{[\s\S]{0,160}?endedBox\.hidden = true/.test(js));
+  check('showEndPrompt 不直接调用保存（绝不自动改进度）',
+        (function () {
+          const body = js.slice(js.indexOf('function showEndPrompt'), js.indexOf('function advanceEpisode'));
+          return body.length > 0 && !/opts\.plus/.test(body) && !/save\(/.test(body);
+        })());
+  check('「＋1 / 播完确认」都会把续播点归零', /progress: next, position: 0/.test(html));
+
+  check('封面图带 no-referrer，防盗链站点也能显示', (html.match(/img\.referrerPolicy = "no-referrer"/g) || []).length >= 2);
+  check('封面懒加载', /img\.loading = "lazy"/.test(html) && /img\.decoding = "async"/.test(html));
+
+  check('同步会补最新集数（只增不减）', /patch\.latest = latest/.test(html) && /latest > Number\(d\.latest\)/.test(html));
+  check('同步会补总集数（只增不减）', /eps > Number\(d\.episodes\)/.test(html));
+  check('同步会写入完结状态', /patch\.finished = true/.test(html) && /info\.finished === true/.test(html));
+  check('同步不碰用户进度 / 状态', (function () {
+        const body = html.slice(html.indexOf('function airingPatch'), html.indexOf('function updateSyncBtn'));
+        return body.length > 0 && !/patch\.progress/.test(body) && !/patch\.status/.test(body);
+      })());
+  check('手填的更新日 / 时间优先', /!hasValue\(d\.airday\) && info\.airday/.test(html) && /!hasValue\(d\.airtime\) && info\.airtime/.test(html));
+  check('按钮与文案改成「同步资料」', /id="wbSync"/.test(html) && /同步资料<\/button>/.test(html));
+  check('同步后报告有几部有新一话', /其中 " \+ fresh \+ " 部有新一话/.test(html));
+  check('有新一话的卡片有绿色「新 N」标', /className = "fresh"/.test(html) || /"fresh"/.test(html));
+  check('工作台导出 freshCount 供页面复用', /freshCount: freshCount/.test(read('workbench.js')));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

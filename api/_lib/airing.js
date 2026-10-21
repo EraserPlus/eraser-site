@@ -119,6 +119,31 @@ export function latestMainEpisode(result) {
   return best;
 }
 
+/* B 站把集数放在 title（通常是 "196"）里，show_title 是「第196话 标题」。
+   只认明确的整数，不从小标题里瞎猜（比如「2.5 话」「第3话总集篇」宁可留空）。 */
+export function episodeNumber(ep) {
+  const fields = [ep && ep.title, ep && ep.show_title, ep && ep.index_show];
+  for (const raw of fields) {
+    const s = String(raw == null ? '' : raw).trim();
+    if (!s) continue;
+    let m = s.match(/^(\d{1,5})$/);
+    if (!m) m = s.match(/第\s*(\d{1,5})\s*[话話集]/);
+    if (!m) m = s.match(/^(\d{1,5})\s*[话話集]/);
+    if (!m) continue;
+    const n = Number(m[1]);
+    if (n > 0) return n;
+  }
+  return null;
+}
+
+/* 最新一集正片的集数。episodes 列表拿不到时，退而用官方 new_ep 的标题。 */
+export function latestEpisodeNumber(result) {
+  const fromEp = episodeNumber(latestMainEpisode(result));
+  if (fromEp != null) return fromEp;
+  const ne = result && result.new_ep;
+  return episodeNumber({ title: ne && ne.title, index_show: ne && ne.index_show });
+}
+
 /* 把 B 站 season 返回归一化成站点能直接用的字段。
    完结番不再给放送时间（避免「本周放送」里出现已经完结的条目）。 */
 export function shapeSeason(result) {
@@ -144,6 +169,12 @@ export function shapeSeason(result) {
 
   const rating = Number(result.rating && result.rating.score);
   const total = Number(result.total);
+  const latest = latestEpisodeNumber(result);
+  /* 连载中的 total 常是 0；完结番的 total 也可能是 0，
+     这时最新一集的序号就是最终话数，拿它兜底比留空有用。 */
+  const episodes = Number.isInteger(total) && total > 0
+    ? total
+    : (finished && latest ? latest : null);
   const title = String(result.title || result.season_title || '').slice(0, 120);
 
   return {
@@ -153,7 +184,8 @@ export function shapeSeason(result) {
     title: title || null,
     cover: typeof result.cover === 'string' && /^https?:\/\//i.test(result.cover) ? result.cover : null,
     score: Number.isFinite(rating) && rating > 0 ? Math.round(rating * 10) / 10 : null,
-    episodes: Number.isInteger(total) && total > 0 ? total : null,
+    episodes: episodes,
+    latest: latest,
     finished: finished,
     started: started,
     newEp: result.new_ep && result.new_ep.title ? String(result.new_ep.title).slice(0, 40) : null,

@@ -205,15 +205,21 @@ html[data-theme="dark"] .mg-tag.t-wish { background: #6b7480; }
 }
 
 /* 进度：看到第几集 / 共几话。有总集数才画进度条，否则只显示文字 */
-.mg-prog { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.mg-prog { display: flex; align-items: center; gap: 5px; margin-bottom: 4px; }
 .mg-prog .track {
-  flex: 1; min-width: 24px; height: 4px; border-radius: 999px;
+  flex: 1; min-width: 20px; height: 4px; border-radius: 999px;
   background: rgba(255,255,255,.28); overflow: hidden;
 }
 .mg-prog .track i { display: block; height: 100%; border-radius: 999px; background: #fff; }
 .mg-prog .txt {
   color: rgba(255,255,255,.88); font-size: 10.5px; white-space: nowrap;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis;
+}
+/* 「新 3 话」：追平前提醒还有几集没看，绿色只在真有更新时出现 */
+.mg-prog .fresh {
+  flex: 0 0 auto; border-radius: 999px; padding: 1px 5px;
+  background: #2f9e56; color: #fff; font-size: 9.5px; font-weight: 700;
+  line-height: 1.5; white-space: nowrap;
 }
 
 /* 覆盖整张卡的链接层（有外链时才有）。放在按钮之下，点卡片空白处照旧跳外链 */
@@ -285,7 +291,7 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
   font-size: 12.5px; color: var(--muted); margin-top: 3px;
   font-variant-numeric: tabular-nums;
 }
-.wb-grid { display: grid; gap: 14px; margin-top: 18px; }
+.wb-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; margin-top: 18px; }
 @media (min-width: 900px) {
   .wb-grid {
     grid-template-columns: minmax(0, 1.55fr) minmax(300px, .9fr);
@@ -293,6 +299,7 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
   }
 }
 .wb-panel {
+  min-width: 0;
   background: var(--card); border: 1px solid var(--line);
   border-radius: 14px; padding: 14px 16px 10px;
 }
@@ -307,7 +314,7 @@ html[data-theme="dark"] .mg-fold { color: var(--ink3); }
 .wb-head-r { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .wb-count { font-size: 12px; color: var(--muted); white-space: nowrap; }
 
-/* 「补全放送表」：自动补空字段，手动兜底。
+/* 「同步资料」：自动补放送时间 / 最新集数，手动兜底。
    注意全站暗色有 `html[data-theme="dark"] button{color:#0d1117}`（权重 0,1,2），
    单个类名压不住，所以用同一元素双类名提权（不要写成后代选择器）。 */
 .wb-sync.wb-sync {
@@ -351,11 +358,16 @@ html[data-theme="dark"] .wb-cats.wb-cats button.on { color: #0d1117; }
   color: #fff; font-size: 16px; font-weight: 700;
 }
 .wb-info { flex: 1; min-width: 0; }
-.wb-name { display: flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 600; line-height: 1.35; }
-.wb-name .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wb-name { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 13.5px; font-weight: 600; line-height: 1.35; }
+.wb-name .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wb-src {
   flex: 0 0 auto; font-size: 10px; font-weight: 600; line-height: 1.6;
   color: var(--blue); background: var(--blue-l); border-radius: 4px; padding: 0 5px;
+}
+/* 有新一话：绿色小标，和「看到 / 更新至」的文字互相印证 */
+.wb-new {
+  flex: 0 0 auto; font-size: 10px; font-weight: 700; line-height: 1.6;
+  color: #fff; background: #2f9e56; border-radius: 4px; padding: 0 5px;
 }
 .wb-meta {
   font-size: 11.5px; color: var(--muted); margin-top: 1px;
@@ -544,6 +556,15 @@ html[data-theme="dark"] .watch-x { color: var(--ink); }
 }
 .watch-error p { margin: 0; max-width: 460px; line-height: 1.6; }
 
+/* 播完后的确认条：非静默，用户点了才记下一话 */
+.watch-ended {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px;
+  padding: 10px 14px; border-top: 1px solid var(--line);
+  background: var(--card); box-shadow: inset 3px 0 0 #2f9e56;
+}
+.watch-ended[hidden] { display: none; }
+.watch-ended-t { flex: 1 1 220px; min-width: 0; font-size: 13px; font-weight: 600; color: var(--ink); }
+
 .watch-foot {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
   gap: 10px 14px; padding: 10px 14px;
@@ -617,12 +638,12 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
         <div class="wb-head-r">
           <span class="wb-count" id="wbAirCount"></span>
           <button class="wb-sync" id="wbSync" type="button" style="display:none"
-                  title="按 B 站番剧链接补全缺的更新日 / 更新时间">补全放送表</button>
+                  title="按 B 站番剧链接同步放送时间、最新集数和完结状态">同步资料</button>
         </div>
       </div>
       <div class="wb-days" id="wbDays" role="tablist" aria-label="按更新日筛选"></div>
       <div class="wb-air" id="wbAirList" role="tabpanel"></div>
-      <p class="wb-legend" id="wbAirLegend">番剧贴 B 站番剧链接后，更新日 / 时间会自动补（只填空，不覆盖手填）；漫画和各站没有统一日历，手填一次即可。B 站播放器只同步到「第几话」，具体秒数由官方播放器自己记住。</p>
+      <p class="wb-legend" id="wbAirLegend">番剧贴 B 站番剧链接后，更新日 / 时间 / 最新集数 / 完结状态每天自动同步；手填的更新日与时间优先。漫画和各站没有统一日历，手填一次即可。B 站播放器只同步到「第几话」，具体秒数由官方播放器自己记住。</p>
     </section>
   </div>
 
@@ -688,7 +709,7 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
   var filter = "all";       /* 当前状态筛选 */
   var airDay = null;        /* 本周放送选中的星期；null = 今天 */
   var wbCat = "all";        /* 接着追的栏目筛选：all / anime / comic */
-  var syncing = false;      /* 放送表正在补全，防止重复点 */
+  var syncing = false;      /* 资料正在同步，防止重复点 */
   var SYNC_KEY = "eraser.airing.sync";
   var CAT_NAME = { anime: "追番", comic: "漫画" };
 
@@ -707,7 +728,7 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
     return v !== null && v !== undefined && v !== "";
   }
   /* 与服务端 api/_lib/airing.js 认的是同一类链接：B 站番剧 ss / ep / md 页。
-     只用来决定「要不要发补全请求」，真正能否解析仍以接口为准。 */
+     只用来决定「要不要发同步请求」，真正能否解析仍以接口为准。 */
   function isBiliUrl(u) {
     try {
       var x = new URL(u);
@@ -721,21 +742,26 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
   }
 
   /* 一张海报 */
-  /* 进度：progress = 看到第几集，episodes = 总集数。两个都可空。
-     - 都有 → 画进度条 + 「12 / 28」
-     - 只有总集数 → 只显示「共 28 话」
-     - 只有进度   → 只显示「看到 12 话」（连载中不知道总数很正常） */
+  /* 进度：progress = 看到第几集，episodes = 总集数，latest = 上游最新一集。
+     - 有进度 + 分母 → 画进度条 + 「8 / 12」（分母优先总集数，缺失时用最新集数）
+     - 只有最新集数 → 「更至 12 话」；上游已完结 → 「共 12 话」
+     - 只有进度    → 「看到 12 话」（连载中不知道总数很正常） */
   function progressOf(d) {
-    var hasCur = d.progress !== null && d.progress !== undefined && d.progress !== "";
-    var hasTot = d.episodes !== null && d.episodes !== undefined && d.episodes !== "";
-    if (!hasCur && !hasTot) return null;
+    var hasCur = hasValue(d.progress);
+    var hasTot = hasValue(d.episodes);
+    var hasLatest = hasValue(d.latest);
+    if (!hasCur && !hasTot && !hasLatest) return null;
     var cur = hasCur ? Number(d.progress) : null;
     var tot = hasTot ? Number(d.episodes) : null;
-    if (cur != null && tot != null && tot > 0) {
-      return { pct: Math.max(0, Math.min(100, Math.round(cur / tot * 100))), text: cur + " / " + tot };
+    var latest = hasLatest ? Number(d.latest) : null;
+    var denom = tot != null && (latest == null || tot >= latest) ? tot : latest;
+    if (cur != null && denom != null && denom > 0) {
+      var pct = window.Workbench ? Workbench.epPct(d) : null;
+      return { pct: pct, text: cur + " / " + denom };
     }
-    if (tot != null) return { pct: null, text: "共 " + tot + " 话" };
-    return { pct: null, text: "看到 " + cur + " 话" };
+    if (cur != null) return { pct: null, text: "看到 " + cur + " 话" };
+    if (latest != null) return { pct: null, text: (d.finished === true ? "共 " : "更至 ") + latest + " 话" };
+    return { pct: null, text: "共 " + tot + " 话" };
   }
 
   function makeCard(it, lab) {
@@ -756,6 +782,9 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
       img.src = cover;
       img.alt = "";
       img.loading = "lazy";
+      img.decoding = "async";
+      /* 不少图床会检查 Referer；不带来源更容易正常显示（B 站图床实测可用） */
+      img.referrerPolicy = "no-referrer";
       /* 图挂了就换成渐变兜底，不让卡片空着 */
       img.addEventListener("error", function () {
         if (!img.parentNode) return;
@@ -787,6 +816,11 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
         bar.appendChild(track);
       }
       bar.appendChild(el("span", "txt", pg.text));
+      /* 「想看」不计欠账；只要在追 / 有进度，就把还在前面的集数标出来 */
+      var fresh = window.Workbench ? Workbench.freshCount(d) : 0;
+      if (fresh > 0 && (d.status === "watching" || Number(d.progress) > 0)) {
+        bar.appendChild(el("span", "fresh", "新 " + fresh));
+      }
       mask.appendChild(bar);
     }
     mask.appendChild(el("div", "nm", d.name || "(未命名)"));
@@ -1123,6 +1157,8 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
       img.src = cover;
       img.alt = "";
       img.loading = "lazy";
+      img.decoding = "async";
+      img.referrerPolicy = "no-referrer";
       img.addEventListener("error", function () {
         if (img.parentNode) img.parentNode.removeChild(img);
         box.appendChild(el("span", "fb", firstChar(d.name)));
@@ -1191,6 +1227,10 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
     var info = el("div", "wb-info");
     var name = el("div", "wb-name");
     name.appendChild(el("span", "t", d.name || "(未命名)"));
+    var fresh = window.Workbench ? Workbench.freshCount(d) : 0;
+    if (fresh > 0 && (d.status === "watching" || Number(d.progress) > 0)) {
+      name.appendChild(el("span", "wb-new", "新 " + fresh + " 话"));
+    }
     var src = sourceLabel(d);
     if (src) name.appendChild(el("span", "wb-src", src));
     info.appendChild(name);
@@ -1354,10 +1394,12 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
     dayItems.forEach(function (it) { listBox.appendChild(airRow(it)); });
   }
 
-  /* ==================== 放送表自动补全（M21） ====================
+  /* ==================== 追更资料自动同步（M21 / M22） ====================
      数据源：B 站公开番剧资料（api/_lib/airing.js 解析，走 ?action=airing）。
      原则：
-       - 只补「空」的字段，绝不覆盖手填的更新日 / 时间 / 封面 / 评分
+       - 自动补更新日 / 时间 / 封面 / 评分 / 总集数 / 最新集数 / 完结状态
+       - 手填的更新日 / 时间 / 封面 / 评分不被覆盖；总集数只增不减
+       - 只动元数据，绝不动用户自己的 progress / status
        - 写入时 touch:false，不改 updated_at，不打乱「接着追」的排序
        - 登录状态下每天最多自动跑一次；手动按钮随时可再跑
        - 漫画没有稳定的公开日历，不在这里瞎猜，保留手填 */
@@ -1366,8 +1408,7 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
       var d = it.data || {};
       if (d.category !== "anime") return false;
       if (d.status === "finished" || d.status === "paused") return false;
-      if (!isBiliUrl(safeUrl(d.url))) return false;
-      return !hasValue(d.airday) || !hasValue(d.airtime);
+      return !!isBiliUrl(safeUrl(d.url));
     });
   }
 
@@ -1389,10 +1430,21 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
 
   function airingPatch(d, info) {
     var patch = {};
+    /* 上游确认整季完结：只记元数据，不替用户改 status；
+       工作台会据此把它移出「本周放送」，但「接着追」里仍然保留。 */
+    if (info.finished === true && d.finished !== true) patch.finished = true;
+    else if (info.finished === false && d.finished === true) patch.finished = false;
     if (!hasValue(d.airday) && info.airday) patch.airday = info.airday;
     if (!hasValue(d.airtime) && info.airtime) patch.airtime = info.airtime;
     if (!hasValue(d.cover) && info.cover) patch.cover = info.cover;
     if (!hasValue(d.score) && info.score != null) patch.score = info.score;
+    /* 最新集数只增不减；总集数只补空或向上修正，避免把连载中的 0 写死 */
+    var latest = Number(info.latest);
+    if (Number.isInteger(latest) && latest > 0 &&
+        (!hasValue(d.latest) || latest > Number(d.latest))) patch.latest = latest;
+    var eps = Number(info.episodes);
+    if (Number.isInteger(eps) && eps > 0 &&
+        (!hasValue(d.episodes) || eps > Number(d.episodes))) patch.episodes = eps;
     return patch;
   }
 
@@ -1403,25 +1455,25 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
     if (!n) {
       btn.style.display = "none";
       btn.disabled = false;
-      btn.textContent = "补全放送表";
+      btn.textContent = "同步资料";
       return;
     }
     btn.style.display = "";
     btn.disabled = syncing;
-    btn.textContent = syncing ? "补全中…" : "补全 " + n + " 部";
+    btn.textContent = syncing ? "同步中…" : "同步 " + n + " 部";
   }
 
   function syncSchedules(opts) {
     if (syncing) return;
     var list = syncCandidates(allItems);
     if (!list.length) {
-      if (opts && opts.manual && window.Owner) Owner.toast("放送表已经齐了", "ok");
+      if (opts && opts.manual && window.Owner) Owner.toast("没有需要同步的 B 站番剧", "ok");
       return;
     }
     syncing = true;
     updateSyncBtn();
 
-    var filled = 0, skipped = 0, failed = 0, authLost = false;
+    var filled = 0, fresh = 0, skipped = 0, failed = 0, authLost = false;
     var i = 0;
 
     function finish() {
@@ -1432,16 +1484,17 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
         if (window.Owner) Owner.toast("登录已过期，先按 Ctrl/⌘+Shift+L 重新登录", "err");
         return;
       }
+      var extra = fresh ? "，其中 " + fresh + " 部有新一话" : "";
       if (opts && opts.manual) {
         if (filled) {
-          if (window.Owner) Owner.toast("已补全 " + filled + " 部放送时间", "ok");
+          if (window.Owner) Owner.toast("已同步 " + filled + " 部资料" + extra, "ok");
         } else if (failed) {
           if (window.Owner) Owner.toast("有 " + failed + " 部没查到，稍后再试", "err");
         } else {
-          if (window.Owner) Owner.toast("B 站没写更新时间的要手填", "");
+          if (window.Owner) Owner.toast("资料已经是最新的", "");
         }
       } else if (filled && window.Owner) {
-        Owner.toast("已自动补全 " + filled + " 部放送时间", "ok");
+        Owner.toast("已同步 " + filled + " 部资料" + extra, "ok");
       }
     }
 
@@ -1453,9 +1506,13 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
         if (!j.supported || !j.data) { skipped++; return step(); }
         var patch = airingPatch(d, j.data);
         if (!Object.keys(patch).length) { skipped++; return step(); }
+        /* 先判断再合并：patch.latest 比当前进度大才算「有新一话」 */
+        var gained = hasValue(patch.latest) && hasValue(d.progress) &&
+          Number(patch.latest) > Number(d.progress);
         return patchMedia(it.id, patch, { touch: false }).then(function () {
           Object.keys(patch).forEach(function (k) { d[k] = patch[k]; });
           filled++;
+          if (gained) fresh++;
           step();
         }, function () {
           failed++;
@@ -1802,7 +1859,7 @@ html[data-theme="dark"] .watch-btn.hot { color: #fff; }
         canEdit = !!getToken();   /* 有令牌才画「＋1 话」，必须先于 apply */
         apply((j && j.items) || []);
         setupQuickAdd();   /* 数据到手后再决定是否显示按钮，避免闪一下 */
-        autoSyncSchedules();   /* 每天最多一次，只补空字段 */
+        autoSyncSchedules();   /* 每天最多一次，只动元数据 */
       })
       .catch(function () {
         ["anime", "comic"].forEach(function (k) {

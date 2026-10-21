@@ -82,9 +82,11 @@ console.log('\n=== 接着看：收谁 ===');
     item('d', { status: 'wish' }),
     item('e', { status: 'finished', progress: 28 }),
     item('f', { status: 'paused', progress: 5 }),
+    item('g', { status: 'watching', progress: 5, finished: true }),
   ]);
   const ids = list.map(x => x.id).join(',');
-  check('在看的、有进度的进来；想看没进度、完结、搁置不进来', ids === 'a,b,c', ids);
+  check('在看的、有进度的进来；想看没进度、完结、搁置不进来', ids === 'a,b,c,g', ids);
+  check('上游完结但自己没看完的仍在接着追', list.some(x => x.id === 'g'));
   check('null 输入不炸', W.continueList(null).length === 0);
 }
 
@@ -106,11 +108,12 @@ console.log('\n=== 本周放送 ===');
     item('wed-none', { airday: 3 }),
     item('wed-done', { airday: 3, status: 'finished' }),
     item('wed-paused', { airday: 3, status: 'paused' }),
+    item('wed-upstream-done', { airday: 3, airtime: '21:00', finished: true }),
     item('fri', { airday: 5, airtime: '20:00' }),
     item('no-day', { status: 'watching' }),
   ];
   const wed = W.scheduleFor(items, 3);
-  check('只收周三、排除完结/搁置/没填更新日', wed.map(x => x.id).join(',') === 'wed-early,wed-late,wed-none',
+  check('只收周三、排除完结/搁置/上游完结/没填更新日', wed.map(x => x.id).join(',') === 'wed-early,wed-late,wed-none',
     wed.map(x => x.id).join(','));
   check('按更新时间升序，没填时间的排最后', wed[2].id === 'wed-none', wed[2].id);
   check('周五各自归位', W.scheduleFor(items, 5).map(x => x.id).join(',') === 'fri');
@@ -120,7 +123,7 @@ console.log('\n=== 本周放送 ===');
   const counts = W.dayCounts(items);
   check('计数数组下标 1–7 对应周一到周日', counts.length === 8 && counts[3] === 3 && counts[5] === 1,
     JSON.stringify(counts));
-  check('完结/搁置不计入放送数', counts[3] === 3, String(counts[3]));
+  check('完结/搁置/上游完结不计入放送数', counts[3] === 3, String(counts[3]));
 }
 
 console.log('\n=== 进度文案 ===');
@@ -131,16 +134,37 @@ console.log('\n=== 进度文案 ===');
   check('缺进度 → null', W.epPct({ episodes: 28 }) === null);
   check('缺总数 → null', W.epPct({ progress: 3 }) === null);
   check('总集数为 0 → null', W.epPct({ progress: 0, episodes: 0 }) === null);
+  check('只有最新集数也能画进度（8 / 12）', W.epPct({ progress: 8, latest: 12 }) === 67,
+    String(W.epPct({ progress: 8, latest: 12 })));
+  check('有总集数时优先用总集数（8 / 28）', W.epPct({ progress: 8, episodes: 28, latest: 12 }) === 29,
+    String(W.epPct({ progress: 8, episodes: 28, latest: 12 })));
+  check('总集数比最新集数还小 → 用最新集数兜底', W.epPct({ progress: 8, episodes: 12, latest: 20 }) === 40,
+    String(W.epPct({ progress: 8, episodes: 12, latest: 20 })));
+
+  check('新 4 话', W.freshCount({ progress: 8, latest: 12 }) === 4);
+  check('追平后没有新集', W.freshCount({ progress: 12, latest: 12 }) === 0);
+  check('没填进度不算欠账', W.freshCount({ latest: 12 }) === 0 && W.freshCount({ progress: 8 }) === 0);
+  check('非法进度不炸', W.freshCount({ progress: -2, latest: 12 }) === 0 && W.freshCount(null) === 0);
 
   check('有进度有总数', W.watchedText({ progress: 12, episodes: 28 }) === '看到 12 / 28 话');
   check('只有进度', W.watchedText({ progress: 12 }) === '看到第 12 话');
   check('只有总数', W.watchedText({ episodes: 28 }) === '共 28 话');
   check('都没有', W.watchedText({}) === '还没开始');
+  check('有最新集数时提示更新到哪', W.watchedText({ progress: 8, latest: 12 }) === '看到 8 / 更新至 12 话');
+  check('追平最新一话', W.watchedText({ progress: 12, latest: 12 }) === '已追平 · 更新至 12 话');
+  check('上游完结但没看完', W.watchedText({ progress: 8, latest: 12, finished: true }) === '看到 8 / 共 12 话');
+  check('上游完结且追平', W.watchedText({ progress: 12, latest: 12, finished: true }) === '已追平 · 共 12 话');
+  check('只有最新集数', W.watchedText({ latest: 12 }) === '更新至第 12 话');
+  check('只有最新集数且已完结', W.watchedText({ latest: 12, finished: true }) === '共 12 话');
 
   check('下一话', W.nextEpText({ progress: 12, episodes: 28 }) === '下一话 第 13 话');
   check('追平了', W.nextEpText({ progress: 28, episodes: 28 }) === '已追平 · 共 28 话');
   check('只有总数时的下一话文案', W.nextEpText({ episodes: 28 }) === '共 28 话');
   check('没进度没总数', W.nextEpText({}) === '待开看');
+  check('最新集数决定下一话', W.nextEpText({ progress: 8, episodes: 28, latest: 12 }) === '下一话 第 9 话');
+  check('追平最新一话（总集数还没到）', W.nextEpText({ progress: 12, episodes: 28, latest: 12 }) === '已追平 · 更新至 12 话');
+  check('上游完结且追平', W.nextEpText({ progress: 12, latest: 12, finished: true }) === '已追平 · 共 12 话');
+  check('只有最新集数', W.nextEpText({ latest: 12 }) === '更新至第 12 话');
 
   check('续播剩余分钟（向上取整）', W.remainingText({ position: 100, duration: 700 }) === '还剩约 10 分钟',
     W.remainingText({ position: 100, duration: 700 }));

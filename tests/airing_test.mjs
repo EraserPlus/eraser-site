@@ -106,6 +106,31 @@ console.log('\n=== 最近一集正片（跳过预告 / PV）===');
   check('episodes 不是数组 → null', A.latestMainEpisode({}) === null && A.latestMainEpisode(null) === null);
 }
 
+console.log('\n=== 集数解析（只认明确整数）===');
+{
+  check('title "196" → 196', A.episodeNumber({ title: '196' }) === 196);
+  check('show_title「第196话 标题」→ 196',
+        A.episodeNumber({ title: '特别篇', show_title: '第196话 慕兰之战20' }) === 196);
+  check('index_show「更新至第196话」→ 196',
+        A.episodeNumber({ index_show: '更新至第196话' }) === 196);
+  check('「12话」→ 12', A.episodeNumber({ title: '12话' }) === 12);
+  check('2.5 话不硬猜 → null', A.episodeNumber({ title: '2.5', show_title: '第2.5话' }) === null);
+  check('PV / 预告没有集数 → null',
+        A.episodeNumber({ title: 'PV', show_title: '正式PV' }) === null);
+  check('0 不算有效集数', A.episodeNumber({ title: '0' }) === null);
+  check('空值不炸', A.episodeNumber(null) === null && A.episodeNumber({}) === null);
+
+  const withEps = { episodes: [
+    { pub_time: 100, title: '11', show_title: '第11话' },
+    { pub_time: 200, title: '12', show_title: '第12话' },
+    { pub_time: 300, title: '13', show_title: '第13话预告', badge: '预告' },
+  ] };
+  check('最新正片集数 = 12（预告不算）', A.latestEpisodeNumber(withEps) === 12);
+  check('没有正片时用 new_ep 兜底',
+        A.latestEpisodeNumber({ episodes: [], new_ep: { title: '7' } }) === 7);
+  check('都没有 → null', A.latestEpisodeNumber({ episodes: [] }) === null);
+}
+
 console.log('\n=== season 归一化 ===');
 {
   const base = {
@@ -128,6 +153,8 @@ console.log('\n=== season 归一化 ===');
   check('标题 / 封面 / 评分带回来', s.title === '凡人修仙传' && /hdslb/.test(s.cover) && s.score === 9.7);
   check('连载中：matched = true', s.finished === false && s.matched === true);
   check('预告不影响结果（样例里预告比正片晚 15 分钟）', s.airtime === '11:00');
+  check('最新集数 = 196', s.latest === 196, String(s.latest));
+  check('连载中 total=0 → 总集数留空', s.episodes === null, String(s.episodes));
 
   const noDesc = A.shapeSeason(Object.assign({}, base, { new_ep: { desc: '', title: '196' } }));
   check('文案没写星期 → 用最近一集正片（周六 11:00）',
@@ -141,9 +168,16 @@ console.log('\n=== season 归一化 ===');
 
   const ended = A.shapeSeason(Object.assign({}, base, { publish: { is_finish: 1, is_started: 1 } }));
   check('完结番不再给放送时间', ended.finished === true && ended.airday === null && ended.airtime === null);
+  check('完结且 total=0 → 用最新集数当总集数', ended.episodes === 196 && ended.latest === 196,
+        JSON.stringify([ended.episodes, ended.latest]));
+
+  const totalKnown = A.shapeSeason(Object.assign({}, base, { total: 28 }));
+  check('上游给了总集数就用 total', totalKnown.episodes === 28 && totalKnown.latest === 196,
+        JSON.stringify([totalKnown.episodes, totalKnown.latest]));
 
   const empty = A.shapeSeason({ season_id: 1, episodes: [] });
   check('没有任何可用信息 → matched = false', empty && empty.matched === false && empty.airday === null);
+  check('没有集数时 latest 留空', empty.latest === null && empty.episodes === null);
   check('非对象 → null', A.shapeSeason(null) === null && A.shapeSeason('x') === null);
 }
 

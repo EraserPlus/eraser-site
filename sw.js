@@ -23,7 +23,8 @@
 /* v4 → v5：M19 追更页站内播放（watch.js、collect 弹层、续播点字段） */
 /* v5 → v6：M20 个人追更工作台（workbench.js、collect 接着看 / 本周放送、airday/airtime） */
 /* v6 → v7：M21 漫画对等 + B 站放送表自动补全（collect 交互与样式） */
-const VERSION = 'eraser-v7';
+/* v7 → v8：M22 追更资料自动同步（最新集数 / 完结）+ 播放结束确认条 */
+const VERSION = 'eraser-v8';
 const CACHE = VERSION;
 
 /* 预缓存：离线时至少能打开首页外壳（页面本体走 network-first，这是兜底） */

@@ -624,7 +624,10 @@ console.log('\n=== 内容接口 /api/content ===');
   /* PATCH 只改进度：合并语义不能把总集数冲掉（前台「＋1」就靠这个） */
   fakeDb((t) => {
     if (/SELECT \* FROM content WHERE id/.test(t)) {
-      return [row({ id: 7, type: 'media', data: { category: 'anime', name: '芙莉莲', status: 'watching', episodes: 28, progress: 12 } })];
+      return [row({ id: 7, type: 'media', data: {
+        category: 'anime', name: '芙莉莲', status: 'watching',
+        episodes: 28, progress: 12, latest: 14, finished: false,
+      } })];
     }
     if (/UPDATE content/.test(t)) return [row({ id: 7, type: 'media' })];
     return [];
@@ -636,6 +639,8 @@ console.log('\n=== 内容接口 /api/content ===');
     const payload = up ? String(up.values && up.values[0]) : '';
     check('PATCH 合并后 total 保留、progress 前进',
           /"episodes":28/.test(payload) && /"progress":13/.test(payload), payload.slice(0, 200));
+    check('PATCH 合并后 latest / finished 也保留',
+          /"latest":14/.test(payload) && /"finished":false/.test(payload), payload.slice(0, 300));
   }
 
   /* 超上限 */
@@ -1084,6 +1089,9 @@ console.log('\n=== 放送表自动补全 /api/content?action=airing（B 站）==
           calls[0] && calls[0].url);
     check('解析出周六 11:00', r.json.data.airday === 6 && r.json.data.airtime === '11:00', JSON.stringify(r.json.data));
     check('带上标题 / 封面 / 评分', r.json.data.title === '凡人修仙传' && /hdslb/.test(r.json.data.cover) && r.json.data.score === 9.7);
+    check('带回最新集数 196', r.json.data.latest === 196, String(r.json.data.latest));
+    check('连载中 total=0 时总集数留空', r.json.data.episodes === null, String(r.json.data.episodes));
+    check('连载中 finished=false', r.json.data.finished === false);
     check('首次查询不是缓存', r.json.cached !== true);
 
     calls = [];
@@ -1102,6 +1110,24 @@ console.log('\n=== 放送表自动补全 /api/content?action=airing（B 站）==
     });
     check('ep 链接走 ep_id 参数',
           calls.length === 1 && /[?&]ep_id=3854820/.test(calls[0].url), calls[0] && calls[0].url);
+
+    stubFetch(() => Promise.resolve(seasonJson(Object.assign({}, fixture, {
+      season_id: 55555,
+      total: 0,
+      new_ep: { desc: '', title: '12' },
+      publish: { is_finish: 1, is_started: 1 },
+      episodes: [{ pub_time: 1792206000, title: '12', show_title: '第12话' }],
+    }))));
+    r = await call(airRoute, 'GET', {
+      token: TOKEN,
+      query: { action: 'airing', url: 'https://www.bilibili.com/bangumi/play/ss55555' },
+    });
+    check('完结番 finished=true 且不再给放送时间',
+          r.json.data.finished === true && r.json.data.airday === null && r.json.data.airtime === null,
+          JSON.stringify(r.json.data));
+    check('完结且 total=0 → 用最新集数当总集数',
+          r.json.data.latest === 12 && r.json.data.episodes === 12,
+          JSON.stringify([r.json.data.latest, r.json.data.episodes]));
 
     stubFetch(() => Promise.reject(new Error('network down')));
     r = await call(airRoute, 'GET', {
