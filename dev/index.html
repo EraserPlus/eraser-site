@@ -82,7 +82,7 @@ html[data-theme="dark"] .steps li::before { color: #0d1117; }
     <tr><th>数据库</th><td>Neon Postgres，四张表：content（七种内容共用，新增类型不用建表）/ todos / events / meta（键值小仓库，存 AI 令牌世代号等）</td></tr>
     <tr><th>后台</th><td><code>/admin/</code> 密码登录（站长持有），9 个标签：今天 / 待办 / 日程 / 导航 / 博客 / 追更 / 学习 / 页面 / 数据</td></tr>
     <tr><th>测试</th><td>十二套 1919 项，一条命令：<code>npm test</code>。提交前必须全绿</td></tr>
-    <tr><th>当前版本</th><td>main @ <code>a6eac1d</code> · 最近批次 <b>M20 个人追更工作台：接着看 + 本周放送 + 点开自动转「在看」</b>（2026-10-21，已上线）</td></tr>
+    <tr><th>当前版本</th><td>main @ <code>198680d</code> · 最近批次 <b>M20 个人追更工作台：接着看 + 本周放送 + 点开自动转「在看」</b>（2026-10-21，已上线，PR #40）</td></tr>
   </table>
 
   <h2>2. 工作流程（六步，别跳步）</h2>
@@ -238,7 +238,7 @@ done < /tmp/main_tree.tsv</code></pre>
     <div class="row"><span class="no">M17</span><span class="what"><b>站主就地编辑（后台与前台合并）</b>：新增 <code>owner.js</code> + <code>owner.css</code>，任意可编辑页按 <code>Ctrl/⌘+Shift+L</code> 登录（与后台共用 <code>eraser.admin.token</code>），博客 / 文章 / 关于 / 导航 / 追更 / 学习地图原地新建、编辑、删除；访客看不到入口、草稿不进公开列表；表单与 Markdown 预览全部复用 <code>admin/content.js</code></span><span class="when">10-21</span></div>
     <div class="row"><span class="no">M18</span><span class="what"><b>阅读便利</b>：正文续读（只存百分比、30 天过期）、字号 90%–130%、标题锚点复制、复制链接 / 打印、图片灯箱、回到顶部；博客列表显示「约 N 分钟 · 读到 55%」与 RSS 入口；移动端顶栏 126px → 90px，列表「阅读」按钮不再竖排（M14–M18 合并推送 main @ <code>4c208b2</code>）</span><span class="when">10-21</span></div>
     <div class="row"><span class="no">M19</span><span class="what"><b>追更站内播放</b>：新增 <code>watch.js</code>——B 站 / YouTube / Vimeo 官方嵌入 + mp4 直链，海报上出现 ▶；media 新增 <code>position / duration</code>，播放每 15 秒自动保存、关闭补存；「＋1 话」把续播点归零，已看完从头播；<b>B 站官方 iframe 拿不到播放时间，只同步集数</b>；未登录可看不记录；<b>没有新开接口</b>（12 函数上限，复用 <code>PATCH /api/content</code>）；<code>sw.js</code> → v5（2026-10-21）</span><span class="when">10-21</span></div>
-    <div class="row latest"><span class="no">M20</span><span class="what"><b>个人追更工作台</b>：<code>/collect/</code> 顶部改成两栏——左「接着看」（在追 / 有进度，按最近更新排，缩略图 + 进度 + 下一话 + 直接开播），右「本周放送」（7 个星期格 + 当天列表，按更新时间排序）；media 新增 <code>airday / airtime</code>（编辑表单、快速添加、批量导入导出、后台列表都支持）；点开播放器自动把「想看」转「在看」；新增纯逻辑 <code>workbench.js</code> + <code>tests/workbench_test.mjs</code>；<b>没有新开接口</b>，<code>sw.js</code> → v6（2026-10-21）</span><span class="when">10-21</span></div>
+    <div class="row latest"><span class="no">M20</span><span class="what"><b>个人追更工作台</b>：<code>/collect/</code> 顶部改成两栏——左「接着看」（在追 / 有进度，按最近更新排，缩略图 + 进度 + 下一话 + 直接开播），右「本周放送」（7 个星期格 + 当天列表，按更新时间排序）；media 新增 <code>airday / airtime</code>（编辑表单、快速添加、批量导入导出、后台列表都支持）；点开播放器自动把「想看」转「在看」；新增纯逻辑 <code>workbench.js</code> + <code>tests/workbench_test.mjs</code>；<b>没有新开接口</b>，<code>sw.js</code> → v6（2026-10-21，PR #40）</span><span class="when">10-21</span></div>
   </div>
 
   <h2>7. 当前待办 / 已知事项</h2>
