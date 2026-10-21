@@ -143,9 +143,27 @@ console.log('\n=== media（追更）===');
   check('进度负数报错', code(() => C.normalize('media', { ...base, progress: -1 })) === 'BAD_INPUT');
   check('进度非数字报错', code(() => C.normalize('media', { ...base, progress: '看到12话' })) === 'BAD_INPUT');
   check('进度超上限报错', code(() => C.normalize('media', { ...base, progress: 999999 })) === 'BAD_INPUT');
+
+  /* 自动同步来的最新集数 / 上游完结标记（M22） */
+  check('最新集数默认是 null', empty.latest === null);
+  check('最新集数接受数字字符串', C.normalize('media', { ...base, latest: '196' }).latest === 196);
+  check('最新集数为 0 合法（还没更新）', C.normalize('media', { ...base, latest: 0 }).latest === 0);
+  check('最新集数小数报错', code(() => C.normalize('media', { ...base, latest: 12.5 })) === 'BAD_INPUT');
+  check('最新集数负数报错', code(() => C.normalize('media', { ...base, latest: -1 })) === 'BAD_INPUT');
+  check('上游完结标记默认是 null', empty.finished === null);
+  check('上游完结标记接受 true / false',
+        C.normalize('media', { ...base, finished: true }).finished === true &&
+        C.normalize('media', { ...base, finished: false }).finished === false);
+  check('上游完结标记只认布尔值', C.normalize('media', { ...base, finished: 'yes' }).finished === null);
+
   /* PATCH 是「先合并再归一化」，所以只改 progress 不会把 episodes 冲掉 */
   const merged = C.normalize('media', { ...C.normalize('media', { ...base, episodes: 28, progress: 12 }), progress: 13 });
   check('合并语义：只改进度不会丢掉总集数', merged.episodes === 28 && merged.progress === 13);
+  const mergedMeta = C.normalize('media', Object.assign(
+    C.normalize('media', { ...base, episodes: 28, latest: 12, finished: true }), { progress: 9 }));
+  check('合并语义：只改进度不会丢 latest / finished',
+        mergedMeta.latest === 12 && mergedMeta.finished === true && mergedMeta.progress === 9,
+        JSON.stringify(mergedMeta));
 
   /* 站内播放续播点（M19）：position / duration，秒，可空 */
   check('播放位置/时长默认是 null', empty.position === null && empty.duration === null);

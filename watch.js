@@ -6,6 +6,7 @@
      ② 开弹层：在站内用官方 iframe 播放；直链 mp4/webm/ogv 用 <video>
      ③ 记续播点：能读到时间的来源（YouTube / Vimeo / 直链）每 15 秒
         和关闭时 PATCH 一次 position/duration；B 站不开放时间，只记集数
+     ④ 播完提醒：确认条问「记到第 N 话？」，用户点了才 +1，绝不自动改进度
 
    安全边界（重要）：
      - 只接受白名单来源，iframe 地址由解析出的 ID 重新拼，绝不直接用用户填的 URL
@@ -173,6 +174,23 @@
     return h ? h + ":" + two(m) + ":" + two(s) : m + ":" + two(s);
   }
 
+  /* 一集播完后的建议：只给「下一话」，绝不自动写进度。
+     latest 是 B 站资料里的最新一集；已经追平时不提示再 +1，
+     避免把进度记到还没更新的集数上（手动「＋1」仍保留，方便看其他来源）。 */
+  function endedPlan(d) {
+    var cur = Number(d && d.progress);
+    if (!Number.isFinite(cur) || cur < 0) cur = 0;
+    cur = Math.floor(cur);
+    var latest = Number(d && d.latest);
+    if (!Number.isFinite(latest) || latest <= 0) latest = null;
+    var next = cur + 1;
+    return {
+      next: next,
+      latest: latest,
+      caughtUp: latest != null && next > latest,
+    };
+  }
+
   function safeUrl(u) {
     u = text(u);
     return /^https?:\/\//i.test(u) ? u : "";
@@ -224,6 +242,24 @@
 
     var stage = el("div", "watch-stage");
     panel.appendChild(stage);
+
+    /* 播完后的确认条：只在用户点「记到第 N 话」时才写 progress。
+       B 站 iframe 拿不到 ended，不会出现；YouTube / Vimeo / 直链才会。 */
+    var endedBox = el("div", "watch-ended");
+    endedBox.hidden = true;
+    var endedText = el("span", "watch-ended-t", "");
+    endedText.setAttribute("aria-live", "polite");
+    var endedYes = el("button", "watch-btn primary", "＋1 话");
+    endedYes.type = "button";
+    var endedNo = el("button", "watch-btn", "先不记");
+    endedNo.type = "button";
+    endedBox.appendChild(endedText);
+    endedBox.appendChild(endedYes);
+    endedBox.appendChild(endedNo);
+    panel.appendChild(endedBox);
+
+    var endedShown = false;
+    var endedDismissed = false;
 
     var foot = el("div", "watch-foot");
     var meta = el("div", "watch-meta");
@@ -364,6 +400,24 @@
       flush(false);
     }
 
+    /* 播放器报「播完」时弹一条确认。同一集只提示一次，
+       用户点「先不记」或已经 +1 之后都不再打扰。 */
+    function showEndPrompt() {
+      if (!plusBtn || !canEdit || info.provider === "bilibili") return;
+      if (episodeAdvanced || endedDismissed || endedShown) return;
+      var plan = endedPlan(d);
+      endedShown = true;
+      if (plan.caughtUp) {
+        setMeta((epText() ? epText() + " · " : "") + "这集看完了，已经追平最新第 " + plan.latest + " 话");
+        return;
+      }
+      endedText.textContent = plan.latest == null
+        ? "这集看完了，要记到下一话吗？"
+        : "这集看完了，要记到第 " + plan.next + " 话吗？";
+      endedYes.textContent = plan.latest == null ? "＋1 话" : "记到第 " + plan.next + " 话";
+      endedBox.hidden = false;
+    }
+
     /* ------------------------------ 官方 iframe ------------------------------ */
     function ytListen() {
       if (!frame || !frame.contentWindow) return;
@@ -399,10 +453,12 @@
         /* 播放中 / 暂停 / 结束都会推 infoDelivery，暂停与结束立即落盘 */
         if (typeof i.currentTime === "number") noteTime(i.currentTime, i.duration);
         if (i.playerState === 0 || i.playerState === 2) flush(false);
+        if (i.playerState === 0) showEndPrompt();
         return;
       }
       if (isYt && data.event === "onStateChange") {
         if (data.info === 0 || data.info === 2) flush(false);
+        if (data.info === 0) showEndPrompt();
         return;
       }
       if (isVimeo && data.event === "ready") {
@@ -414,7 +470,10 @@
         if (typeof data.data.seconds === "number") noteTime(data.data.seconds, data.data.duration);
         return;
       }
-      if (isVimeo && data.event === "ended") flush(false);
+      if (isVimeo && data.event === "ended") {
+        flush(false);
+        showEndPrompt();
+      }
     }
 
     if (info.provider === "video") {
@@ -433,7 +492,10 @@
         noteTime(video.currentTime, video.duration);
       });
       video.addEventListener("pause", function () { flush(false); });
-      video.addEventListener("ended", function () { flush(false); });
+      video.addEventListener("ended", function () {
+        flush(false);
+        showEndPrompt();
+      });
       video.addEventListener("error", function () {
         var err = el("div", "watch-error");
         err.appendChild(el("p", null, "这个直链没能播放，可能是格式不支持、需要登录或对方限制了跨站播放。"));
@@ -485,37 +547,47 @@
     }
 
     /* ------------------------------ 交互 ------------------------------ */
-    if (plusBtn) {
-      plusBtn.addEventListener("click", function () {
-        plusBtn.disabled = true;
-        var old = plusBtn.textContent;
-        plusBtn.textContent = "记录中…";
-        opts.plus(function (next) {
-          d.progress = next;
-          hot = false;
-          episodeAdvanced = true;
-          /* 新一集从零开始：停掉本集的续播点写入，避免把上一集的时间盖回去 */
-          canSave = false;
-          curTime = null;
-          curDur = null;
-          resume = 0;
-          lastPos = 0;
-          lastDur = -1;
-          plusBtn.classList.remove("hot");
-          plusBtn.textContent = "已记到第 " + next + " 话";
-          renderMeta();
-          if (typeof opts.toast === "function") opts.toast("进度已记到第 " + next + " 话", "ok");
-          setTimeout(function () {
-            plusBtn.textContent = "＋1 话";
-            plusBtn.disabled = false;
-          }, 1800);
-        }, function (msg) {
-          plusBtn.textContent = old;
+    function advanceEpisode() {
+      if (!plusBtn || plusBtn.disabled) return;
+      plusBtn.disabled = true;
+      endedYes.disabled = true;
+      var old = plusBtn.textContent;
+      plusBtn.textContent = "记录中…";
+      opts.plus(function (next) {
+        d.progress = next;
+        hot = false;
+        episodeAdvanced = true;
+        /* 新一集从零开始：停掉本集的续播点写入，避免把上一集的时间盖回去 */
+        canSave = false;
+        curTime = null;
+        curDur = null;
+        resume = 0;
+        lastPos = 0;
+        lastDur = -1;
+        plusBtn.classList.remove("hot");
+        plusBtn.textContent = "已记到第 " + next + " 话";
+        endedBox.hidden = true;
+        endedYes.disabled = false;
+        renderMeta();
+        if (typeof opts.toast === "function") opts.toast("进度已记到第 " + next + " 话", "ok");
+        setTimeout(function () {
+          plusBtn.textContent = "＋1 话";
           plusBtn.disabled = false;
-          if (typeof opts.toast === "function") opts.toast(msg || "没记上，稍后再试", "err");
-        });
+        }, 1800);
+      }, function (msg) {
+        plusBtn.textContent = old;
+        plusBtn.disabled = false;
+        endedYes.disabled = false;
+        if (typeof opts.toast === "function") opts.toast(msg || "没记上，稍后再试", "err");
       });
     }
+
+    if (plusBtn) plusBtn.addEventListener("click", advanceEpisode);
+    endedYes.addEventListener("click", advanceEpisode);
+    endedNo.addEventListener("click", function () {
+      endedDismissed = true;
+      endedBox.hidden = true;
+    });
 
     function close() {
       flush(false);
@@ -579,6 +651,7 @@
     open: open,
     fmt: fmt,
     toSeconds: toSeconds,
+    endedPlan: endedPlan,
     providers: ["bilibili", "youtube", "vimeo", "video"],
   };
 })(window);

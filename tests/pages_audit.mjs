@@ -108,7 +108,7 @@ for (const f of PAGES) {
   check(`${f} 标题分隔符统一为 ·`, /<title>[^<]* · Eraser 的小站<\/title>/.test(html));
 }
 check('skip-link 样式在 style.css 里', /\.skip-link\s*\{/.test(read('style.css')));
-check('sw.js 缓存版本号已升级到 v7', /VERSION = 'eraser-v7'/.test(read('sw.js')));
+check('sw.js 缓存版本号已升级到 v8', /VERSION = 'eraser-v8'/.test(read('sw.js')));
 check('sw.js 预缓存站内播放器与工作台逻辑', /PRECACHE = \[[\s\S]*?'\/watch\.js'/.test(read('sw.js')) && /PRECACHE = \[[\s\S]*?'\/workbench\.js'/.test(read('sw.js')));
 check('移动端顶栏：控件与品牌同排、导航整行下移',
       /@media \(max-width: 768px\)[\s\S]*?\.navbar nav\s*\{\s*order:\s*3;\s*flex-basis:\s*100%;/.test(read('style.css')));
@@ -362,6 +362,19 @@ console.log('\n=== 追更页 ===');
         /html\[data-theme="dark"\] \.wb-sync\.wb-sync/.test(html) &&
         /html\[data-theme="dark"\] \.wb-cats\.wb-cats button/.test(html) &&
         /html\[data-theme="dark"\] \.wb-mini\.wb-mini/.test(html));
+
+  /* --- M22 自动同步最新集数 / 新集提示 / 播完确认 --- */
+  check('同步会补最新集数与完结状态', /patch\.latest = latest/.test(html) && /patch\.finished = true/.test(html));
+  check('同步不写用户进度 / 状态', /function airingPatch/.test(html) &&
+        !/patch\.progress/.test(html.slice(html.indexOf('function airingPatch'), html.indexOf('function updateSyncBtn'))) &&
+        !/patch\.status/.test(html.slice(html.indexOf('function airingPatch'), html.indexOf('function updateSyncBtn'))));
+  check('有新一话的卡片显示绿色「新 N」', /\.mg-prog \.fresh/.test(html) && /Workbench\.freshCount/.test(html));
+  check('接着看行也标「新 N 话」', /\.wb-new/.test(html) && /"wb-new"/.test(html));
+  check('封面图懒加载 + no-referrer', /referrerPolicy = "no-referrer"/.test(html) && /loading = "lazy"/.test(html));
+  check('播放器有播完确认条（不自动记）', /\.watch-ended/.test(html) && /watch-ended/.test(read('watch.js')));
+  check('同步说明写明最新集数 / 完结状态自动更新',
+        /最新集数 \/ 完结状态每天自动同步/.test(html));
+  check('已完结的番剧不再进本周放送（逻辑在 workbench.js）', /d\.finished !== true/.test(read('workbench.js')));
 }
 
 console.log('\n=== 学习地图页 ===');

@@ -34,8 +34,8 @@ const TYPES = {
   media: {
     public: true,
     needsParent: false,
-    fields: ['category', 'name', 'status', 'score', 'episodes', 'progress', 'note', 'date', 'url', 'cover',
-             'position', 'duration', 'airday', 'airtime'],
+    fields: ['category', 'name', 'status', 'score', 'episodes', 'progress', 'latest', 'note', 'date', 'url', 'cover',
+             'position', 'duration', 'airday', 'airtime', 'finished'],
   },
   learn_map: {
     public: true,
@@ -237,6 +237,10 @@ export function normalize(type, raw) {
        两个都可空——连载中 / 没追完的片子只知道看到哪、不知道总集数很正常。 */
     out.episodes = count(d.episodes, '总集数');
     out.progress = count(d.progress, '进度（看到第几集）');
+    /* latest 是 B 站资料里最新一集正片的序号（自动同步写入），
+       finished 是上游确认整季完结。两者都不影响用户自己的 status / progress。 */
+    out.latest = count(d.latest, '最新一集');
+    out.finished = typeof d.finished === 'boolean' ? d.finished : null;
     /* 站内播放器的续播点，单位为秒。B 站播放器不开放读取时间，只有
        YouTube / Vimeo / 直链视频会写这两个字段；其他来源保持 null。 */
     out.position = count(d.position, '播放位置（秒）', 1000000);

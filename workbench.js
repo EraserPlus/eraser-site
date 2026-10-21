@@ -58,9 +58,15 @@
     return n != null && n >= 1 && n <= 7 ? n : null;
   }
 
-  /* 参与放送的条目：完结和搁置不打扰 */
+  /* 用户自己标了完结 / 搁置的，不再出现在工作台 */
+  function suppressed(d) {
+    return !d || d.status === "finished" || d.status === "paused";
+  }
+
+  /* 参与放送的条目：除了用户的完结 / 搁置，上游确认整季完结的也不再占放送格。
+     注意「接着看」不用这个判断——已完结但还没看完的番仍然要继续追。 */
   function airing(d) {
-    return !!d && d.status !== "finished" && d.status !== "paused";
+    return !suppressed(d) && d.finished !== true;
   }
 
   /* "20:00" → 1200；没填或格式不对 → 排在最后 */
@@ -76,11 +82,12 @@
     return String((b && b.updated_at) || "").localeCompare(String((a && a.updated_at) || ""));
   }
 
-  /* 继续看：在追的，或已经有进度 / 续播点的；完结、搁置不算 */
+  /* 继续看：在追的，或已经有进度 / 续播点的；用户标完结、搁置的不算。
+     上游完结但自己还没看完的仍要收进来（finished 只影响放送格）。 */
   function continueList(items) {
     return (items || []).filter(function (it) {
       var d = it && it.data;
-      if (!airing(d)) return false;
+      if (suppressed(d)) return false;
       if (d.status === "watching") return true;
       return nonNeg(d.position) > 0 || nonNeg(d.progress) > 0;
     }).sort(byUpdatedDesc);
@@ -111,25 +118,56 @@
     return out;
   }
 
+  /* 进度条分母：优先「总集数」，但上游最新集数更新时用它兜底，
+     避免总集数过期（12）而实际已经更到 24 时把进度算成 200%。 */
+  function denominator(d) {
+    var tot = posInt(d && d.episodes);
+    var latest = posInt(d && d.latest);
+    if (tot != null && (latest == null || tot >= latest)) return tot;
+    return latest;
+  }
+
   function epPct(d) {
     var cur = nonNeg(d && d.progress);
-    var tot = posInt(d && d.episodes);
+    var tot = denominator(d);
     if (cur == null || tot == null) return null;
     return Math.max(0, Math.min(100, Math.round(cur / tot * 100)));
+  }
+
+  /* 还没看的已更新集数；progress 没填时不算「新」（那只是更新进度，不是欠账） */
+  function freshCount(d) {
+    var cur = nonNeg(d && d.progress);
+    var latest = posInt(d && d.latest);
+    if (cur == null || latest == null) return 0;
+    return Math.max(0, latest - cur);
   }
 
   function watchedText(d) {
     var cur = nonNeg(d && d.progress);
     var tot = posInt(d && d.episodes);
+    var latest = posInt(d && d.latest);
+    var done = !!(d && d.finished === true);
+    if (cur != null && latest != null) {
+      if (done) return cur >= latest ? "已追平 · 共 " + latest + " 话" : "看到 " + cur + " / 共 " + latest + " 话";
+      return latest > cur ? "看到 " + cur + " / 更新至 " + latest + " 话" : "已追平 · 更新至 " + latest + " 话";
+    }
     if (cur != null && tot != null) return "看到 " + cur + " / " + tot + " 话";
     if (cur != null) return "看到第 " + cur + " 话";
     if (tot != null) return "共 " + tot + " 话";
+    if (latest != null) return done ? "共 " + latest + " 话" : "更新至第 " + latest + " 话";
     return "还没开始";
   }
 
   function nextEpText(d) {
     var cur = nonNeg(d && d.progress);
     var tot = posInt(d && d.episodes);
+    var latest = posInt(d && d.latest);
+    var done = !!(d && d.finished === true);
+    if (latest != null) {
+      if (cur != null && cur < latest) return "下一话 第 " + (cur + 1) + " 话";
+      if (cur != null) return done ? "已追平 · 共 " + latest + " 话" : "已追平 · 更新至 " + latest + " 话";
+      return done ? "共 " + latest + " 话" : "更新至第 " + latest + " 话";
+    }
     if (tot != null && cur != null && cur >= tot) return "已追平 · 共 " + tot + " 话";
     if (cur != null) return "下一话 第 " + (cur + 1) + " 话";
     if (tot != null) return "共 " + tot + " 话";
@@ -160,6 +198,7 @@
     scheduleFor: scheduleFor,
     dayCounts: dayCounts,
     epPct: epPct,
+    freshCount: freshCount,
     watchedText: watchedText,
     nextEpText: nextEpText,
     remainingText: remainingText,
