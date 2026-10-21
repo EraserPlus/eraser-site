@@ -5,9 +5,11 @@
    ?type=nav 是特例：一次返回分类和链接，省得前台发两次请求。
    ?action=lookup 是另一个特例：拿名字去 AniList 查，把封面/评分/话数/年份/链接
           带回来，用于「按名字自动填充」。**需要登录**，且只认 GET。
+   ?action=airing 按 B 站番剧链接查官方更新日 / 更新时间（只取公开资料，不代理
+          视频内容）。**需要登录**，且只认 GET；漫画没有公开日历，仍由站主手填。
 
    注意：Vercel Hobby 档每个部署最多 12 个 Serverless Function，本目录已经在
-   上限上，所以「按名字查」没有单独开 api/lookup.js，而是并到这里——和
+   上限上，所以「按名字查」「查放送表」都没有单独开文件，而是并到这里——和
    api/learn.js 的 ?action=xxx 是同一套写法。
    =========================================================================== */
 
@@ -16,6 +18,7 @@ import { requireAuth } from './_lib/token.js';
 import { ok, send, fail, readJson, needId } from './_lib/http.js';
 import { normalize, knownType, needsParent } from './_lib/content.js';
 import { normalizeQuery, normalizeKind, buildQuery, shapeResponse } from './_lib/lookup.js';
+import { biliRef, seasonApiUrl, shapeSeason } from './_lib/airing.js';
 
 /* jsonb 正常会被驱动解析成对象，但这里防一手 */
 function asObj(v) {
@@ -253,9 +256,10 @@ async function lookupMedia(res, query) {
   }
 
   if (!r.ok) {
-    return send(res, 502, {
-      error: '番剧资料库返回了 ' + r.status + '，稍后再试，或直接手填。',
-    });
+    const hint = r.status === 403
+      ? '番剧资料库（AniList）目前暂停服务，先直接手填；贴 B 站番剧链接后，放送时间可以自动补。'
+      : '番剧资料库返回了 ' + r.status + '，稍后再试，或直接手填。';
+    return send(res, 502, { error: hint });
   }
 
   let json;
@@ -281,6 +285,84 @@ async function lookupMedia(res, query) {
   });
 }
 
+/* ---------------------------------------------------------------------------
+   按 B 站番剧链接查放送表（GET /api/content?action=airing&url=...）
+   ---------------------------------------------------------------------------
+   只认 bilibili.com 的番剧页（ss / ep / md），再拼固定地址取公开资料；
+   用户的原始 URL 不会被直接请求（避免 SSRF）。返回里的 airday / airtime
+   由 _lib/airing.js 解析，优先用官方「每周X HH:MM」文案，缺失时用最近一集
+   正片的北京时间推算。漫画没有稳定的公开日历，不走这里。
+   --------------------------------------------------------------------------- */
+const AIRING_API = 'https://api.bilibili.com/pgc/view/web/season';
+const AIR_CACHE = new Map();
+const AIR_CACHE_MAX = 200;
+const AIR_CACHE_TTL = 6 * 60 * 60 * 1000;   /* 6 小时：更新日不会频繁变 */
+
+function airCacheGet(k) {
+  const hit = AIR_CACHE.get(k);
+  if (hit && hit.exp > Date.now()) return hit.value;
+  if (hit) AIR_CACHE.delete(k);
+  return null;
+}
+function airCacheSet(k, value) {
+  if (AIR_CACHE.size >= AIR_CACHE_MAX) AIR_CACHE.delete(AIR_CACHE.keys().next().value);
+  AIR_CACHE.set(k, { value: value, exp: Date.now() + AIR_CACHE_TTL });
+}
+
+async function airingInfo(res, query) {
+  const raw = String((query && query.url) || '').trim();
+  if (!raw) return send(res, 400, { error: '请先给一个 B 站番剧链接' });
+  if (raw.length > 2000) return send(res, 400, { error: '链接太长了' });
+
+  const ref = biliRef(raw);
+  if (!ref) {
+    return ok(res, { ok: true, supported: false, reason: 'not-bilibili' });
+  }
+  const apiUrl = seasonApiUrl(ref);
+  if (!apiUrl) {
+    return ok(res, { ok: true, supported: false, reason: 'no-id' });
+  }
+
+  const key = ref.kind + ':' + ref.id;
+  const cached = airCacheGet(key);
+  if (cached) return ok(res, { ok: true, supported: true, data: cached, cached: true });
+
+  let r;
+  try {
+    r = await fetch(apiUrl, {
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'eraser-site/1.0 (+https://eraser.de5.net)',
+        Referer: 'https://www.bilibili.com/',
+      },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  } catch (e) {
+    return send(res, 502, { error: '连不上 B 站资料接口，稍后再试。' });
+  }
+
+  if (!r.ok) {
+    return send(res, 502, { error: 'B 站资料接口返回了 ' + r.status + '，稍后再试。' });
+  }
+
+  let json;
+  try {
+    json = await r.json();
+  } catch (e) {
+    return send(res, 502, { error: 'B 站返回的内容看不懂，稍后再试。' });
+  }
+  if (json && json.code != null && Number(json.code) !== 0) {
+    return send(res, 502, { error: 'B 站没有给出这部番的资料（' + (json.message || json.msg || json.code) + '）。' });
+  }
+
+  const data = shapeSeason(json && (json.result || json.data));
+  if (!data) {
+    return send(res, 502, { error: 'B 站返回的番剧资料不完整，稍后再试。' });
+  }
+  airCacheSet(key, data);
+  return ok(res, { ok: true, supported: true, data: data });
+}
+
 export default async function handler(req, res) {
   try {
     await ensureSchema();
@@ -292,6 +374,12 @@ export default async function handler(req, res) {
       if (req.query && req.query.action === 'lookup') {
         requireAuth(req);
         return await lookupMedia(res, req.query);
+      }
+
+      /* 按 B 站链接补放送表：同样只给登录后的站主用 */
+      if (req.query && req.query.action === 'airing') {
+        requireAuth(req);
+        return await airingInfo(res, req.query);
       }
 
       const t = pickType(req);
@@ -331,6 +419,9 @@ export default async function handler(req, res) {
        否则会掉到下面被当成「建一条内容」，报一个莫名其妙的 400。 */
     if (req.query && req.query.action === 'lookup') {
       return send(res, 405, { error: '按名字查询只支持 GET' });
+    }
+    if (req.query && req.query.action === 'airing') {
+      return send(res, 405, { error: '查放送表只支持 GET' });
     }
 
     /* ---------------- 以下都需要登录 ---------------- */
@@ -375,9 +466,13 @@ export default async function handler(req, res) {
       const order = (b.sort_order === undefined) ? row.sort_order
         : (Number.isFinite(Number(b.sort_order)) ? Number(b.sort_order) : row.sort_order);
 
+      /* touch:false 用于后台自动补字段（封面 / 放送时间）：写了数据但不改
+         updated_at，否则「接着追」按最近更新排序会被一次批量补全整体打乱。 */
+      const touch = b.touch !== false;
       const rows = await sql`
         UPDATE content
-        SET data = ${JSON.stringify(data)}::jsonb, sort_order = ${order}, updated_at = now()
+        SET data = ${JSON.stringify(data)}::jsonb, sort_order = ${order},
+            updated_at = CASE WHEN ${touch}::boolean THEN now() ELSE updated_at END
         WHERE id = ${id}
         RETURNING *`;
       return ok(res, { ok: true, item: shape(rows[0]) });

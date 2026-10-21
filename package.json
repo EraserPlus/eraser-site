@@ -7,6 +7,6 @@
     "@vercel/blob": "^2.8.1"
   },
   "scripts": {
-    "test": "node tests/api_test.mjs && node tests/content_test.mjs && node tests/watch_test.mjs && node tests/workbench_test.mjs && node tests/api_routes_test.mjs && node tests/pages_audit.mjs && node tests/admin_audit.mjs && node tests/outline_check.mjs && node tests/media_import_test.mjs && node tests/lookup_test.mjs && node tests/nav_test.cjs && node tests/nav_audit.cjs"
+    "test": "node tests/api_test.mjs && node tests/content_test.mjs && node tests/watch_test.mjs && node tests/workbench_test.mjs && node tests/airing_test.mjs && node tests/api_routes_test.mjs && node tests/pages_audit.mjs && node tests/admin_audit.mjs && node tests/outline_check.mjs && node tests/media_import_test.mjs && node tests/lookup_test.mjs && node tests/nav_test.cjs && node tests/nav_audit.cjs"
   }
 }

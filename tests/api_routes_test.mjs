@@ -521,6 +521,19 @@ console.log('\n=== 内容接口 /api/content ===');
   const upd = executed.find(e => /UPDATE content/.test(e.text));
   check('PATCH 合并旧字段而不是整体覆盖', upd && /old\.com/.test(upd.values[0]), upd ? String(upd.values[0]).slice(0, 80) : 'none');
 
+  /* touch:false：自动补放送表时不改 updated_at，避免打乱「接着追」的排序 */
+  fakeDb((t) => /SELECT \* FROM content WHERE id/.test(t)
+    ? [row({ id: 7, type: 'media', data: { category: 'anime', name: '测试番', status: 'watching' } })]
+    : [row({ id: 7, type: 'media' })]);
+  await call(contentRoute, 'PATCH', {
+    token: TOKEN,
+    body: { id: 7, data: { airday: 6, airtime: '11:00' }, touch: false },
+  });
+  const updTouch = executed.find(e => /UPDATE content/.test(e.text));
+  check('PATCH 支持 touch:false（保留 updated_at）',
+        updTouch && /CASE WHEN/.test(updTouch.text) && updTouch.values.includes(false),
+        updTouch ? JSON.stringify(updTouch.values.slice(1)) : 'none');
+
   /* --- 删除 --- */
   fakeDb(() => []);
   res = await call(contentRoute, 'DELETE', { token: TOKEN, query: { id: '999' } });
@@ -986,6 +999,12 @@ console.log('\n=== 番剧自动填充 /api/content?action=lookup（AniList）===
     r = await call(lookupRoute, 'GET', { token: TOKEN, query: { action: 'lookup', q: 'yyy-unique-' + Date.now()  }});
     check('AniList 返回错误码 → 502 不漏状态码细节', r.statusCode === 502, String(r.statusCode));
 
+    /* 2026-10：AniList 官方临时停服（403），要给出「先手填 / 用 B 站链接」的明确指引 */
+    stubFetch(() => Promise.resolve({ ok: false, status: 403, json: async () => ({}) }));
+    r = await call(lookupRoute, 'GET', { token: TOKEN, query: { action: 'lookup', q: 'xxx-unique-' + Date.now()  }});
+    check('AniList 停用（403）→ 提示先手填 / 贴 B 站链接',
+          r.statusCode === 502 && /暂停服务/.test(r.json.error || '') && /B 站/.test(r.json.error || ''), r.json.error);
+
     /* 缓存命中不再打上游 */
     calls = [];
     stubFetch(() => Promise.resolve(anilistJson([{ id: 1, title: { native: '缓存番' }, averageScore: 80 }])));
@@ -1003,6 +1022,107 @@ console.log('\n=== 番剧自动填充 /api/content?action=lookup（AniList）===
       try { return /type:MANGA/.test(JSON.parse(calls[0].opt.body).query); } catch (e) { return false; }
     })());
     check('漫画用 chapters 当话数', r.json.results[0].episodes === 400, String(r.json.results[0].episodes));
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+}
+
+console.log('\n=== 放送表自动补全 /api/content?action=airing（B 站）===');
+{
+  const airRoute = (await load('api/content.js')).default;
+  const realFetch = globalThis.fetch;
+  let calls = [];
+  function stubFetch(fn) {
+    globalThis.fetch = (u, o) => { calls.push({ url: String(u), opt: o }); return fn(u, o); };
+  }
+  const seasonJson = (result) => ({
+    ok: true, status: 200, json: async () => ({ code: 0, result: result }),
+  });
+  const fixture = {
+    season_id: 28747,
+    media_id: 28223043,
+    title: '凡人修仙传',
+    cover: 'https://i0.hdslb.com/bfs/bangumi/x.png',
+    rating: { score: 9.7 },
+    new_ep: { desc: '6月13日起 每周六11:00', title: '196' },
+    publish: { is_finish: 0, is_started: 1 },
+    episodes: [{ pub_time: 1792206000, title: '196', show_title: '第196话' }],
+  };
+  try {
+    let r = await call(airRoute, 'POST', { query: { action: 'airing', url: 'https://www.bilibili.com/bangumi/play/ss28747' } });
+    check('POST 查放送表 → 405（不落到建内容上）', r.statusCode === 405, String(r.statusCode));
+
+    r = await call(airRoute, 'GET', { query: { action: 'airing', url: 'https://www.bilibili.com/bangumi/play/ss28747' } });
+    check('未登录查放送表 → 401', r.statusCode === 401, String(r.statusCode));
+
+    r = await call(airRoute, 'GET', { token: TOKEN, query: { action: 'airing' } });
+    check('没给链接 → 400', r.statusCode === 400, String(r.statusCode));
+
+    calls = [];
+    r = await call(airRoute, 'GET', { token: TOKEN, query: { action: 'airing', url: 'https://example.com/bangumi/play/ss1' } });
+    check('非 B 站链接 → 200 但不支持（不报错打断批量补全）',
+          r.statusCode === 200 && r.json.supported === false && r.json.reason === 'not-bilibili', JSON.stringify(r.json));
+    check('非 B 站链接不发任何上游请求', calls.length === 0, 'calls=' + calls.length);
+
+    calls = [];
+    r = await call(airRoute, 'GET', {
+      token: TOKEN,
+      query: { action: 'airing', url: 'https://bilibili.com.evil.com/bangumi/play/ss1' },
+    });
+    check('伪造域名不会被当成 B 站（防 SSRF）',
+          r.json.supported === false && calls.length === 0, JSON.stringify(r.json));
+
+    calls = [];
+    stubFetch(() => Promise.resolve(seasonJson(fixture)));
+    r = await call(airRoute, 'GET', {
+      token: TOKEN,
+      query: { action: 'airing', url: 'https://www.bilibili.com/bangumi/play/ss28747' },
+    });
+    check('有效 B 站番剧链接 → 200', r.statusCode === 200 && r.json.supported === true, String(r.statusCode));
+    check('请求发给固定 season 接口（不是用户原 URL）',
+          calls.length === 1 && calls[0].url === 'https://api.bilibili.com/pgc/view/web/season?season_id=28747',
+          calls[0] && calls[0].url);
+    check('解析出周六 11:00', r.json.data.airday === 6 && r.json.data.airtime === '11:00', JSON.stringify(r.json.data));
+    check('带上标题 / 封面 / 评分', r.json.data.title === '凡人修仙传' && /hdslb/.test(r.json.data.cover) && r.json.data.score === 9.7);
+    check('首次查询不是缓存', r.json.cached !== true);
+
+    calls = [];
+    r = await call(airRoute, 'GET', {
+      token: TOKEN,
+      query: { action: 'airing', url: 'https://www.bilibili.com/bangumi/play/ss28747?spm=1' },
+    });
+    check('同一季重复查走缓存不打上游',
+          calls.length === 0 && r.json.cached === true, 'calls=' + calls.length + ' cached=' + r.json.cached);
+
+    calls = [];
+    stubFetch(() => Promise.resolve(seasonJson(Object.assign({}, fixture, { season_id: 9999 }))));
+    r = await call(airRoute, 'GET', {
+      token: TOKEN,
+      query: { action: 'airing', url: 'https://www.bilibili.com/bangumi/play/ep3854820' },
+    });
+    check('ep 链接走 ep_id 参数',
+          calls.length === 1 && /[?&]ep_id=3854820/.test(calls[0].url), calls[0] && calls[0].url);
+
+    stubFetch(() => Promise.reject(new Error('network down')));
+    r = await call(airRoute, 'GET', {
+      token: TOKEN,
+      query: { action: 'airing', url: 'https://www.bilibili.com/bangumi/play/ss111111' },
+    });
+    check('连不上 B 站 → 502 且给可读提示', r.statusCode === 502 && /稍后再试/.test(r.json.error || ''), r.json.error);
+
+    stubFetch(() => Promise.resolve({ ok: false, status: 500, json: async () => ({}) }));
+    r = await call(airRoute, 'GET', {
+      token: TOKEN,
+      query: { action: 'airing', url: 'https://www.bilibili.com/bangumi/play/ss222222' },
+    });
+    check('B 站返回错误码 → 502', r.statusCode === 502, String(r.statusCode));
+
+    stubFetch(() => Promise.resolve({ ok: true, status: 200, json: async () => ({ code: -404, message: '啥都木有' }) }));
+    r = await call(airRoute, 'GET', {
+      token: TOKEN,
+      query: { action: 'airing', url: 'https://www.bilibili.com/bangumi/play/ss333333' },
+    });
+    check('B 站业务错误 → 502 且带原因', r.statusCode === 502 && /啥都木有/.test(r.json.error || ''), r.json.error);
   } finally {
     globalThis.fetch = realFetch;
   }

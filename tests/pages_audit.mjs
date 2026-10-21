@@ -108,7 +108,7 @@ for (const f of PAGES) {
   check(`${f} 标题分隔符统一为 ·`, /<title>[^<]* · Eraser 的小站<\/title>/.test(html));
 }
 check('skip-link 样式在 style.css 里', /\.skip-link\s*\{/.test(read('style.css')));
-check('sw.js 缓存版本号已升级到 v6', /VERSION = 'eraser-v6'/.test(read('sw.js')));
+check('sw.js 缓存版本号已升级到 v7', /VERSION = 'eraser-v7'/.test(read('sw.js')));
 check('sw.js 预缓存站内播放器与工作台逻辑', /PRECACHE = \[[\s\S]*?'\/watch\.js'/.test(read('sw.js')) && /PRECACHE = \[[\s\S]*?'\/workbench\.js'/.test(read('sw.js')));
 check('移动端顶栏：控件与品牌同排、导航整行下移',
       /@media \(max-width: 768px\)[\s\S]*?\.navbar nav\s*\{\s*order:\s*3;\s*flex-basis:\s*100%;/.test(read('style.css')));
@@ -335,9 +335,33 @@ console.log('\n=== 追更页 ===');
   check('放送行显示时间 / 名称 / 下一话', /"wb-time"/.test(html) && /"wb-air-name"/.test(html) && /Workbench\.nextEpText/.test(html));
   check('空放送日有说明，不留白框', /今天没有安排放送/.test(html));
   check('快速添加能填更新日 / 更新时间', /daySel/.test(html) && /tmInput/.test(html) && /airday: daySel\.value/.test(html));
-  check('点开播放器自动把「想看」转「在看」', /d\.status === "wish"/.test(html) && /status: "watching"/.test(html));
+  check('点开播放器自动把「想看」转「在看」', /function markWatching/.test(html) && /d\.status !== "wish"/.test(html) && /status: "watching"/.test(html));
   check('工作台也走 textContent（不拼数据进 innerHTML）', !/innerHTML\s*=\s*[^"';]*d\.(name|note|cover|url)/.test(html));
   check('手机端工作台收紧间距', /@media \(max-width: 480px\)[\s\S]{0,240}?\.wb-panel\s*\{/.test(html));
+
+  /* --- M21 漫画对等 + 放送表自动补全 --- */
+  check('「接着追」同时覆盖番 / 漫', /接着追/.test(html) && /function renderCats/.test(html));
+  check('漫画外链有「接着读 / 开读」主按钮', /"接着读"|"开读"/.test(html) && /d\.category === "comic"/.test(html));
+  check('外链旁也有 ＋1（不用开表单）', /"wb-mini"/.test(html) && /\.wb-mini\.wb-mini/.test(html));
+  check('点外链自动把「想看 / 想读」转「在看 / 在读」',
+        /function markWatching/.test(html) && /silent: true, keepalive: true/.test(html));
+  check('番 / 漫都有时出现栏目筛选（纯前端切换）',
+        /id="wbCats"/.test(html) && /renderContinue\(allItems\);\s*\/\* 纯前端切换/.test(html));
+  check('有「补全放送表」按钮与手动动作',
+        /id="wbSync"/.test(html) && /function syncSchedules/.test(html) && /manual: true/.test(html));
+  check('登录后每天最多自动补一次',
+        /function autoSyncSchedules/.test(html) && /eraser\.airing\.sync/.test(html) && /todayStamp/.test(html));
+  check('只补空字段，不覆盖手填',
+        /function airingPatch/.test(html) && /!hasValue\(d\.airday\)/.test(html) && /!hasValue\(d\.airtime\)/.test(html));
+  check('补全写入不改 updated_at（不打乱排序）',
+        /touch: false/.test(html) && /opts\.touch === false/.test(html));
+  check('只给 B 站番剧链接补全（漫画不瞎猜）',
+        /function isBiliUrl/.test(html) && /d\.category !== "anime"/.test(html));
+  check('说明里写清漫画 / 各站手填', /漫画和各站没有统一日历，手填一次即可/.test(html));
+  check('暗色下补全按钮 / 栏目按钮 / ＋1 可读（双类名提权）',
+        /html\[data-theme="dark"\] \.wb-sync\.wb-sync/.test(html) &&
+        /html\[data-theme="dark"\] \.wb-cats\.wb-cats button/.test(html) &&
+        /html\[data-theme="dark"\] \.wb-mini\.wb-mini/.test(html));
 }
 
 console.log('\n=== 学习地图页 ===');
@@ -401,7 +425,7 @@ console.log('\n=== 开发交接页（dev/，给接手的 AI）===');
   check('M11 的选择器笔误已在交接页更正', /后代选择器/.test(html) && !/\.mg-filters \.mg-filters button\s*\{/.test(html));
   check('M12 批量导入批次记录在', /M12/.test(html) && /batch=1/.test(html) && /action=lookup/.test(html) && /eraser\.admin\.token/.test(html));
   check('追更数据上游取舍写进了交接页', /AniList/.test(html) && /中文名搜不到/.test(html) && /api\.bgm\.tv/.test(html));
-  check('测试套数已更新为十二套', /十二套/.test(html) && /outline_check/.test(html) && /media_import_test/.test(html) && /lookup_test/.test(html) && /watch_test/.test(html) && /workbench_test/.test(html));
+  check('测试套数已更新为十三套', /十三套/.test(html) && /outline_check/.test(html) && /media_import_test/.test(html) && /lookup_test/.test(html) && /watch_test/.test(html) && /workbench_test/.test(html) && /airing_test/.test(html));
   check('M14–M18 批次记录在', /M14/.test(html) && /M16/.test(html) && /M17/.test(html) && /M18/.test(html));
   check('M19 站内播放批次记录在', /M19/.test(html) && /watch\.js/.test(html) && /position/.test(html) && /B 站/.test(html));
   check('M20 工作台批次记录在', /M20/.test(html) && /workbench\.js/.test(html) && /airday/.test(html) && /接着看/.test(html) && /本周放送/.test(html));
