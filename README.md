@@ -312,6 +312,7 @@ body: { items: [ {type:"media", data:{...}}, ... ] }     一次最多 500 条
 | --- | --- | --- |
 | 批量导入 | `POST /api/content?batch=1` | `{items:[…]}`，≤500 条，先全量预校验再写库 |
 | 按名字查 | `GET /api/content?action=lookup&q=Frieren` | **需要登录**；返回候选（封面/评分/话数/年份/链接） |
+| 查放送表 | `GET /api/content?action=airing&url=…` | **需要登录**；只认 B 站番剧 `ss / ep / md` 页，返回 `airday / airtime / cover / score`，缓存 6 小时 |
 
 **上游选型的实测结论**：AniList 可用且能热链；Bangumi / TMDB / Jikan / 豆瓣图在本机沙箱全部不可达。AniList 对**中文标题基本返回 0 条**（英文名 / 罗马字 / 日文原名都正常），这是上游限制，已在 0 结果里直接提示。
 
