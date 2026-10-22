@@ -84,12 +84,31 @@ console.log('\n=== 站主身份合并：公开页就地编辑 ===');
     check(`${f} 纯浏览页不加载站主编辑器`, !/owner\.(css|js)|admin\/content\.js/.test(html));
   }
 
+  const blogHtml = read('blog/index.html');
+  const postHtml = read('blog/post.html');
+  check('博客列表可直接发布 / 转草稿',
+        /isPub \? "转草稿" : "发布"/.test(blogHtml) && /published: !isPub/.test(blogHtml));
+  check('文章页可直接发布 / 转草稿',
+        /isPub \? "转草稿" : "发布"/.test(postHtml) && /published: !isPub/.test(postHtml));
+
   const owner = read('owner.js');
   check('owner.js 复用后台令牌键', /TOKEN_KEY = "eraser\.admin\.token"/.test(owner));
   check('没有令牌时不画编辑浮条', /if \(!hasToken\(\)\) \{[\s\S]*removeChild\(dock\)/.test(owner));
   check('401 时先清本地令牌再提示登录',
         /r\.status === 401[\s\S]*expire\(\)/.test(owner) && /setToken\(""\)/.test(owner));
   check('登录框不拼 innerHTML（密码与错误都走 textContent）', !/innerHTML\s*=/.test(owner));
+  check('浮条带「写文章」与「下载备份」快捷钮',
+        /owner-dock-act[\s\S]{0,400}?writePost/.test(owner) && /owner-dock-act[\s\S]{0,900}?backup/.test(owner));
+  check('写文章不必先进后台（按需加载编辑器）',
+        /function ensureEditor\(\)/.test(owner) && /admin\/content\.js/.test(owner));
+  check('备份直接下 JSON 文件', /a\.download = backupName\(new Date\(\)\)/.test(owner));
+  check('快捷动作对外暴露给命令面板',
+        /quickActions: quickActions/.test(owner) && /writePost: writePost/.test(owner));
+  const shell = read('shell.js');
+  check('Ctrl+K 面板包含站主快捷动作',
+        /Owner\.quickActions\(\)\.forEach/.test(shell) && /写新文章/.test(owner));
+  check('编辑器 / 登录框开着时 Ctrl+K 不抢键盘',
+        /getElementById\("ownerLogin"\)[\s\S]{0,80}?\.cf-overlay/.test(shell));
   check('页面里没有写死密码或令牌',
         PAGES.every(f => !/(password|token)\s*[:=]\s*["'][^"']{8,}/i.test(read(f))));
 }
@@ -108,7 +127,7 @@ for (const f of PAGES) {
   check(`${f} 标题分隔符统一为 ·`, /<title>[^<]* · Eraser 的小站<\/title>/.test(html));
 }
 check('skip-link 样式在 style.css 里', /\.skip-link\s*\{/.test(read('style.css')));
-check('sw.js 缓存版本号已升级到 v8', /VERSION = 'eraser-v8'/.test(read('sw.js')));
+check('sw.js 缓存版本号已升级到 v9', /VERSION = 'eraser-v9'/.test(read('sw.js')));
 check('sw.js 预缓存站内播放器与工作台逻辑', /PRECACHE = \[[\s\S]*?'\/watch\.js'/.test(read('sw.js')) && /PRECACHE = \[[\s\S]*?'\/workbench\.js'/.test(read('sw.js')));
 check('移动端顶栏：控件与品牌同排、导航整行下移',
       /@media \(max-width: 768px\)[\s\S]*?\.navbar nav\s*\{\s*order:\s*3;\s*flex-basis:\s*100%;/.test(read('style.css')));
@@ -442,6 +461,7 @@ console.log('\n=== 开发交接页（dev/，给接手的 AI）===');
   check('M14–M18 批次记录在', /M14/.test(html) && /M16/.test(html) && /M17/.test(html) && /M18/.test(html));
   check('M19 站内播放批次记录在', /M19/.test(html) && /watch\.js/.test(html) && /position/.test(html) && /B 站/.test(html));
   check('M20 工作台批次记录在', /M20/.test(html) && /workbench\.js/.test(html) && /airday/.test(html) && /接着看/.test(html) && /本周放送/.test(html));
+  check('M23 写作便利批次记录在', /M23/.test(html) && /draft\.v2/.test(html) && /拖入图片/.test(html) && /写文章/.test(html) && /eraser-v9/.test(html));
   check('后台标签数已更新为 9', /9 个标签/.test(html) || /9 标签/.test(html));
   check('本机坑位补充了 BOM / PowerShell / gh PR 退出码', /BOM/.test(html) && /PowerShell/.test(html) && /SIGTERM/.test(html));
   check('待办里写明 M10 主线B 搁置原因', /主线 B/.test(html) && /(0 篇|博客 0)/.test(html));

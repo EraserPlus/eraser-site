@@ -8,6 +8,8 @@
   "use strict";
 
   var api = null, say = null, md = null;
+  /* 上传走原生 fetch，401 不走 Owner.api 的自动登录；这里由页面注入补救 */
+  var onAuthError = null;
 
   /* ---------------- 字段定义 ---------------- */
   var SCHEMA = {
@@ -98,16 +100,47 @@
   }
   function tagsToText(t) { return Array.isArray(t) ? t.join(", ") : (t || ""); }
 
-  /* ---------------- 草稿自动保存（写长文不怕误关） ---------------- */
-  function draftKeyOf(type) { return "eraser.admin.draft." + type; }
+  /* ---------------- 草稿自动保存（写长文不怕误关） ----------------
+     v2：草稿按「类型 + 条目 id」存整份表单（标题 / 标签 / 发布状态一起存），
+     不再只存正文。这样编辑 A 篇时不会把 A 的草稿恢复进 B 篇。 */
+  var DRAFT_PREFIX = "eraser.admin.draft.v2.";
+  var LEGACY_DRAFT_PREFIX = "eraser.admin.draft.";
+  function draftKeyOf(type, id) {
+    return DRAFT_PREFIX + type + "." + (id == null || id === "" ? "new" : String(id).replace(/[^\w-]/g, ""));
+  }
+  function legacyDraftKeyOf(type) { return LEGACY_DRAFT_PREFIX + type; }
   function loadDraft(key) {
     try { return localStorage.getItem(key) || ""; } catch (e) { return ""; }
   }
   function saveDraft(key, value) {
-    try { if (value && value.trim()) localStorage.setItem(key, value); else localStorage.removeItem(key); } catch (e) {}
+    try { if (value && String(value).trim()) localStorage.setItem(key, value); else localStorage.removeItem(key); } catch (e) {}
   }
   function clearDraft(key) {
     try { localStorage.removeItem(key); } catch (e) {}
+  }
+  function fmtDraftTime(ts) {
+    if (!ts) return "";
+    var d = new Date(ts);
+    function p(n) { return (n < 10 ? "0" : "") + n; }
+    return p(d.getMonth() + 1) + "-" + p(d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes());
+  }
+  /* 找到可恢复的草稿：优先 v2 整份草稿；旧版正文草稿只在「新建」时兜底 */
+  function readDraft(type, id) {
+    var key = draftKeyOf(type, id);
+    var raw = loadDraft(key);
+    if (raw) {
+      try {
+        var j = JSON.parse(raw);
+        if (j && j.v === 2 && j.data && typeof j.data === "object") {
+          return { data: j.data, at: Number(j.at) || 0, key: key, legacy: false };
+        }
+      } catch (e) {}
+    }
+    if (id == null || id === "") {
+      var old = loadDraft(legacyDraftKeyOf(type));
+      if (old && old.trim()) return { data: old, at: 0, key: legacyDraftKeyOf(type), legacy: true };
+    }
+    return null;
   }
   var draftTimers = [];
 
@@ -115,12 +148,183 @@
      文件仓库（type=file）下架后，改挂在追更的链接 / 封面图上，让上传仍然可达。 */
   var UPLOAD_FIELDS = { file: ["url"], media: ["url", "cover"] };
 
+  /* ==================== 插图 / 上传（M23） ====================
+     写作时最高频的诉求是「截图直接进来」。这里做三件事：
+       ① 只收浏览器能显示的位图（不收 SVG，避免脚本随图片进站）；
+       ② 大图先在浏览器里缩放 / 重编码到 4MB 以内，再传 Vercel Blob；
+       ③ 粘贴、拖拽、点按钮三种入口共用一条上传通道。 */
+  var MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
+  var MAX_IMAGE_EDGE = 1600;
+  var IMAGE_EXT = {
+    "image/png": "png",
+    "image/jpeg": "jpg",
+    "image/webp": "webp",
+    "image/gif": "gif",
+    "image/avif": "avif"
+  };
+  function imageExt(type) { return IMAGE_EXT[String(type || "").toLowerCase()] || ""; }
+  function isImageFile(file) { return !!(file && imageExt(file.type)); }
+  /* 上传文件名：去掉原扩展名，换成真实 MIME 对应的扩展名 */
+  function imageUploadName(name, type) {
+    var base = String(name == null ? "" : name).replace(/^.*[\\/]/, "").replace(/\.[^.]+$/, "");
+    base = base.replace(/[\u0000-\u001f/\\:*?"<>|]/g, "").slice(0, 60) || "image";
+    var ext = imageExt(type);
+    return ext ? base + "." + ext : base;
+  }
+  /* 等比缩放后的尺寸；上限只作用在长边 */
+  function fitImageEdge(w, h, maxEdge) {
+    var mw = Math.max(1, Number(w) || 1), mh = Math.max(1, Number(h) || 1);
+    var max = Math.max(1, Number(maxEdge) || MAX_IMAGE_EDGE);
+    var scale = Math.min(1, max / Math.max(mw, mh));
+    return { w: Math.max(1, Math.round(mw * scale)), h: Math.max(1, Math.round(mh * scale)), scaled: scale < 1 };
+  }
+  function tokenFromStore() {
+    try { return localStorage.getItem("eraser.admin.token") || ""; } catch (e) { return ""; }
+  }
+  function uploadBlob(blob, name, type) {
+    var token = tokenFromStore();
+    var q = "?name=" + encodeURIComponent(name) + (type ? "&type=" + encodeURIComponent(type) : "");
+    return fetch("/api/upload" + q, {
+      method: "POST",
+      headers: token ? { Authorization: "Bearer " + token } : {},
+      body: blob
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        if (r.status === 401) {
+          var e = new Error("登录已过期，请重新登录后再传图");
+          e.auth = true;
+          throw e;
+        }
+        if (!r.ok) throw new Error((j && j.error) || ("上传失败（" + r.status + "）"));
+        var url = j && j.data && j.data.url;
+        if (!url) throw new Error("服务器没有返回图片地址");
+        return url;
+      });
+    });
+  }
+  function loadImageFile(file) {
+    return new Promise(function (resolve, reject) {
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function () { URL.revokeObjectURL(url); resolve(img); };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error("这张图片读不出来，换一张试试")); };
+      img.src = url;
+    });
+  }
+  function canvasToBlob(canvas, type, quality) {
+    return new Promise(function (resolve) {
+      if (!canvas.toBlob) { resolve(null); return; }
+      canvas.toBlob(function (b) { resolve(b); }, type, quality);
+    });
+  }
+  function encodeCanvas(img, preferType, originalName) {
+    var typeList = preferType === "image/jpeg" ? ["image/jpeg"] : ["image/webp", "image/jpeg"];
+    var quality = 0.86;
+    var fi = fitImageEdge(img.width, img.height, MAX_IMAGE_EDGE);
+    var canvas = document.createElement("canvas");
+    canvas.width = fi.w;
+    canvas.height = fi.h;
+    canvas.getContext("2d").drawImage(img, 0, 0, fi.w, fi.h);
+
+    function attempt(i) {
+      if (i >= typeList.length) throw new Error("图片压缩失败，换一张试试");
+      return canvasToBlob(canvas, typeList[i], quality).then(function (blob) {
+        if (!blob) return attempt(i + 1);
+        if (blob.size > MAX_UPLOAD_BYTES * 0.9 && quality > 0.55) {
+          quality = Math.max(0.55, quality - 0.12);
+          return attempt(i);
+        }
+        if (blob.size > MAX_UPLOAD_BYTES * 0.9 && i + 1 < typeList.length) {
+          quality = 0.82;
+          return attempt(i + 1);
+        }
+        var outType = blob.type || typeList[i];
+        return { blob: blob, name: imageUploadName(originalName, outType), type: outType };
+      });
+    }
+    return attempt(0);
+  }
+  /* 小图原样传；大图或长边超 1600 先在本地压，失败再按原图尝试（≤4MB 才允许） */
+  function prepareUpload(file) {
+    if (!isImageFile(file)) {
+      if (file.size > MAX_UPLOAD_BYTES) throw new Error("文件超过 4MB，传不了");
+      return Promise.resolve({ blob: file, name: file.name, type: file.type || "" });
+    }
+    if (file.type === "image/gif") {
+      if (file.size > MAX_UPLOAD_BYTES) throw new Error("GIF 超过 4MB，没法自动压缩；先裁短一点或转成视频");
+      return Promise.resolve({ blob: file, name: file.name, type: file.type });
+    }
+    var needCompress = file.size > 1.2 * 1024 * 1024;
+    return loadImageFile(file).then(function (img) {
+      var overEdge = Math.max(img.width, img.height) > MAX_IMAGE_EDGE;
+      if (!needCompress && !overEdge) {
+        return { blob: file, name: file.name, type: file.type };
+      }
+      return encodeCanvas(img, file.type, file.name);
+    }).then(function (out) {
+      if (out.blob.size > MAX_UPLOAD_BYTES) {
+        throw new Error("图片压缩后仍然超过 4MB，换一张小一点的");
+      }
+      return out;
+    }).catch(function (e) {
+      /* 浏览器不支持解码（如 HEIC）时，原图不大就照传 */
+      if (file.size <= MAX_UPLOAD_BYTES && !/压缩失败/.test(e.message || "")) {
+        return { blob: file, name: file.name, type: file.type };
+      }
+      throw e;
+    });
+  }
+  function mdImageSnippet(url, alt) {
+    var label = String(alt || "图片").replace(/[[\]]/g, "").replace(/\s+/g, " ").trim() || "图片";
+    return "![" + label + "](" + url + ")";
+  }
+
   /* ---------------- 通用表单 ---------------- */
-  /* 返回一个 <div>，调用 form.read() 取数据、form.fill(item) 回填 */
-  function buildForm(type, onSave, onCancel) {
+  /* 返回一个 <div>，调用 form.read() 取数据、form.fill(item) 回填。
+     opts.draftId：草稿按哪条内容隔离（编辑传 id，新建传 null）。 */
+  function buildForm(type, onSave, onCancel, opts) {
+    opts = opts || {};
     var spec = SCHEMA[type];
     var box = el("div", "cform");
     var inputs = {};
+    var draftId = opts.draftId;
+    var draftKey = draftKeyOf(type, draftId);
+    var legacyKey = legacyDraftKeyOf(type);
+    var changed = false, applying = false, draftTimer = null, draftInterval = null;
+    var painters = [];
+    var mdKey = null;
+
+    var state = el("div", "draftstate", "改动会自动存本机 · Ctrl/⌘+S 保存");
+    state.setAttribute("role", "status");
+    state.setAttribute("aria-live", "polite");
+
+    function collect() {
+      var data = {};
+      for (var i = 0; i < spec.fields.length; i++) {
+        var f = spec.fields[i], node = inputs[f.k];
+        if (f.t === "bool") data[f.k] = !!node.checked;
+        else data[f.k] = node.value;
+      }
+      return data;
+    }
+    function writeDraft() {
+      if (!changed || applying) return;
+      saveDraft(draftKey, JSON.stringify({ v: 2, at: Date.now(), data: collect() }));
+      state.textContent = "草稿已自动保存 · " + fmtDraftTime(Date.now()) + " · Ctrl/⌘+S 保存";
+      state.className = "draftstate ok";
+    }
+    function markChanged() {
+      if (applying) return;
+      changed = true;
+      state.textContent = "有改动，正在本机存草稿…";
+      state.className = "draftstate";
+      if (!draftInterval) {
+        draftInterval = setInterval(writeDraft, 3000);
+        draftTimers.push(draftInterval);
+      }
+      if (draftTimer) clearTimeout(draftTimer);
+      draftTimer = setTimeout(writeDraft, 700);
+    }
 
     spec.fields.forEach(function (f) {
       var wrap = el("div", "cf-row");
@@ -134,40 +338,110 @@
         /* 实时预览：输入即渲染，不用点「预览」按钮 */
         var prev = el("div", "mdprev");
         var cnt = el("div", "mdcnt");
-        var dkey = draftKeyOf(type);
-        function paint() {
+        var paint = function () {
           cnt.textContent = ta.value.length + " 字";
           prev.innerHTML = md ? md.render(ta.value) : "";
-        }
-        ta.addEventListener("input", function () { paint(); saveDraft(dkey, ta.value); });
-        ta.addEventListener("blur", function () { saveDraft(dkey, ta.value); });
-        var dt = setInterval(function () { saveDraft(dkey, ta.value); }, 3000);
-        draftTimers.push(dt);
+        };
+        painters.push(paint);
+        ta.addEventListener("input", paint);
+        mdKey = mdKey || f.k;
 
-        /* 有未保存草稿时给出恢复/丢弃条 */
-        var saved = loadDraft(dkey);
-        if (saved && saved.trim()) {
-          var dbar = el("div", "draftbar");
-          dbar.appendChild(el("span", null, "检测到未保存的草稿（" + saved.length + " 字）"));
-          var rb = el("button", "btn ghost sm", "恢复");
-          rb.type = "button";
-          rb.addEventListener("click", function () { ta.value = saved; paint(); });
-          var db = el("button", "btn ghost sm", "丢弃");
-          db.type = "button";
-          db.addEventListener("click", function () {
-            clearDraft(dkey);
-            if (dbar.parentNode) dbar.parentNode.removeChild(dbar);
-          });
-          dbar.appendChild(rb); dbar.appendChild(db);
-          wrap.appendChild(dbar);
-        }
+        /* 插图：按钮 / 粘贴 / 拖拽共用一条通道 */
+        var mt = el("div", "mdtools");
+        var imgBtn = el("button", "btn ghost sm", "🖼 插入图片");
+        imgBtn.type = "button";
+        var picker = document.createElement("input");
+        picker.type = "file";
+        picker.accept = "image/png,image/jpeg,image/webp,image/gif,image/avif";
+        picker.multiple = true;
+        picker.style.display = "none";
+        imgBtn.addEventListener("click", function () { picker.click(); });
+        picker.addEventListener("change", function () {
+          if (picker.files && picker.files.length) handleFiles(picker.files);
+        });
+        mt.appendChild(imgBtn);
+        mt.appendChild(picker);
+        mt.appendChild(el("span", "mdtip", "可直接粘贴或拖入图片，自动压到 4MB 内"));
 
+        function insertImage(url, alt) {
+          var start = typeof ta.selectionStart === "number" ? ta.selectionStart : ta.value.length;
+          var end = typeof ta.selectionEnd === "number" ? ta.selectionEnd : start;
+          var before = ta.value.slice(0, start);
+          var after = ta.value.slice(end);
+          var snippet = (before && !/\n$/.test(before) ? "\n\n" : "") +
+                        mdImageSnippet(url, alt) +
+                        (after && !/^\n/.test(after) ? "\n\n" : "\n");
+          ta.value = before + snippet + after;
+          var pos = before.length + snippet.length;
+          try { ta.setSelectionRange(pos, pos); } catch (e) {}
+          paint();
+          markChanged();
+          ta.focus();
+        }
+        function handleFiles(fileList) {
+          var all = Array.prototype.slice.call(fileList || []);
+          var images = all.filter(isImageFile);
+          var skipped = all.length - images.length;
+          if (!images.length) {
+            say("app", "只能插入图片（PNG / JPG / WebP / GIF / AVIF）", "err");
+            return;
+          }
+          var total = images.length, done = 0, okCount = 0, errors = [];
+          imgBtn.disabled = true;
+          function next() {
+            if (!images.length) {
+              imgBtn.disabled = false;
+              imgBtn.textContent = "🖼 插入图片";
+              picker.value = "";
+              if (okCount) say("app", "已插入 " + okCount + " 张图片，记得保存", "ok");
+              if (errors.length) say("app", errors[0], "err");
+              if (skipped) say("app", "已跳过 " + skipped + " 个非图片文件", "err");
+              return;
+            }
+            var file = images.shift();
+            imgBtn.textContent = "上传中 " + (done + 1) + "/" + total + "…";
+            Promise.resolve().then(function () { return prepareUpload(file); })
+              .then(function (out) { return uploadBlob(out.blob, out.name, out.type); })
+              .then(function (url) { insertImage(url, String(file.name || "").replace(/\.[^.]+$/, "")); okCount++; })
+              .catch(function (e) {
+                errors.push(e.message || "图片上传失败");
+                if (e && e.auth && onAuthError) onAuthError();
+              })
+              .then(function () { done++; next(); });
+          }
+          next();
+        }
+        ta.addEventListener("paste", function (e) {
+          var items = (e.clipboardData && e.clipboardData.items) || [];
+          var files = [];
+          for (var i = 0; i < items.length; i++) {
+            if (items[i].kind === "file") {
+              var f = items[i].getAsFile();
+              if (isImageFile(f)) files.push(f);
+            }
+          }
+          if (files.length) { e.preventDefault(); handleFiles(files); }
+        });
+        ta.addEventListener("dragover", function (e) {
+          if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+            e.preventDefault();
+            ta.classList.add("md-drop");
+          }
+        });
+        ta.addEventListener("dragleave", function () { ta.classList.remove("md-drop"); });
+        ta.addEventListener("drop", function (e) {
+          ta.classList.remove("md-drop");
+          if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+            e.preventDefault();
+            handleFiles(e.dataTransfer.files);
+          }
+        });
+
+        wrap.appendChild(mt);
         wrap.appendChild(ta);
         wrap.appendChild(cnt);
         wrap.appendChild(prev);
         inputs[f.k] = ta;
-        box.mdKeys = box.mdKeys || [];
-        box.mdKeys.push(dkey);
       } else if (f.t === "bool") {
         var cb = el("input");
         cb.type = "checkbox";
@@ -192,7 +466,7 @@
         if (f.ph) inp.placeholder = f.ph;
         if (f.t === "tags") inp.autocomplete = "off";
 
-        /* 可上传字段（文件仓库的 url、追更的链接 / 封面）旁加「上传」按钮，成功后回填地址 */
+        /* 可上传字段（追更的链接 / 封面）旁挂「上传」按钮，成功后回填地址 */
         if (UPLOAD_FIELDS[type] && UPLOAD_FIELDS[type].indexOf(f.k) !== -1) {
           var upRow = el("div");
           upRow.style.display = "flex";
@@ -202,37 +476,34 @@
           upRow.appendChild(inp);
           var upBtn = el("button", "btn ghost sm", "上传");
           upBtn.type = "button";
-          var filePicker = el("input");
+          var filePicker = document.createElement("input");
           filePicker.type = "file";
           filePicker.style.display = "none";
           upBtn.addEventListener("click", function () { filePicker.click(); });
           filePicker.addEventListener("change", function () {
             var file = filePicker.files && filePicker.files[0];
             if (!file) return;
-            if (file.size > 4 * 1024 * 1024) { say("app", "文件超过 4MB，传不了", "err"); return; }
             upBtn.disabled = true;
-            upBtn.textContent = "上传中…";
-            /* 令牌直读 localStorage——与 admin/index.html 的 TOKEN_KEY（eraser.admin.token）同一个键 */
-            var token = "";
-            try { token = localStorage.getItem("eraser.admin.token") || ""; } catch (e) {}
-            fetch("/api/upload?name=" + encodeURIComponent(file.name), {
-              method: "POST",
-              headers: token ? { Authorization: "Bearer " + token } : {},
-              body: file
-            }).then(function (r) {
-              return r.json().catch(function () { return {}; }).then(function (j) {
-                if (r.status === 401) { say("app", "登录已过期，请重新登录", "err"); return; }
-                if (!r.ok) { say("app", j.error || ("上传失败（" + r.status + "）"), "err"); return; }
-                inp.value = (j.data && j.data.url) || "";
+            upBtn.textContent = "处理中…";
+            Promise.resolve().then(function () { return prepareUpload(file); })
+              .then(function (out) {
+                upBtn.textContent = "上传中…";
+                return uploadBlob(out.blob, out.name, out.type);
+              })
+              .then(function (url) {
+                inp.value = url;
+                markChanged();
                 say("app", "上传成功，地址已填好，点保存即可", "ok");
+              })
+              .catch(function (e) {
+                say("app", (e && e.message) || "上传失败：网络错误", "err");
+                if (e && e.auth && onAuthError) onAuthError();
+              })
+              .then(function () {
+                upBtn.disabled = false;
+                upBtn.textContent = "上传";
+                filePicker.value = "";
               });
-            }).catch(function () {
-              say("app", "上传失败：网络错误", "err");
-            }).then(function () {
-              upBtn.disabled = false;
-              upBtn.textContent = "上传";
-              filePicker.value = "";
-            });
           });
           upRow.appendChild(upBtn);
           upRow.appendChild(filePicker);
@@ -245,17 +516,19 @@
       box.appendChild(wrap);
     });
 
+    /* 所有普通字段的改动都进草稿；md 的预览由自己的 input 监听负责 */
+    box.addEventListener("input", markChanged);
+    box.addEventListener("change", markChanged);
+
+    box.appendChild(state);
+
     var acts = el("div", "form-acts");
     var save = el("button", "btn", "保存");
     save.type = "button";
-    save.addEventListener("click", function () {
-      var data = {};
-      for (var i = 0; i < spec.fields.length; i++) {
-        var f = spec.fields[i], node = inputs[f.k];
-        if (f.t === "bool") data[f.k] = !!node.checked;
-        else if (f.t === "tags") data[f.k] = node.value;
-        else data[f.k] = node.value;
-      }
+    function doSave() {
+      if (save.disabled) return;
+      writeDraft();
+      var data = collect();
       /* 短链接留空时按标题自动生成 */
       var slugField = spec.fields.filter(function (x) { return x.auto; })[0];
       if (slugField && !String(data[slugField.k] || "").trim()) {
@@ -270,7 +543,8 @@
       }
       save.disabled = true;
       onSave(data, function () { save.disabled = false; });
-    });
+    }
+    save.addEventListener("click", doSave);
     acts.appendChild(save);
 
     var cancel = el("button", "btn ghost", "取消");
@@ -280,11 +554,21 @@
     box.appendChild(acts);
 
     box.read = function () { return inputs; };
+    box.save = doSave;
     /* 保存成功后由调用方触发：清掉已入库内容的草稿 */
     box.clearDraft = function () {
-      (box.mdKeys || []).forEach(function (k) { clearDraft(k); });
+      clearDraft(draftKey);
+      clearDraft(legacyKey);
+      changed = false;
+      state.textContent = "已保存，草稿已清掉";
+      state.className = "draftstate ok";
+    };
+    box.flushDraft = function () {
+      if (draftTimer) { clearTimeout(draftTimer); draftTimer = null; }
+      writeDraft();
     };
     box.fill = function (data) {
+      applying = true;
       spec.fields.forEach(function (f) {
         var v = data ? data[f.k] : "";
         if (f.t === "bool") inputs[f.k].checked = data ? (v !== false) : true;
@@ -297,24 +581,69 @@
         }
         else inputs[f.k].value = v == null ? "" : v;
       });
+      applying = false;
+      painters.forEach(function (p) { p(); });
     };
     box.focusFirst = function () {
       var first = spec.fields[0];
       if (first && inputs[first.k] && inputs[first.k].focus) inputs[first.k].focus();
     };
+
+    /* 有未保存草稿时给出恢复 / 丢弃条（整份字段，不只是正文） */
+    var saved = readDraft(type, draftId);
+    if (saved) {
+      var dbar = el("div", "draftbar");
+      var when = saved.at ? fmtDraftTime(saved.at) + " 保存" : "旧版本";
+      dbar.appendChild(el("span", null,
+        "检测到未保存的草稿（" + when + (saved.legacy ? "，只有正文" : "") + "）"));
+      var rb = el("button", "btn ghost sm", "恢复");
+      rb.type = "button";
+      rb.addEventListener("click", function () {
+        if (saved.legacy) {
+          if (mdKey && inputs[mdKey]) {
+            inputs[mdKey].value = String(saved.data || "");
+            painters.forEach(function (p) { p(); });
+          }
+        } else {
+          box.fill(saved.data);
+        }
+        changed = true;
+        state.textContent = "已恢复草稿，检查后点保存";
+        state.className = "draftstate ok";
+        if (dbar.parentNode) dbar.parentNode.removeChild(dbar);
+        say("app", "已恢复草稿", "ok");
+      });
+      var db = el("button", "btn ghost sm", "丢弃");
+      db.type = "button";
+      db.addEventListener("click", function () {
+        clearDraft(draftKey);
+        clearDraft(legacyKey);
+        changed = false;
+        state.textContent = "草稿已丢弃";
+        state.className = "draftstate";
+        if (dbar.parentNode) dbar.parentNode.removeChild(dbar);
+      });
+      dbar.appendChild(rb);
+      dbar.appendChild(db);
+      box.insertBefore(dbar, box.firstChild);
+    }
+
     return box;
   }
 
   /* ---------------- 通用：打开一个表单弹层 ---------------- */
-  var overlay = null;
+  var overlay = null, activeForm = null;
   function openForm(title, formNode) {
     closeForm();
+    activeForm = formNode;
     overlay = el("div", "cf-overlay");
+    overlay.tabIndex = -1;
     var panel = el("div", "cf-panel");
     var head = el("div", "cf-head");
     head.appendChild(el("b", null, title));
     var x = el("button", "btn icon", "✕");
     x.type = "button";
+    x.title = "关闭（Esc）";
     x.addEventListener("click", closeForm);
     head.appendChild(x);
     panel.appendChild(head);
@@ -324,11 +653,29 @@
     panel.appendChild(body);
     overlay.appendChild(panel);
     overlay.addEventListener("click", function (e) { if (e.target === overlay) closeForm(); });
+    /* 编辑快捷键：Ctrl/⌘+S 或 Ctrl/⌘+Enter 保存，Esc 关闭。
+       登录弹层在上层时先让登录框自己处理 Esc（它用捕获阶段）。 */
+    overlay.addEventListener("keydown", function (e) {
+      /* 登录框用捕获阶段处理 Esc 并 preventDefault；别让同一次按键再关掉表单 */
+      if (e.defaultPrevented) return;
+      if (document.getElementById("ownerLogin")) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeForm();
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "S" || e.key === "Enter")) {
+        e.preventDefault();
+        if (formNode.save) formNode.save();
+      }
+    });
     document.body.appendChild(overlay);
     document.body.style.overflow = "hidden";
     if (formNode.focusFirst) formNode.focusFirst();
+    else overlay.focus();
   }
   function closeForm() {
+    /* 关掉前把还没落盘的改动写进本机草稿，下一次打开还能恢复 */
+    if (activeForm && activeForm.flushDraft) activeForm.flushDraft();
+    activeForm = null;
     draftTimers.forEach(function (t) { clearInterval(t); });
     draftTimers.length = 0;
     if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
@@ -339,11 +686,18 @@
   /* ---------------- 内容操作 ---------------- */
   function create(type, data, parentId, done) {
     return api("content", { method: "POST", body: { type: type, data: data, parent_id: parentId || undefined } })
-      .then(done).catch(function (e) { say("app", e.message, "err"); throw e; });
+      .then(function (j) {
+        /* 回调可能要接着 reload；等它完成，再把服务端返回的 item 交给调用方 */
+        return Promise.resolve(done ? done(j) : null).then(function () { return j; });
+      })
+      .catch(function (e) { say("app", e.message, "err"); throw e; });
   }
   function update(id, data, done) {
     return api("content", { method: "PATCH", body: { id: id, data: data } })
-      .then(done).catch(function (e) { say("app", e.message, "err"); throw e; });
+      .then(function (j) {
+        return Promise.resolve(done ? done(j) : null).then(function () { return j; });
+      })
+      .catch(function (e) { say("app", e.message, "err"); throw e; });
   }
   function remove(id, what, done) {
     if (!confirm("删除这个" + what + "？删了就找不回来了。")) return;
@@ -652,10 +1006,10 @@
   function editCategory(cat) {
     var form = buildForm("nav_category", function (data, unlock) {
       var p = cat ? update(cat.id, data, unlock) : create("nav_category", data, null, unlock);
-      p.then(function () { closeForm(); return refreshNav(); })
+      p.then(function () { form.clearDraft(); closeForm(); return refreshNav(); })
        .then(function () { say("app", cat ? "已保存" : "已添加"); })
        .catch(function () { unlock(); });
-    }, closeForm);
+    }, closeForm, { draftId: cat ? cat.id : null });
     form.fill(cat ? cat.data : null);
     openForm(cat ? "编辑分类" : "新建分类", form);
   }
@@ -663,10 +1017,10 @@
   function editLink(link, categoryId) {
     var form = buildForm("nav_link", function (data, unlock) {
       var p = link ? update(link.id, data, unlock) : create("nav_link", data, categoryId, unlock);
-      p.then(function () { closeForm(); return refreshNav(); })
+      p.then(function () { form.clearDraft(); closeForm(); return refreshNav(); })
        .then(function () { say("app", link ? "已保存" : "已添加"); })
        .catch(function () { unlock(); });
-    }, closeForm);
+    }, closeForm, { draftId: link ? link.id : null });
     form.fill(link ? link.data : null);
     openForm(link ? "编辑链接" : "添加链接", form);
   }
@@ -1236,15 +1590,16 @@
                 url: r.url || "",
                 cover: r.cover || "",
               };
-              closeForm();
               var form = buildForm("media", function (d, unlock) {
                 create("media", d, null, unlock).then(function () {
+                  form.clearDraft();
                   closeForm();
                   return reload("media");
                 }).then(function () { renderMedia("mediaHost"); say("app", "已添加：" + d.name); })
                   .catch(function () { unlock(); });
-              }, closeForm);
+              }, closeForm, { draftId: null });
               form.fill(data);
+              openForm("新增追更", form);
             });
             card.appendChild(use);
             out.appendChild(card);
@@ -1299,7 +1654,7 @@
         /* 错误已经由 say() 提示；保留弹层，让用户改完再存 */
         unlock();
       });
-    }, closeForm);
+    }, closeForm, { draftId: item ? item.id : null });
     var initial = item ? item.data : (opts.initial || null);
     form.fill(initial);
     var name = SCHEMA[type].name;
@@ -1573,10 +1928,10 @@
   function editMapInfo(map, onBack) {
     var form = buildForm("learn_map", function (data, unlock) {
       api("learn", { method: "PATCH", body: { id: map.id, title: data.title, desc: data.desc, status: data.status } })
-        .then(function () { closeForm(); return reloadEditor(onBack); })
+        .then(function () { form.clearDraft(); closeForm(); return reloadEditor(onBack); })
         .then(function () { say("app", "已保存"); })
         .catch(function (e) { say("app", e.message, "err"); unlock(); });
-    }, closeForm);
+    }, closeForm, { draftId: map.id });
     form.fill(map.data || null);
     openForm("编辑学习地图", form);
   }
@@ -1666,13 +2021,13 @@
   function newMap(onDone) {
     var form = buildForm("learn_map", function (data, unlock) {
       api("learn", { method: "POST", body: { title: data.title, desc: data.desc, status: data.status } })
-        .then(function (j) { closeForm(); return j; })
+        .then(function (j) { form.clearDraft(); closeForm(); return j; })
         .then(function (j) {
           say("app", "已新建，开始加节点吧");
           return onDone().then(function () { return openMap(j.item.id, onDone); });
         })
         .catch(function (e) { say("app", e.message, "err"); unlock(); });
-    }, closeForm);
+    }, closeForm, { draftId: null });
     form.fill({ status: "active" });
     openForm("新建学习地图", form);
   }
@@ -1743,12 +2098,17 @@
   global.ContentAdmin = {
     init: function (opts) {
       api = opts.api; say = opts.say; md = global.MD || null;
+      if (typeof opts.onAuthError === "function") onAuthError = opts.onAuthError;
+      else if (global.Owner && typeof global.Owner.expire === "function") onAuthError = global.Owner.expire;
+      else onAuthError = null;
     },
     render: render,
     /* 公开页就地编辑：直接开单条表单，不依赖后台列表 DOM */
     openItem: openItem,
     openNew: openNew,
     removeItem: removeItem,
+    /* 编辑器生命周期（登录过期等场景由页面主动收起） */
+    close: closeForm,
     types: Object.keys(SCHEMA),
     /* 追更批量导入的解析逻辑（纯函数，供测试直接调，避免「写一套测另一套」） */
     parseImport: parseImport,
@@ -1759,5 +2119,10 @@
     normCount: normCount,
     normDay: normDay,
     normTime: normTime,
+    /* 插图 / 上传的纯逻辑，供测试直接调 */
+    imageExt: imageExt,
+    imageUploadName: imageUploadName,
+    fitImageEdge: fitImageEdge,
+    mdImageSnippet: mdImageSnippet,
   };
 })(window);

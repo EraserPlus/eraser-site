@@ -128,6 +128,14 @@
       if (query && p.name.toLowerCase().indexOf(lq) === -1) return;
       out.push({ ic: p.ic, lb: p.name, hint: "前往 · g " + p.key, run: function () { go(p.href); } });
     });
+    /* 站主登录后，常用动作直接出现在面板里（写文章 / 下载备份 / 后台） */
+    if (window.Owner && window.Owner.hasToken && window.Owner.hasToken() &&
+        typeof window.Owner.quickActions === "function") {
+      window.Owner.quickActions().forEach(function (a) {
+        if (query && a.lb.toLowerCase().indexOf(lq) === -1) return;
+        out.push({ ic: a.ic, lb: a.lb, hint: a.hint, run: function () { closePalette(); a.run(); } });
+      });
+    }
     out.push({ ic: "🌓", lb: themeNow() === "dark" ? "切换到浅色" : "切换到深色",
                hint: "主题", run: function () { toggleTheme(); closePalette(); } });
     out.push({ ic: "🔗", lb: "复制当前链接", hint: "剪贴板",
@@ -247,8 +255,9 @@
   function disarmG() { gArmed = false; if (gTimer) { clearTimeout(gTimer); gTimer = null; } }
 
   document.addEventListener("keydown", function (e) {
-    /* Ctrl/⌘+K：开合面板 */
+    /* Ctrl/⌘+K：开合面板（编辑器 / 登录框开着时不抢键盘） */
     if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) {
+      if (document.getElementById("ownerLogin") || document.querySelector(".cf-overlay")) return;
       e.preventDefault();
       if (paletteOpen()) closePalette(); else openPalette();
       return;

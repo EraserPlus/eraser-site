@@ -204,6 +204,13 @@ textarea:focus{ outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgb
 .mdprev a{ color:var(--blue); }
 /* 实时预览：字数条 + 草稿恢复条 */
 .mdcnt{ font-size:12px; color:var(--muted); text-align:right; margin:8px 0 2px; }
+/* 插图工具条 + 自动草稿状态 */
+.mdtools{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:8px 0 6px; }
+.mdtip{ font-size:12px; color:var(--muted); }
+.cf-panel textarea.md-drop{ border-color:var(--blue); box-shadow:0 0 0 3px var(--sel); background:var(--card); }
+.draftstate{ font-size:12px; color:var(--muted); margin-top:10px; }
+.draftstate.ok{ color:var(--green); }
+html[data-theme="dark"] .draftstate.ok{ color:#3fb950; }
 .draftbar{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:13px;
            background:var(--amber-l); color:var(--amber); border:1px solid var(--amber);
            border-radius:9px; padding:8px 12px; margin:0 0 10px; }
@@ -1318,7 +1325,15 @@ function refresh(){
 
 function enterApp(){
   showApp();
-  if (window.ContentAdmin) ContentAdmin.init({ api: api, say: say });
+  if (window.ContentAdmin) ContentAdmin.init({
+    api: api, say: say,
+    /* 上传走原生 fetch，401 时后台没有自动登出：收起编辑器、回到登录页 */
+    onAuthError: function(){
+      if (ContentAdmin.close) ContentAdmin.close();
+      logout();
+      say("login", "登录已过期，重新登录即可继续", "err");
+    }
+  });
   aiBind();
   cancelEditTodo();
   cancelEditEvent();
