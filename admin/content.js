@@ -84,6 +84,40 @@
             ["archived", "归档（不显示在列表，但数据还在）"]
         ] }
       ]
+    },
+    project: {
+      name: "AI 项目",
+      fields: [
+        { k: "name", l: "项目名", t: "text", ph: "比如：Eraser 的小站", req: true },
+        { k: "slug", l: "项目标识（网址 / 接口里用）", t: "text", ph: "比如：eraser-site", req: true },
+        { k: "summary", l: "一句话简介（可空）", t: "text", ph: "这个项目是做什么的" },
+        { k: "status", l: "状态", t: "select", req: true, opts: [
+            ["active", "进行中"], ["paused", "暂停"], ["done", "完成"], ["archived", "归档"]
+        ] },
+        { k: "stack", l: "技术栈（可空）", t: "text", ph: "比如：HTML / Vercel / Postgres" },
+        { k: "repo", l: "代码仓库（可空）", t: "text", ph: "https://github.com/..." },
+        { k: "site", l: "项目地址（可空）", t: "text", ph: "https://..." },
+        { k: "goal", l: "当前目标（可空）", t: "text", ph: "这一阶段要做到什么" },
+        { k: "author", l: "登记人（可空）", t: "text", ph: "比如：Eraser / Qoder" },
+        { k: "architecture", l: "架构说明（Markdown）", t: "md", ph: "目录结构、关键模块、数据流、部署方式…" },
+        { k: "painpoints", l: "难点与坑（Markdown）", t: "md", ph: "踩过的坑、限制、为什么这样取舍…" },
+        { k: "conventions", l: "约定与红线（Markdown）", t: "md", ph: "下一位 AI 必须遵守的规矩…" }
+      ]
+    },
+    project_log: {
+      name: "项目记录",
+      fields: [
+        { k: "project", l: "所属项目（slug）", t: "text", ph: "比如：eraser-site", req: true },
+        { k: "kind", l: "记录类型", t: "select", req: true, opts: [
+            ["log", "工作记录"], ["decision", "关键决策"], ["pain", "难点"],
+            ["handoff", "交接说明"], ["message", "讨论"]
+        ] },
+        { k: "title", l: "标题（讨论可空）", t: "text", ph: "一句话说明这一笔" },
+        { k: "author", l: "署名（可空）", t: "text", ph: "比如：Qoder" },
+        { k: "refs", l: "关联（PR / commit，可空）", t: "text", ph: "比如：PR #47 / 9db94b1" },
+        { k: "tags", l: "标签（逗号分隔）", t: "tags", ph: "接口, 验证" },
+        { k: "body", l: "内容（Markdown）", t: "md", req: true, ph: "改了什么 / 为什么 / 验证结果 / 下一步" }
+      ]
     }
   };
 

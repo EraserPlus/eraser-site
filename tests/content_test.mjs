@@ -233,6 +233,67 @@ console.log('\n=== learn_map（学习地图）===');
         !('evil' in C.normalize('learn_map', { title: 't', nodes: [{ id: 'a', text: 'x', evil: 1 }] }).nodes[0]));
 }
 
+console.log('\n=== project（AI 项目卡）===');
+{
+  const base = { slug: 'Eraser Site', name: 'Eraser 的小站' };
+  check('project 是已知类型', C.knownType('project'));
+  check('project 不需要父分类', !C.needsParent('project'));
+  const r = C.normalize('project', base);
+  check('正常通过', r.slug === 'eraser-site' && r.name === 'Eraser 的小站');
+  check('状态默认 active', r.status === 'active');
+  check('可选字段默认 null',
+        r.summary === null && r.stack === null && r.repo === null && r.site === null &&
+        r.goal === null && r.architecture === null && r.painpoints === null &&
+        r.conventions === null && r.author === null);
+  check('缺项目名报错', code(() => C.normalize('project', { slug: 'a' })) === 'BAD_INPUT');
+  check('缺 slug 报错', code(() => C.normalize('project', { name: 'a' })) === 'BAD_INPUT');
+  check('非法状态报错', code(() => C.normalize('project', { ...base, status: 'live' })) === 'BAD_INPUT');
+  check('四种状态都通过',
+        ['active', 'paused', 'done', 'archived'].every(s => C.normalize('project', { ...base, status: s }).status === s));
+  check('仓库 / 主页接受 https',
+        C.normalize('project', { ...base, repo: 'https://github.com/a/b', site: 'https://a.com' }).repo === 'https://github.com/a/b');
+  check('仓库伪协议被拒', code(() => C.normalize('project', { ...base, repo: 'javascript:alert(1)' })) === 'BAD_INPUT');
+  check('架构 / 难点 / 约定按 Markdown 原文保留',
+        C.normalize('project', { ...base, architecture: '## 架构\n- a', painpoints: '坑', conventions: '别删数据' }).architecture === '## 架构\n- a');
+  check('架构说明上限 20000 字',
+        code(() => C.normalize('project', { ...base, architecture: 'x'.repeat(20001) })) === 'BAD_INPUT');
+  check('时间缺省填 ISO', /^\d{4}-\d{2}-\d{2}T/.test(C.normalize('project', base).at));
+  check('时间能解析就统一成 ISO',
+        C.normalize('project', { ...base, at: '2026-10-22 10:00' }).at === new Date('2026-10-22 10:00').toISOString());
+  check('时间乱填报错', code(() => C.normalize('project', { ...base, at: '昨天' })) === 'BAD_INPUT');
+  check('多传字段被丢掉', !('evil' in C.normalize('project', { ...base, evil: 1 })));
+}
+
+console.log('\n=== project_log（AI 工作记录）===');
+{
+  const base = { project: 'Eraser Site', body: '改了什么 / 为什么 / 验证结果' };
+  check('project_log 是已知类型', C.knownType('project_log'));
+  check('project_log 不需要父分类', !C.needsParent('project_log'));
+  const r = C.normalize('project_log', base);
+  check('项目 slug 归一化', r.project === 'eraser-site', r.project);
+  check('记录类型默认 log', r.kind === 'log');
+  check('标题缺省用类型名', r.title === '工作记录', r.title);
+  check('署名缺省为「未署名 AI」', r.author === '未署名 AI', r.author);
+  check('讨论允许不写标题（用「讨论」兜底）',
+        C.normalize('project_log', { ...base, kind: 'message' }).title === '讨论');
+  check('五种记录类型都通过',
+        ['log', 'decision', 'pain', 'handoff', 'message'].every(k =>
+          C.normalize('project_log', { ...base, kind: k }).kind === k));
+  check('非法记录类型报错', code(() => C.normalize('project_log', { ...base, kind: 'note' })) === 'BAD_INPUT');
+  check('缺正文报错', code(() => C.normalize('project_log', { project: 'a' })) === 'BAD_INPUT');
+  check('缺项目报错', code(() => C.normalize('project_log', { body: 'x' })) === 'BAD_INPUT');
+  check('正文上限 12000 字',
+        code(() => C.normalize('project_log', { ...base, body: 'x'.repeat(12001) })) === 'BAD_INPUT');
+  check('标题上限 160 字',
+        code(() => C.normalize('project_log', { ...base, title: 'x'.repeat(161) })) === 'BAD_INPUT');
+  check('标签支持逗号分隔并去重',
+        JSON.stringify(C.normalize('project_log', { ...base, tags: '接口, 验证，接口' }).tags) === '["接口","验证"]');
+  check('refs 原样保留', C.normalize('project_log', { ...base, refs: 'PR #47' }).refs === 'PR #47');
+  check('时间缺省填 ISO', /^\d{4}-\d{2}-\d{2}T/.test(r.at));
+  check('时间乱填报错', code(() => C.normalize('project_log', { ...base, at: '刚刚' })) === 'BAD_INPUT');
+  check('多传字段被丢掉', !('evil' in C.normalize('project_log', { ...base, evil: 1 })));
+}
+
 console.log('\n=== 未知类型 ===');
 {
   check('normalize 未知类型报错', code(() => C.normalize('hack', {})) === 'BAD_INPUT');

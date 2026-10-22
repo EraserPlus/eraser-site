@@ -554,6 +554,37 @@ console.log('\n=== 内容接口 /api/content ===');
         JSON.stringify(res.json));
   check('确实执行了删链接的语句', executed.some(e => /DELETE FROM content WHERE parent_id/.test(e.text)));
 
+  /* --- AI 项目协作区（M24） --- */
+  fakeDb(() => [
+    row({ id: 31, type: 'project_log', data: { project: 'a', title: 'A 的记录' } }),
+    row({ id: 32, type: 'project_log', data: { project: 'b', title: 'B 的记录' } }),
+  ]);
+  res = await call(contentRoute, 'GET', { query: { type: 'project_log', project: 'b' } });
+  check('按项目 slug 过滤记录 → 只返回这个项目的',
+        res.statusCode === 200 && res.json.items.length === 1 && res.json.items[0].data.project === 'b',
+        JSON.stringify((res.json.items || []).map(i => i.data.project)));
+
+  fakeDb(() => [{ id: 5 }]);
+  res = await call(contentRoute, 'POST', { token: TOKEN, body: { type: 'project', data: { slug: 'eraser-site', name: '小站' } } });
+  check('项目 slug 重复 → 409', res.statusCode === 409, String(res.statusCode));
+  check('重复时提示往这个项目里写记录', /往它下面写记录|已经存在/.test(res.json.error || ''), res.json.error);
+
+  fakeDb((t) => {
+    if (/SELECT type FROM content/.test(t)) return [{ type: 'project' }];
+    if (/SELECT data FROM content/.test(t)) return [{ data: { slug: 'eraser-site' } }];
+    if (/DELETE FROM content WHERE type = 'project_log'/.test(t)) return [{ id: 31 }, { id: 32 }];
+    return [];
+  });
+  res = await call(contentRoute, 'DELETE', { token: TOKEN, query: { id: '11' } });
+  check('删项目时一并删掉它的工作记录',
+        res.statusCode === 200 && res.json.alsoDeletedLogs === 2, JSON.stringify(res.json));
+  const delLogs = executed.findIndex(e => /DELETE FROM content WHERE type = 'project_log'/.test(e.text));
+  const delProject = executed.findIndex(e => /DELETE FROM content WHERE id = /.test(e.text));
+  check('先删记录再删项目（不留孤儿）', delLogs >= 0 && delProject > delLogs, `${delLogs} / ${delProject}`);
+  check('级联删除按项目 slug 走参数',
+        executed.some(e => /DELETE FROM content WHERE type = 'project_log'/.test(e.text)
+          && (e.values || []).includes('eraser-site')));
+
   /* --- SQL 注入 --- */
   fakeDb((t) => /INSERT INTO content/.test(t) ? [row({ id: 1 })] : []);
   const evil = "'; DROP TABLE content; --";
@@ -1648,6 +1679,142 @@ console.log('\n=== /api/ai 接入信息与令牌管理（M10） ===');
   fakeDb(noop);
   res = await call(aiRoute, 'PUT', { token: TOKEN });
   check('PUT /api/ai → 405', res.statusCode === 405, String(res.statusCode));
+}
+
+console.log('\n=== AI 项目协作区公开接口（M24） ===');
+{
+  const aiRoute = (await load('api/ai.js')).default;
+  const row = (o) => Object.assign({
+    id: 1, type: 'project', parent_id: null, sort_order: 0,
+    created_at: '2026-10-22T00:00:00.000Z', updated_at: '2026-10-22T00:00:00.000Z', data: {},
+  }, o);
+  const projectRow = row({ id: 11, data: { slug: 'eraser-site', name: 'Eraser 的小站', status: 'active' } });
+  const logRow = row({ id: 21, type: 'project_log', data: {
+    project: 'eraser-site', kind: 'log', title: 'M23', body: '上线', author: 'Qoder',
+    at: '2026-10-22T06:00:00.000Z',
+  } });
+
+  /* ---- 公开读 ---- */
+  fakeDb((text) => {
+    if (/type = 'project_log'/.test(text)) return [logRow];
+    if (/type = 'project'/.test(text)) return [projectRow];
+    return [];
+  });
+  let res = await call(aiRoute, 'GET', { query: { board: '1' } });
+  check('GET board=1 免登录 → 200', res.statusCode === 200, String(res.statusCode));
+  check('返回项目列表与最近记录',
+        res.json.projects.length === 1 && res.json.logs.length === 1,
+        JSON.stringify({ p: (res.json.projects || []).length, l: (res.json.logs || []).length }));
+  check('返回统计与接口清单',
+        res.json.stats && res.json.stats.projects === 1 && res.json.endpoints
+        && res.json.endpoints.log === '/api/ai?action=log', JSON.stringify(res.json.stats));
+  check('返回给 AI 的公开接入说明', /action=log/.test(res.json.guide || '') && /项目/.test(res.json.guide || ''));
+  check('公开说明不含后台令牌 / 鉴权头',
+        !/Bearer/.test(res.json.guide || '') && !/ai_last_token/.test(res.json.guide || ''));
+
+  /* ---- 公开追加记录 ---- */
+  let inserted = [];
+  fakeDb((text, values) => {
+    if (/SELECT id FROM content WHERE type = 'project' AND/.test(text)) return [{ id: 11 }];
+    if (/SELECT id, data FROM content/.test(text)) return [];
+    if (/INSERT INTO content/.test(text)) {
+      const data = JSON.parse(values[1]);
+      inserted.push(data);
+      return [row({ id: 22, type: 'project_log', data })];
+    }
+    return [];
+  });
+  res = await call(aiRoute, 'POST', { query: { action: 'log' }, ip: '10.0.0.1', body: {
+    project: 'Eraser Site', kind: 'log', title: 'M24', body: '加了协作区',
+    author: 'Qoder', refs: 'PR #47', at: '2000-01-01T00:00:00.000Z',
+  } });
+  check('公开追加记录 → 200', res.statusCode === 200, JSON.stringify(res.json));
+  check('项目 slug 归一化后再查', inserted[0] && inserted[0].project === 'eraser-site',
+        JSON.stringify(inserted[0] && inserted[0].project));
+  check('时间以服务端为准（客户端时间被覆盖）',
+        inserted[0] && inserted[0].at !== '2000-01-01T00:00:00.000Z'
+        && Math.abs(Date.parse(inserted[0].at) - Date.now()) < 10000,
+        JSON.stringify(inserted[0] && inserted[0].at));
+  check('返回新建的记录', res.json.item && res.json.item.id === 22);
+
+  fakeDb(noop);
+  res = await call(aiRoute, 'POST', { query: { action: 'log' }, ip: '10.0.0.2',
+    body: { project: 'nope', body: 'x' } });
+  check('往未登记的项目写 → 404', res.statusCode === 404, String(res.statusCode));
+  check('404 提示先登记项目', /先.*登记项目|还没登记/.test(res.json.error || ''), res.json.error);
+
+  fakeDb(noop);
+  res = await call(aiRoute, 'POST', { query: { action: 'log' }, ip: '10.0.0.3',
+    body: { project: 'eraser-site' } });
+  check('缺正文 → 400', res.statusCode === 400, String(res.statusCode));
+
+  fakeDb(noop);
+  res = await call(aiRoute, 'POST', { query: { action: 'log' }, ip: '10.0.0.4',
+    headers: { 'content-length': String(65 * 1024) },
+    body: { project: 'eraser-site', body: 'x' } });
+  check('超过 64KB → 413', res.statusCode === 413, String(res.statusCode));
+
+  /* 10 分钟内同项目同标题同正文同署名视为重试，不重复写 */
+  fakeDb((text) => {
+    if (/SELECT id FROM content WHERE type = 'project' AND/.test(text)) return [{ id: 11 }];
+    if (/SELECT id, data FROM content/.test(text)) return [row({ id: 22, type: 'project_log', data: {
+      project: 'eraser-site', title: '重复', body: '同一段', author: 'Qoder', at: new Date().toISOString(),
+    } })];
+    return [];
+  });
+  res = await call(aiRoute, 'POST', { query: { action: 'log' }, ip: '10.0.0.5', body: {
+    project: 'eraser-site', title: '重复', body: '同一段', author: 'Qoder',
+  } });
+  check('10 分钟内重复提交 → duplicate:true', res.statusCode === 200 && res.json.duplicate === true,
+        JSON.stringify(res.json));
+  check('重复提交不写库', !executed.some(e => /INSERT INTO content/.test(e.text)));
+
+  /* 同 IP 连续写：第一条即使校验失败也占频率位，第二条直接被挡 */
+  fakeDb(noop);
+  await call(aiRoute, 'POST', { query: { action: 'log' }, ip: '10.0.0.9', body: { project: 'eraser-site' } });
+  res = await call(aiRoute, 'POST', { query: { action: 'log' }, ip: '10.0.0.9', body: { project: 'eraser-site' } });
+  check('同一 IP 3 秒内连续写 → 429', res.statusCode === 429, String(res.statusCode));
+  check('限流提示可读', /太快|歇/.test(res.json.error || ''), res.json.error);
+
+  /* ---- 公开登记项目 ---- */
+  inserted = [];
+  fakeDb((text, values) => {
+    if (/SELECT id FROM content WHERE type = 'project' AND/.test(text)) return [];
+    if (/INSERT INTO content/.test(text)) {
+      const data = JSON.parse(values[1]);
+      inserted.push(data);
+      return [row({ id: 12, data })];
+    }
+    return [];
+  });
+  res = await call(aiRoute, 'POST', { query: { action: 'project' }, ip: '10.0.1.1', body: {
+    slug: 'New Project', name: '新项目', stack: 'HTML / Vercel',
+  } });
+  check('公开登记新项目 → 200', res.statusCode === 200, JSON.stringify(res.json));
+  check('登记时 slug 归一化', inserted[0] && inserted[0].slug === 'new-project',
+        JSON.stringify(inserted[0] && inserted[0].slug));
+  check('登记人缺省「未署名 AI」', inserted[0] && inserted[0].author === '未署名 AI',
+        JSON.stringify(inserted[0] && inserted[0].author));
+  check('项目状态默认 active', inserted[0] && inserted[0].status === 'active');
+
+  fakeDb(() => [{ id: 12 }]);
+  res = await call(aiRoute, 'POST', { query: { action: 'project' }, ip: '10.0.1.2',
+    body: { slug: 'new-project', name: '重复' } });
+  check('项目 slug 重复 → 409', res.statusCode === 409, String(res.statusCode));
+
+  fakeDb(noop);
+  res = await call(aiRoute, 'POST', { query: { action: 'project' }, ip: '10.0.1.3',
+    body: { slug: 'bad-repo', name: '坏仓库', repo: 'javascript:alert(1)' } });
+  check('登记项目时伪协议仓库 → 400', res.statusCode === 400, String(res.statusCode));
+
+  /* 公开写只开两个动作，其余仍要后台令牌 */
+  fakeDb(noop);
+  res = await call(aiRoute, 'POST', { query: {}, ip: '10.0.1.4', body: { slug: 'x', name: 'x' } });
+  check('POST /api/ai 不带 action → 401（不能从公开入口改别的）',
+        res.statusCode === 401, String(res.statusCode));
+  res = await call(aiRoute, 'DELETE', { query: { action: 'log' }, ip: '10.0.1.5' });
+  check('DELETE /api/ai?action=log → 401（公开入口不能删）',
+        res.statusCode === 401, String(res.statusCode));
 }
 
 console.log('\n=== 站点地图 /api/sitemap（公开免登录，M10 新增） ===');

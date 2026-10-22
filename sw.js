@@ -25,7 +25,7 @@
 /* v6 → v7：M21 漫画对等 + B 站放送表自动补全（collect 交互与样式） */
 /* v7 → v8：M22 追更资料自动同步（最新集数 / 完结）+ 播放结束确认条 */
 /* v8 → v9：M23 写作便利（整份草稿 / 粘贴插图 / 快捷写文章与备份 / 发布开关） */
-const VERSION = 'eraser-v9';
+const VERSION = 'eraser-v10';
 const CACHE = VERSION;
 
 /* 预缓存：离线时至少能打开首页外壳（页面本体走 network-first，这是兜底） */

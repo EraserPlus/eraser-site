@@ -29,6 +29,7 @@
     { ic: "📝", name: "博客", href: "blog/index.html", key: "b" },
     { ic: "📺", name: "追更", href: "collect/index.html", key: "c" },
     { ic: "🗺️", name: "学习", href: "learn/index.html", key: "l" },
+    { ic: "🤖", name: "AI 协作", href: "ai/index.html", key: "i" },
     { ic: "🔗", name: "导航", href: "nav/index.html", key: "n" },
     { ic: "📄", name: "关于", href: "about/index.html", key: "a" },
     { ic: "🎛️", name: "开发交接", href: "dev/index.html", key: "d" }

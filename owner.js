@@ -401,7 +401,9 @@
     /* 站主快捷操作：全局浮条与 Ctrl+K 面板共用 */
     writePost: writePost,
     backup: backup,
-    quickActions: quickActions
+    quickActions: quickActions,
+    /* 按需加载共享编辑器（AI 协作区等新页面用，避免给访客多下 90KB） */
+    ensureEditor: ensureEditor
   };
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);

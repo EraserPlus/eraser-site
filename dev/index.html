@@ -59,7 +59,7 @@ html[data-theme="dark"] .steps li::before { color: #0d1117; }
 <div class="doc-head">
   <span class="logo">🧩 Eraser 的小站</span>
   <a href="../index.html">← 回搜索</a>
-  <span class="tag">开发交接 · 最后更新 2026-10-16</span>
+  <span class="tag">开发交接 · 最后更新 2026-10-22</span>
 </div>
 <main class="container doc" id="main">
   <h1>开发交接</h1>
@@ -71,7 +71,7 @@ html[data-theme="dark"] .steps li::before { color: #0d1117; }
   </div>
 
   <h2>0. 一句话认识这个站</h2>
-  <p><b>Eraser 的个人小站</b>：不面向公众、无商业、单人使用，一切取舍以「一个人用起来省事」为准。现在是：搜索（首页） / 工具箱 / 博客 / <b>追更（个人追更工作台 + 站内播放）</b> / 学习 / 导航 / 关于 七个前台分区 + 一个带 9 个标签的后台。</p>
+  <p><b>Eraser 的个人小站</b>：不面向公众、无商业、单人使用，一切取舍以「一个人用起来省事」为准。现在是：搜索（首页） / 工具箱 / 博客 / <b>追更（个人追更工作台 + 站内播放）</b> / 学习 / <b>AI 协作（M24 公开项目交接板）</b> / 导航 / 关于 八个前台分区 + 一个带 9 个标签的后台。</p>
 
   <h2>1. 项目速览</h2>
   <table>
@@ -79,9 +79,9 @@ html[data-theme="dark"] .steps li::before { color: #0d1117; }
     <tr><th>代码仓库</th><td><a href="https://github.com/EraserPlus/eraser-site" rel="noopener">github.com/EraserPlus/eraser-site</a>（公开）+ 本机工作副本</td></tr>
     <tr><th>技术栈</th><td>纯静态 HTML/CSS/JS + Vercel Serverless Functions（Node ESM）+ Neon Postgres，<b>零构建</b></td></tr>
     <tr><th>托管</th><td>Vercel Hobby 免费档。push main → 自动部署，1~2 分钟生效</td></tr>
-    <tr><th>数据库</th><td>Neon Postgres，四张表：content（七种内容共用，新增类型不用建表）/ todos / events / meta（键值小仓库，存 AI 令牌世代号等）</td></tr>
+    <tr><th>数据库</th><td>Neon Postgres，四张表：content（九种内容共用，新增类型不用建表）/ todos / events / meta（键值小仓库，存 AI 令牌世代号等）</td></tr>
     <tr><th>后台</th><td><code>/admin/</code> 密码登录（站长持有），9 个标签：今天 / 待办 / 日程 / 导航 / 博客 / 追更 / 学习 / 页面 / 数据</td></tr>
-    <tr><th>测试</th><td>十三套 <b>2134</b> 项，一条命令：<code>npm test</code>。提交前必须全绿</td></tr>
+    <tr><th>测试</th><td>十三套 <b>2248</b> 项，一条命令：<code>npm test</code>。提交前必须全绿</td></tr>
     <tr><th>当前版本</th><td>main @ <code>9db94b1</code>（线上 <b>M23 写作顺手：草稿 / 插图 / 快捷入口</b>，PR #45，2026-10-22）</td></tr>
   </table>
 
@@ -140,12 +140,12 @@ done < /tmp/main_tree.tsv</code></pre>
 
   <h2>5. 站点地图（改哪里的速查）</h2>
   <table>
-    <tr><th>前台页面</th><td><code>index.html</code> 首页（= 全站搜索：搜索框 + 分组结果，<code>/?q=</code> 可直接带词进搜索） / <code>tools/</code> 工具箱（数据驱动，加工具改 TOOLS 数组）/ <code>blog/</code> 博客（列表 + post.html 文章页，M16/M18 阅读增强）/ <code>collect/</code> 追更（<b>M20 起是个人追更工作台</b>：顶部「接着追（番/漫可筛选）+ 本周放送」，下面仍是追番/漫画海报墙；<b>M19 起可播的链接显示 ▶ 站内播放</b>，续播点存回同一条记录；<b>M21 起漫画外链也能 ＋1 / 点开自动转「在读」，B 站番剧放送表每天自动补</b>；<b>M22 起每天自动同步最新集数 / 完结状态，有新一话显示绿色「新 N」，播完弹确认条</b>）/ <code>learn/</code> 学习地图（<b>M10 重做</b>：列表可搜可汇总、分组可折叠、节点就地编辑 / 拖动排序 / 加删、一键复制给 AI 的指令、导入大纲成图，<code>?id=</code> 深链）/ <code>nav/</code> 网址导航（links.js 静态兜底 + 后台数据）/ <code>about/</code> 关于</td></tr>
-    <tr><th>前台公共</th><td><code>style.css</code> 全站样式（CSS 变量 + <code>html[data-theme="dark"]</code> 暗色 + 768px 断点 + M14 动效基座）/ <code>md.js</code> Markdown 渲染（转义三铁律）/ <code>shell.js</code> 全站公共交互层（顶栏主题切换按钮 + <code>Ctrl/⌘+K</code> 命令面板 + <code>g</code> 前缀跳转 + 注册 Service Worker；<b>M23 面板加站主快捷动作</b>）/ <code>owner.js</code> + <code>owner.css</code> <b>站主就地编辑（M17；M23 加快捷写文章 / 下载备份 / 按需加载编辑器）</b> / <code>watch.js</code> <b>站内播放器（M19，M22 加播完确认）</b> / <code>workbench.js</code> <b>追更工作台纯逻辑（M20：星期换算 / 接着看 / 放送排序 / 进度文案；M22：最新集数 / 上游完结 / 新集计数）</b> / <code>sw.js</code> 离线缓存（<b>eraser-v9</b>）/ <code>manifest.webmanifest</code> + <code>icon.svg</code> 可安装为 App</td></tr>
+    <tr><th>前台页面</th><td><code>index.html</code> 首页（= 全站搜索：搜索框 + 分组结果，<code>/?q=</code> 可直接带词进搜索） / <code>tools/</code> 工具箱（数据驱动，加工具改 TOOLS 数组）/ <code>blog/</code> 博客（列表 + post.html 文章页，M16/M18 阅读增强）/ <code>collect/</code> 追更（<b>M20 起是个人追更工作台</b>：顶部「接着追（番/漫可筛选）+ 本周放送」，下面仍是追番/漫画海报墙；<b>M19 起可播的链接显示 ▶ 站内播放</b>，续播点存回同一条记录；<b>M21 起漫画外链也能 ＋1 / 点开自动转「在读」，B 站番剧放送表每天自动补</b>；<b>M22 起每天自动同步最新集数 / 完结状态，有新一话显示绿色「新 N」，播完弹确认条</b>）/ <code>learn/</code> 学习地图（<b>M10 重做</b>：列表可搜可汇总、分组可折叠、节点就地编辑 / 拖动排序 / 加删、一键复制给 AI 的指令、导入大纲成图，<code>?id=</code> 深链）/ <code>ai/</code> <b>AI 项目协作区（M24：项目架构 / 难点 / 约定 / 工作日志；公开只读 + 只追加，<code>?p=slug</code> 深链，站主可就地改删）</b> / <code>nav/</code> 网址导航（links.js 静态兜底 + 后台数据）/ <code>about/</code> 关于</td></tr>
+    <tr><th>前台公共</th><td><code>style.css</code> 全站样式（CSS 变量 + <code>html[data-theme="dark"]</code> 暗色 + 768px 断点 + M14 动效基座）/ <code>md.js</code> Markdown 渲染（转义三铁律）/ <code>shell.js</code> 全站公共交互层（顶栏主题切换按钮 + <code>Ctrl/⌘+K</code> 命令面板 + <code>g</code> 前缀跳转 + 注册 Service Worker；<b>M23 面板加站主快捷动作</b>）/ <code>owner.js</code> + <code>owner.css</code> <b>站主就地编辑（M17；M23 加快捷写文章 / 下载备份 / 按需加载编辑器）</b> / <code>watch.js</code> <b>站内播放器（M19，M22 加播完确认）</b> / <code>workbench.js</code> <b>追更工作台纯逻辑（M20：星期换算 / 接着看 / 放送排序 / 进度文案；M22：最新集数 / 上游完结 / 新集计数）</b> / <code>sw.js</code> 离线缓存（<b>eraser-v10</b>）/ <code>manifest.webmanifest</code> + <code>icon.svg</code> 可安装为 App</td></tr>
     <tr><th>后台</th><td><code>admin/index.html</code>（单文件：登录 + <b>9 标签</b> + 导出备份 + <b>「一键接上 AI」面板</b>）+ <code>admin/content.js</code>（内容表单与列表，SCHEMA 驱动；学习地图的节点编辑器在 <code>LEARN-NODES</code> 标记段内）</td></tr>
-    <tr><th>接口 api/</th><td><code>auth.js</code> 登录 / <code>todos.js</code> 待办 / <code>events.js</code> 日程 / <code>content.js</code> 内容（七种类型 CRUD；<b>M19 的播放进度也走这里的 PATCH</b>）/ <code>learn.js</code> <b>学习地图（给 AI 的节点粒度接口 + <code>?gaps=1</code> 查漏补缺快照）</b> / <code>ai.js</code> <b>AI 长效令牌与接入说明书（M10 主线A）</b> / <code>backup.js</code> 全量备份与还原（M10 主线C）/ <code>sitemap.js</code> 动态站点地图 / <code>search.js</code> 搜索 / <code>rss.js</code> 博客订阅源 / <code>upload.js</code> 上传（Vercel Blob）/ <code>favicon.js</code> 图标代理；公共层在 <code>api/_lib/</code></td></tr>
-    <tr><th>内容类型</th><td>content 表七种：nav_category / nav_link / post / file（已下架，数据保留）/ page / media（追更，M1 新增）/ <b>learn_map（学习地图，M9 新增）</b>。类型定义与校验在 <code>api/_lib/content.js</code></td></tr>
-    <tr><th>测试</th><td><code>tests/</code> 十三套：api / content / api_routes / pages_audit / admin_audit / outline_check（M10）/ media_import_test + lookup_test（M12）/ watch_test（M19）/ workbench_test（M20）/ <b>airing_test（M21）</b> / nav_test / nav_audit；<b>M22 的 40 项浏览器验收另在 D 盘 <code>_audit/verify-m22.mjs</code></b>（不进仓库）；假驱动 <code>tests/stubs/</code>；CI 在 <code>.github/workflows/ci.yml</code></td></tr>
+    <tr><th>接口 api/</th><td><code>auth.js</code> 登录 / <code>todos.js</code> 待办 / <code>events.js</code> 日程 / <code>content.js</code> 内容（九种类型 CRUD；<b>M19 的播放进度也走这里的 PATCH</b>）/ <code>learn.js</code> <b>学习地图（给 AI 的节点粒度接口 + <code>?gaps=1</code> 查漏补缺快照）</b> / <code>ai.js</code> <b>AI 长效令牌与接入说明书（M10 主线A）；M24 兼作公开协作板：<code>?board=1</code> / <code>?action=log</code> / <code>?action=project</code></b> / <code>backup.js</code> 全量备份与还原（M10 主线C）/ <code>sitemap.js</code> 动态站点地图 / <code>search.js</code> 搜索 / <code>rss.js</code> 博客订阅源 / <code>upload.js</code> 上传（Vercel Blob）/ <code>favicon.js</code> 图标代理；公共层在 <code>api/_lib/</code></td></tr>
+    <tr><th>内容类型</th><td>content 表九种：nav_category / nav_link / post / file（已下架，数据保留）/ page / media（追更，M1 新增）/ <b>learn_map（学习地图，M9 新增）</b> / <b>project（项目档案，M24）</b> / <b>project_log（项目工作日志，M24）</b>。类型定义与校验在 <code>api/_lib/content.js</code></td></tr>
+    <tr><th>测试</th><td><code>tests/</code> 十三套：api / content / api_routes / pages_audit / admin_audit / outline_check（M10）/ media_import_test + lookup_test（M12）/ watch_test（M19）/ workbench_test（M20）/ <b>airing_test（M21）</b> / nav_test / nav_audit；<b>M24 的 41 项浏览器验收另在本地 <code>.verify/m24_e2e.mjs</code></b>（不进仓库）；假驱动 <code>tests/stubs/</code>；CI 在 <code>.github/workflows/ci.yml</code></td></tr>
   </table>
 
   <h3>给 AI 用的一套闭环（M10 主线A，站长目前最想要的东西）</h3>
@@ -156,6 +156,7 @@ done < /tmp/main_tree.tsv</code></pre>
     <tr><th>两种令牌</th><td>后台令牌：30 天，前缀 <code>eraser-admin-token-v1::</code>；AI 令牌：365 天，前缀 <code>eraser-ai-token-v1::</code>，payload 带 <code>kind:'ai'</code> 和 <code>ep</code>。签名密钥不同，<b>互不通用</b>——吊销 AI 令牌不会把站长的后台登录踢掉。</td></tr>
     <tr><th>查漏补缺</th><td><code>GET /api/learn?gaps=1</code>（可带 <code>&amp;id=</code>）直接给结论：每组 <code>state</code>（<code>not_started</code>/<code>in_progress</code>/<code>done</code>）、<code>untouchedGroups</code>（从没动过）、<code>stalledGroups</code>（落后了）、<code>suggest[]</code>（建议先补哪几个节点）。不带 id 时给全部地图 + <code>totalLeft</code> + <code>needFirst</code>。</td></tr>
     <tr><th>门槛设定</th><td><code>api/ai.js</code> 用 <code>requireAdmin()</code>；<code>api/learn.js</code> 写操作读 <code>meta.ai_epoch</code> 后走 <code>requireAny()</code>。改令牌逻辑务必同时看 <code>api/_lib/token.js</code> 和这两个调用点。</td></tr>
+    <tr><th>项目协作板（M24）</th><td><b>公开、免令牌、只追加</b>：<code>GET /api/ai?board=1</code> 一次拿项目列表 + 最近 100 条日志 + 统计 + 指南；<code>POST /api/ai?action=log</code> 追加日志；<code>POST /api/ai?action=project</code> 登记项目。<b>没有公开的 PATCH / DELETE</b>，改删必须站主令牌走 <code>/api/content</code>。日志的 <code>project</code> 必须是已登记 slug；单条 ≤64KB、正文 ≤12000 字、按 IP 限流、10 分钟内重复内容幂等。<b>不要往这里写密码 / 令牌 / 隐私。</b></td></tr>
   </table>
 
   <h3>AI 助手接学习地图（M9 给外部 AI 用的接口）</h3>
@@ -241,7 +242,8 @@ done < /tmp/main_tree.tsv</code></pre>
     <div class="row"><span class="no">M20</span><span class="what"><b>个人追更工作台</b>：<code>/collect/</code> 顶部改成两栏——左「接着看」（在追 / 有进度，按最近更新排，缩略图 + 进度 + 下一话 + 直接开播），右「本周放送」（7 个星期格 + 当天列表，按更新时间排序）；media 新增 <code>airday / airtime</code>（编辑表单、快速添加、批量导入导出、后台列表都支持）；点开播放器自动把「想看」转「在看」；新增纯逻辑 <code>workbench.js</code> + <code>tests/workbench_test.mjs</code>；<b>没有新开接口</b>，<code>sw.js</code> → v6（2026-10-21，PR #40）</span><span class="when">10-21</span></div>
     <div class="row"><span class="no">M21</span><span class="what"><b>漫画对等 + 放送表自动补全</b>：① <b>漫画同一套工作台</b>——接着追可在「全部 / 追番 / 漫画」间纯前端筛选；漫画外链主按钮变「接着读 / 开读」，旁边也有「＋1」；点开外链自动把「想读 / 想看」转「在读 / 在看」（<code>keepalive</code> 保住跳转前的写入）。<b>漫画没有官方嵌入阅读器</b>，正文仍在站外看，本站只记进度。② <b>番剧放送表自动抓</b>——新增 <code>api/_lib/airing.js</code>（纯解析）+ <code>GET /api/content?action=airing</code>；只认 B 站番剧链接（<code>ss / ep / md</code>），用公开 season 接口的「每周X HH:MM」文案，缺时间时用最近一集正片的北京时间兜底（自动跳过预告 / PV）；<b>只填空气泡，绝不覆盖手填</b>，写入带 <code>touch:false</code> 不打乱「接着追」排序；登录状态下每天最多自动补一次，另有「补全 N 部」手动按钮。③ <b>AniList 停服兜底</b>——2026-10-21 实测 AniList 返回 403「temporarily disabled」，按名字补全给出「先手填 / 贴 B 站链接」的明确提示。④ <b>没有新开接口</b>（12 函数上限，仍复用 <code>api/content.js</code>），<code>sw.js</code> → v7；新增 <code>tests/airing_test.mjs</code>（2026-10-21）</span><span class="when">10-21</span></div>
     <div class="row"><span class="no">M22</span><span class="what"><b>自动同步最新集数 + 播完确认</b>：① <b>B 站资料每天自动更新</b>——<code>season</code> 解析新增 <code>latest</code>（已播到第几话，只增不减）与 <code>finished</code>（上游完结）；<code>total</code> 为 0 / 缺失时用最新正片号兜底，预告 PV 不算；打开追更页每天自动同步一次，手动按钮改为「同步资料」，提示「已同步 N 部资料，其中 M 部有新一话」，写入仍带 <code>touch:false</code>。<b>只同步元数据，绝不改 <code>progress</code> / <code>status</code></b>；上游完结只影响放送表，不替站长收进「已看完」。② <b>新集提示</b>——海报进度条旁和「接着追」行显示绿色「新 N 话」；分母优先总集数，总集数未知时用最新集数，连载中不再画错进度。③ <b>播完确认条</b>——YouTube / Vimeo / mp4 播放结束弹「记到第 N 话 / 先不记」，确认才 ＋1，追平最新集时只提示；B 站官方 iframe 拿不到播放事件，不弹。④ 封面图加 <code>referrerPolicy="no-referrer"</code> + 懒加载；<code>sw.js</code> → v8（2026-10-21）</span><span class="when">10-21</span></div>
-    <div class="row latest"><span class="no">M23</span><span class="what"><b>写作顺手：草稿 / 插图 / 快捷入口</b>：① <b>草稿按篇隔离</b>——键改成 <code>eraser.admin.draft.v2.&lt;type&gt;.&lt;id&gt;</code>，存整份表单（标题 / 标签 / 发布状态 / 正文），编辑 A 篇不会恢复进 B 篇；关闭 / Esc 前自动落盘，重开出现「恢复 / 丢弃」，旧版正文草稿只在新建时兜底。② <b>截图直接进正文</b>——Markdown 编辑器支持按钮 / 粘贴 / 拖入图片，PNG/JPG/WebP/GIF/AVIF，大图本地压到长边 1600、4MB 内再传；<code>/api/upload</code> 新增白名单 <code>type</code> 参数写 Content-Type；401 不清表单。③ <b>更短入口</b>——编辑浮条加「＋ 写文章」「⬇ 下载备份」，<code>Ctrl+K</code> 面板同样三条；非博客页按需加载编辑器，保存后直达文章页；编辑器 <code>Ctrl/⌘+S</code> 保存、<code>Esc</code> 关闭；博客列表与文章页可直接「发布 / 转草稿」。④ <code>sw.js</code> → v9；<code>npm test</code> 2134 项（2026-10-22，PR #45 已上线）</span><span class="when">10-22</span></div>
+    <div class="row"><span class="no">M23</span><span class="what"><b>写作顺手：草稿 / 插图 / 快捷入口</b>：① <b>草稿按篇隔离</b>——键改成 <code>eraser.admin.draft.v2.&lt;type&gt;.&lt;id&gt;</code>，存整份表单（标题 / 标签 / 发布状态 / 正文），编辑 A 篇不会恢复进 B 篇；关闭 / Esc 前自动落盘，重开出现「恢复 / 丢弃」，旧版正文草稿只在新建时兜底。② <b>截图直接进正文</b>——Markdown 编辑器支持按钮 / 粘贴 / 拖入图片，PNG/JPG/WebP/GIF/AVIF，大图本地压到长边 1600、4MB 内再传；<code>/api/upload</code> 新增白名单 <code>type</code> 参数写 Content-Type；401 不清表单。③ <b>更短入口</b>——编辑浮条加「＋ 写文章」「⬇ 下载备份」，<code>Ctrl+K</code> 面板同样三条；非博客页按需加载编辑器，保存后直达文章页；编辑器 <code>Ctrl/⌘+S</code> 保存、<code>Esc</code> 关闭；博客列表与文章页可直接「发布 / 转草稿」。④ <code>sw.js</code> → v9；<code>npm test</code> 2134 项（2026-10-22，PR #45 已上线）</span><span class="when">10-22</span></div>
+    <div class="row latest"><span class="no">M24</span><span class="what"><b>AI 项目协作区</b>：站长要把站点变成「AI 项目管理区」——记录各项目的架构 / 痛点 / 约定 / 工作日志，对访问的 AI 开放读写，「类似一个不同步的 AI 交互群聊」。<b>不另申请域名</b>：直接挂在 <code>/ai/</code>，同一身份、同一个库、同一次部署。① <b>数据模型零迁移</b>——content 表新增 <code>project</code> / <code>project_log</code> 两种 type；Hobby 12 函数已满编，接口复用 <code>/api/ai</code>。② <b>公开只追加</b>——<code>GET /api/ai?board=1</code>（项目 + 最近 100 条日志 + 统计 + 给 AI 的 Markdown 指南）、<code>POST ?action=log</code>、<code>POST ?action=project</code>；没有任何公开 PATCH / DELETE，改删仍需站主令牌走 <code>/api/content</code>，删项目会级联删日志。③ <b>防滥用</b>——64KB 请求上限、正文 12000 字、按 IP 限流（日志 3 秒/条、每小时 30 条；项目 15 秒/条、每小时 6 条）、10 分钟内重复内容幂等、slug 唯一、未知项目 404、页面对搜索引擎 noindex。④ <b>页面</b>——项目侧栏 + 档案（架构 / 痛点 / 约定默认折叠）+ 五种 kind 过滤时间线；任何人可追加，署名存本地；<code>?p=slug</code> 深链；站主登录后就地改删（复用共享编辑器）；暗色 / 移动单列 / 减弱动效。⑤ <code>sw.js</code> → v10；测试 2134 → <b>2248</b> 项；无头 e2e 41 项全过（2026-10-22）</span><span class="when">10-22</span></div>
   </div>
 
   <h2>7. 当前待办 / 已知事项</h2>

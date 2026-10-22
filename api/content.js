@@ -83,6 +83,14 @@ async function createOne(sql, t, b) {
       throw e;
     }
   }
+  if (t === 'project') {
+    const dup = await sql`SELECT id FROM content WHERE type = 'project' AND data->>'slug' = ${data.slug}`;
+    if (dup.length) {
+      const e = new Error('项目标识「' + data.slug + '」已经存在');
+      e.code = 'DUP';
+      throw e;
+    }
+  }
 
   const order = Number.isFinite(Number(b.sort_order)) ? Number(b.sort_order) : 0;
   const rows = await sql`
@@ -402,6 +410,12 @@ export default async function handler(req, res) {
         SELECT * FROM content WHERE type = ${t} ORDER BY sort_order ASC, id ASC`;
       let items = rows.map(shape);
 
+      /* AI 协作区：详情页只要某个项目的记录，按 slug 过滤，别把全站日志都传下去 */
+      if (t === 'project_log' && req.query && req.query.project) {
+        const project = String(req.query.project);
+        items = items.filter(function (r) { return r.data && r.data.project === project; });
+      }
+
       /* 文章草稿只给登录后的站主看：
          公开 GET 不带令牌时把 published === false 的行过滤掉。
          写接口本来就要求登录，这里补上读侧，避免草稿被前台接口直接读走。 */
@@ -462,6 +476,10 @@ export default async function handler(req, res) {
         const dup = await sql`SELECT id FROM content WHERE type='page' AND data->>'key' = ${data.key} AND id <> ${id}`;
         if (dup.length) return send(res, 409, { error: '页面标识「' + data.key + '」已经存在' });
       }
+      if (t === 'project') {
+        const dup = await sql`SELECT id FROM content WHERE type='project' AND data->>'slug' = ${data.slug} AND id <> ${id}`;
+        if (dup.length) return send(res, 409, { error: '项目标识「' + data.slug + '」已经存在' });
+      }
 
       const order = (b.sort_order === undefined) ? row.sort_order
         : (Number.isFinite(Number(b.sort_order)) ? Number(b.sort_order) : row.sort_order);
@@ -488,6 +506,17 @@ export default async function handler(req, res) {
         const n = await sql`DELETE FROM content WHERE parent_id = ${id} RETURNING id`;
         await sql`DELETE FROM content WHERE id = ${id}`;
         return ok(res, { ok: true, id, alsoDeletedLinks: n.length });
+      }
+
+      if (cur[0].type === 'project') {
+        /* 删项目时一并清掉它的工作记录，避免板上留下无主日志 */
+        const row = await sql`SELECT data FROM content WHERE id = ${id}`;
+        const slug = asObj(row[0] && row[0].data).slug;
+        const n = slug
+          ? await sql`DELETE FROM content WHERE type = 'project_log' AND data->>'project' = ${slug} RETURNING id`
+          : [];
+        await sql`DELETE FROM content WHERE id = ${id}`;
+        return ok(res, { ok: true, id, alsoDeletedLogs: n.length });
       }
 
       await sql`DELETE FROM content WHERE id = ${id}`;
