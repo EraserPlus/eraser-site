@@ -616,6 +616,27 @@
     });
     bar.appendChild(ed);
 
+    /* 在正文页直接发布 / 转草稿，不用回列表或后台 */
+    var isPub = found.data.published !== false;
+    var pub = document.createElement("button");
+    pub.type = "button";
+    pub.className = "owner-btn";
+    pub.textContent = isPub ? "转草稿" : "发布";
+    pub.title = isPub ? "转成草稿，前台立刻不显示" : "公开发布，前台立即可见";
+    pub.addEventListener("click", function(){
+      pub.disabled = true;
+      Owner.api("content", { method: "PATCH", body: { id: found.id, data: { published: !isPub } } })
+        .then(function(){
+          Owner.toast(isPub ? "已转为草稿" : "已发布", "ok");
+          location.reload();
+        })
+        .catch(function(e){
+          pub.disabled = false;
+          Owner.toast((e && e.message) || "操作失败", "err");
+        });
+    });
+    bar.appendChild(pub);
+
     var del = document.createElement("button");
     del.type = "button";
     del.className = "owner-btn danger";

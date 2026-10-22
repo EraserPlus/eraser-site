@@ -729,6 +729,21 @@ console.log('\n=== 文件上传 /api/upload（Vercel Blob）===');
         res.json.data && res.json.data.url === 'https://fake.blob.test/' + recorded[0].pathname,
         JSON.stringify(res.json.data));
 
+  /* 客户端压缩会把 webp 改名成 .jpg，Content-Type 必须由前端显式传 */
+  recorded.length = 0;
+  res = await call(uploadRoute, 'POST', {
+    token: TOKEN, query: { name: '截图.jpg', type: 'image/jpeg' }, chunks: [Buffer.from('jpeg')],
+  });
+  check('图片上传带上 Content-Type', recorded[0] && recorded[0].options.contentType === 'image/jpeg',
+        recorded[0] && recorded[0].options.contentType);
+  recorded.length = 0;
+  res = await call(uploadRoute, 'POST', {
+    token: TOKEN, query: { name: 'x.svg', type: 'image/svg+xml' }, chunks: [Buffer.from('<svg/>')],
+  });
+  check('白名单外的类型不写入 Content-Type', recorded[0] && recorded[0].options.contentType === undefined,
+        recorded[0] && String(recorded[0].options.contentType));
+  check('白名单外的文件仍可上传（类型只影响响应头）', res.statusCode === 200, String(res.statusCode));
+
   /* 路径穿越：../ 必须被洗掉 */
   recorded.length = 0;
   res = await call(uploadRoute, 'POST', { token: TOKEN, query: { name: '../evil.txt' }, chunks: [Buffer.from('evil')] });

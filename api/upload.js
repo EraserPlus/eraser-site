@@ -12,6 +12,10 @@ import { ok, send, fail, readBody } from './_lib/http.js';
 /* 4MB 上限：Hobby 函数请求体上限 4.5MB，留余量 */
 const MAX_BYTES = 4 * 1024 * 1024;
 
+/* 只给浏览器能直接显示的位图打上 Content-Type。
+   前端压缩后会把 webp 改名成 .jpg，靠扩展名推断不可靠，这里显式传。 */
+const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif']);
+
 /* 文件名清洗：去路径分隔符和控制字符，防路径穿越 */
 function safeName(raw) {
   const s = String(raw == null ? '' : raw)
@@ -29,13 +33,17 @@ export default async function handler(req, res) {
       return send(res, 503, { error: '服务器还没配好：缺少 BLOB_READ_WRITE_TOKEN。去 Vercel 项目里连接 Blob 存储；或者直接在表单里粘贴文件链接。' });
     }
     const name = safeName((req.query && req.query.name) || '');
+    const rawType = String((req.query && req.query.type) || '').toLowerCase();
+    const contentType = IMAGE_TYPES.has(rawType) ? rawType : '';
     const body = await readBody(req, MAX_BYTES);
     if (!body.length) return send(res, 400, { error: '文件内容是空的' });
-    const result = await put('files/' + name, body, {
+    const options = {
       access: 'public',
       token: process.env.BLOB_READ_WRITE_TOKEN,
       addRandomSuffix: true,
-    });
+    };
+    if (contentType) options.contentType = contentType;
+    const result = await put('files/' + name, body, options);
     return ok(res, { ok: true, data: { url: result.url, pathname: result.pathname } });
   } catch (e) {
     return fail(res, e);

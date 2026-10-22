@@ -129,7 +129,7 @@ console.log('\n=== 内容管理（导航 / 博客 / 页面 / 追更 / 学习）=
     ['页面标签内容区', /id="tab-page"[\s\S]*id="pageHost"/],
     ['加载了 Markdown 渲染器', /<script src="\.\.\/md\.js"><\/script>/],
     ['加载了内容管理模块', /<script src="content\.js"><\/script>/],
-    ['初始化时把 api 和 say 传进去', /ContentAdmin\.init\(\{\s*api:\s*api,\s*say:\s*say\s*\}\)/],
+    ['初始化时把 api 和 say 传进去', /ContentAdmin\.init\(\{[\s\S]{0,260}?api:\s*api,\s*say:\s*say/],
     ['切标签时调用内容渲染', /ContentAdmin\.render\(tab\)/],
     ['标签栏可横向滚动（手机上有 9 个标签）', /\.tabs\{\s*overflow-x:auto/],
     ['表单弹层样式', /\.cf-overlay\{/],
@@ -200,7 +200,7 @@ console.log('\n=== 内容管理（导航 / 博客 / 页面 / 追更 / 学习）=
       /episodes: \["总集数"[\s\S]{0,120}?progress: \["进度"/],
     ['下拉框有选项（select 构建）', /var sel = el\("select"\)/],
     ['链接表单带搜索关键词字段', /\{ k: "keywords", l: "搜索关键词/],
-    ['通用表单构建器', /function buildForm\(type, onSave, onCancel\)/],
+    ['通用表单构建器', /function buildForm\(type, onSave, onCancel, opts\)/],
     ['表单弹层', /function openForm\(title, formNode\)/],
     ['导航：可导入旧的 links.js', /function importFromLinksJs/],
     ['导入用 parseLinksJs 解析（links.js 是 JS literal，不能 JSON.parse）', /var data = parseLinksJs\(text\);/],
@@ -214,11 +214,22 @@ console.log('\n=== 内容管理（导航 / 博客 / 页面 / 追更 / 学习）=
     ['删除前二次确认', /if \(!confirm\(/],
     ['失败时提示不静默，并把失败抛给调用方', /catch\(function \(e\) \{ say\("app", e\.message, "err"\); throw e; \}\)/],
     ['Markdown 预览用 MD.render', /md\.render\(ta\.value\)/],
-    ['Markdown 实时预览（输入即渲染）', /ta\.addEventListener\("input", function \(\) \{ paint\(\)/],
+    ['Markdown 实时预览（输入即渲染）', /ta\.addEventListener\("input", paint\)/],
     ['草稿自动保存', /function saveDraft/],
+    ['草稿按「类型 + 条目」隔离', /DRAFT_PREFIX \+ type \+ "\." \+ \(id == null/],
+    ['草稿存整份表单（不只正文）', /JSON\.stringify\(\{ v: 2, at: Date\.now\(\), data: collect\(\) \}\)/],
     ['草稿恢复/丢弃条', /检测到未保存的草稿/],
     ['保存成功后清草稿', /box\.clearDraft/],
     ['关弹层时停掉草稿定时器', /draftTimers\.forEach/],
+    ['关弹层前把改动落盘', /activeForm\.flushDraft/],
+    ['Ctrl/⌘+S 保存、Esc 关闭', /e\.key === "Escape"[\s\S]{0,400}?formNode\.save/],
+    ['Markdown 可插入图片', /"🖼 插入图片"/],
+    ['支持粘贴图片', /ta\.addEventListener\("paste"/],
+    ['支持拖入图片', /ta\.addEventListener\("drop"/],
+    ['大图先在本地压缩', /function prepareUpload\(file\)/],
+    ['压缩长边上限 1600', /MAX_IMAGE_EDGE = 1600/],
+    ['上传带 MIME 类型', /"&type=" \+ encodeURIComponent\(type\)/],
+    ['上传 401 会唤起登录', /e\.auth = true/],
   ];
   cMust.forEach(([name, re]) => check(`content.js 包含：${name}`, re.test(cjs)));
 
@@ -333,7 +344,7 @@ console.log('\n=== 一键接上 AI 面板（M10）===');
 
   check('面板函数 renderAiPanel 存在', /function renderAiPanel\(/.test(html));
   check('切到学习 tab 时会刷新面板', /tab === "learn"[\s\S]{0,120}?renderAiPanel\(\)/.test(html));
-  check('进入后台时绑定了按钮事件', /function enterApp\(\)[\s\S]{0,220}?aiBind\(\)/.test(html));
+  check('进入后台时绑定了按钮事件', /function enterApp\(\)[\s\S]{0,700}?aiBind\(\)/.test(html));
 
   check('复制按钮用 navigator.clipboard', /navigator\.clipboard\.writeText/.test(html));
   check('复制失败有 execCommand 兜底', /execCommand\("copy"\)/.test(html));

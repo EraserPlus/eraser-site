@@ -17,6 +17,9 @@
   var TOKEN_KEY = "eraser.admin.token";
   var AUTH_API = "/api/auth";
   var ADMIN_URL = "/admin/";
+  /* 站点根前缀：根目录为空，一级子目录为 "../"（与 shell.js 同一口径） */
+  var HERE = location.pathname;
+  var PREFIX = (HERE === "/" || /^\/[^/]*\.html$/.test(HERE)) ? "" : "../";
   var loginOpen = false;
   var expiredNotified = false;
   var toastTimer = null;
@@ -210,6 +213,99 @@
     input.focus();
   }
 
+  /* ---------------------------------------------------- 站主快捷操作（M23） */
+  /* 写文章 / 下载备份原先都藏在后台，进后台再找标签其实很绕。
+     这里放到全局：浮条一个按钮、Ctrl+K 面板三条动作。 */
+  function loadScript(src) {
+    return new Promise(function (resolve, reject) {
+      var s = document.createElement("script");
+      s.src = src;
+      s.onload = function () { resolve(); };
+      s.onerror = function () { reject(new Error("脚本加载失败：" + src)); };
+      document.head.appendChild(s);
+    });
+  }
+  /* 不在博客页也能写文章：按需把编辑器和 Markdown 渲染器拉进来 */
+  var editorLoading = null;
+  function ensureEditor() {
+    if (global.ContentAdmin && global.MD) {
+      global.ContentAdmin.init({ api: api, say: say, onAuthError: expire });
+      return Promise.resolve(global.ContentAdmin);
+    }
+    if (editorLoading) return editorLoading;
+    editorLoading = (global.MD ? Promise.resolve() : loadScript(PREFIX + "md.js").catch(function () {}))
+      .then(function () {
+        if (global.ContentAdmin) return null;
+        return loadScript(PREFIX + "admin/content.js");
+      })
+      .then(function () {
+        if (!global.ContentAdmin) throw new Error("编辑器加载失败，去后台试试");
+        global.ContentAdmin.init({ api: api, say: say, onAuthError: expire });
+        return global.ContentAdmin;
+      });
+    editorLoading.catch(function () { editorLoading = null; });
+    return editorLoading;
+  }
+
+  function writePost() {
+    if (!hasToken()) { openLogin(); return; }
+    ensureEditor().then(function (CA) {
+      CA.openNew("post", {
+        title: "写新文章",
+        afterSave: function (item) {
+          var d = (item && item.data) || {};
+          var slug = d.slug || d.title || "";
+          if (/\/blog\/post\.html$/.test(location.pathname)) { location.reload(); return; }
+          location.href = PREFIX + "blog/post.html" +
+            (slug ? "?slug=" + encodeURIComponent(slug) : "");
+        }
+      });
+    }).catch(function (e) { toast((e && e.message) || "编辑器加载失败", "err"); });
+  }
+
+  function backupName(d) {
+    var p = function (n) { return (n < 10 ? "0" : "") + n; };
+    return "eraser-backup-" + d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + ".json";
+  }
+  function backupCount(b) {
+    b = b || {};
+    var n = 0;
+    ["todos", "events", "posts", "files", "pages", "media", "learnMaps"].forEach(function (k) {
+      if (Array.isArray(b[k])) n += b[k].length;
+    });
+    if (b.nav) {
+      if (Array.isArray(b.nav.categories)) n += b.nav.categories.length;
+      if (Array.isArray(b.nav.links)) n += b.nav.links.length;
+    }
+    return n;
+  }
+  function backup() {
+    if (!hasToken()) { openLogin(); return; }
+    toast("正在打包全站数据…");
+    api("backup")
+      .then(function (j) {
+        var bk = (j && j.backup) || j;
+        var blob = new Blob([JSON.stringify(bk, null, 2)], { type: "application/json" });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = backupName(new Date());
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+        toast("备份已下载 · 共 " + backupCount(bk) + " 条数据", "ok");
+      })
+      .catch(function (e) { toast((e && e.message) || "备份失败", "err"); });
+  }
+
+  var OPEN_ACTIONS = [
+    { ic: "✍️", lb: "写新文章", hint: "站主", run: writePost },
+    { ic: "⬇️", lb: "下载全站备份", hint: "站主", run: backup },
+    { ic: "🎛️", lb: "管理后台", hint: "站主", run: function () { location.href = ADMIN_URL; } }
+  ];
+  function quickActions() { return hasToken() ? OPEN_ACTIONS : []; }
+
   /* ---------------------------------------------------------------- 浮条 */
   function refreshDock() {
     var dock = document.getElementById("ownerDock");
@@ -227,6 +323,20 @@
     mark.setAttribute("aria-hidden", "true");
     dock.appendChild(mark);
     dock.appendChild(el("span", "owner-dock-text", "编辑模式"));
+
+    var writeBtn = el("button", "owner-dock-act", "＋");
+    writeBtn.type = "button";
+    writeBtn.title = "写新文章（不开后台也能写）";
+    writeBtn.setAttribute("aria-label", writeBtn.title);
+    writeBtn.addEventListener("click", writePost);
+    dock.appendChild(writeBtn);
+
+    var dlBtn = el("button", "owner-dock-act", "⬇");
+    dlBtn.type = "button";
+    dlBtn.title = "下载全站备份（JSON）";
+    dlBtn.setAttribute("aria-label", dlBtn.title);
+    dlBtn.addEventListener("click", backup);
+    dock.appendChild(dlBtn);
 
     var back = el("a", "owner-dock-link", "后台");
     back.href = ADMIN_URL;
@@ -286,7 +396,12 @@
     openLogin: openLogin,
     logout: function () { setToken(""); location.reload(); },
     verify: verify,
-    refreshDock: refreshDock
+    expire: expire,
+    refreshDock: refreshDock,
+    /* 站主快捷操作：全局浮条与 Ctrl+K 面板共用 */
+    writePost: writePost,
+    backup: backup,
+    quickActions: quickActions
   };
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);

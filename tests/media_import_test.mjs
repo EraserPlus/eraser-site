@@ -204,6 +204,40 @@ console.log('\n=== 更新日 / 更新时间列（M20）===');
     js.items[0].airday + '/' + js.items[0].airtime);
 }
 
+console.log('\n=== 插图 / 上传纯逻辑（M23） ===');
+{
+  check('imageExt 只认可显示的位图',
+    CA.imageExt('image/png') === 'png' && CA.imageExt('image/JPEG') === 'jpg' &&
+    CA.imageExt('image/svg+xml') === '' && CA.imageExt('') === '');
+  check('imageUploadName 去路径、统一扩展名',
+    CA.imageUploadName('../../截图.PNG', 'image/jpeg') === '截图.jpg',
+    CA.imageUploadName('../../截图.PNG', 'image/jpeg'));
+  check('imageUploadName 空名兜底为 image',
+    CA.imageUploadName('', 'image/png') === 'image.png',
+    CA.imageUploadName('', 'image/png'));
+  check('imageUploadName 去掉非法字符',
+    CA.imageUploadName('a:b*c?.png', 'image/png') === 'abc.png',
+    CA.imageUploadName('a:b*c?.png', 'image/png'));
+  const big = CA.fitImageEdge(3200, 1600, 1600);
+  check('fitImageEdge 长边缩到上限、保持比例',
+    big.w === 1600 && big.h === 800 && big.scaled === true,
+    JSON.stringify(big));
+  const small = CA.fitImageEdge(800, 600, 1600);
+  check('fitImageEdge 小图不放大',
+    small.w === 800 && small.h === 600 && small.scaled === false,
+    JSON.stringify(small));
+  check('fitImageEdge 坏尺寸兜底 1×1',
+    CA.fitImageEdge(0, 0, 1600).w === 1 && CA.fitImageEdge(0, 0, 1600).h === 1);
+  check('mdImageSnippet 生成标准 Markdown',
+    CA.mdImageSnippet('https://x/y.png', '封面') === '![封面](https://x/y.png)',
+    CA.mdImageSnippet('https://x/y.png', '封面'));
+  check('mdImageSnippet 清掉 alt 里的方括号',
+    CA.mdImageSnippet('https://x/y.png', 'a]b[c') === '![abc](https://x/y.png)',
+    CA.mdImageSnippet('https://x/y.png', 'a]b[c'));
+  check('mdImageSnippet 空 alt 用「图片」',
+    CA.mdImageSnippet('https://x/y.png', '') === '![图片](https://x/y.png)');
+}
+
 console.log('\n=== 脏数据 ===');
 {
   const r = CA.parseImport('名称\t状态\n\t在看\n好的\t看完');
