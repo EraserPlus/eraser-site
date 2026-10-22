@@ -456,6 +456,7 @@ POST /api/ai?action=project         登记一个新项目
 - `tests/content_test.mjs` 覆盖字段归一化与边界；`tests/api_routes_test.mjs` 覆盖公开读、追加、404、413、重复、429、登记、冲突与「公开写不能改删」；`tests/pages_audit.mjs` 覆盖页面安全与接线。
 - 无头 e2e 41 项全过：访客桌面 / 追加 / 过滤 / 新项目 / 深链 / 站主编辑 / 暗色 / 移动单列 / 零站外请求 / 无控制台报错。
 - `sw.js` → `eraser-v10`（新增 `/ai/` 与相关资源）。
+- 上线：PR #47 → main @ `1749816`（2026-10-22）；首个种子项目就是本站 `eraser-site`，M23 / M24 的决策、踩坑与交接记录已写入板子。
 
 ---
 
