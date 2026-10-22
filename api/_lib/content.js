@@ -43,6 +43,20 @@ const TYPES = {
     // 学习地图：一张地图内含若干节点（nodes 是内嵌数组，不占额外表）
     fields: ['title', 'desc', 'status', 'nodes'],
   },
+  /* AI 项目协作区（M24）：一个项目一张卡 + 一串只追加的工作记录。
+     不新建表：项目和工作记录都放 content，靠 type 区分。
+     写入接口在 api/ai.js（公开、只追加），读取走公开的 /api/content。 */
+  project: {
+    public: true,
+    needsParent: false,
+    fields: ['slug', 'name', 'summary', 'status', 'stack', 'repo', 'site',
+             'goal', 'architecture', 'painpoints', 'conventions', 'author', 'at'],
+  },
+  project_log: {
+    public: true,
+    needsParent: false,
+    fields: ['project', 'kind', 'title', 'body', 'author', 'refs', 'tags', 'at'],
+  },
 };
 
 export function knownType(type) {
@@ -74,6 +88,20 @@ function url(v, name) {
   if (!/^https?:\/\//i.test(s)) throw bad(`${name}要以 http:// 或 https:// 开头`);
   try { new URL(s); } catch { throw bad(`${name}不是有效的网址`); }
   return s;
+}
+
+function optionalUrl(v, name) {
+  if (v == null || v === '') return null;
+  return url(v, name);
+}
+
+/* 统一存 ISO 时间。缺省用服务端当前时间；传了但解析不了就明确报错。
+   公开写入接口会强制覆盖成服务端时间，不信任客户端时钟。 */
+function isoAt(v) {
+  if (v == null || v === '') return new Date().toISOString();
+  const d = new Date(String(v));
+  if (Number.isNaN(d.getTime())) throw bad('时间格式不对，要能解析成日期');
+  return d.toISOString();
 }
 
 /* 可选的非负整数（集数 / 进度这类）。空、null、'' 一律当「没填」→ null。
@@ -261,6 +289,42 @@ export function normalize(type, raw) {
     }
     out.status = st;
     out.nodes = nodes(d.nodes);
+  } else if (type === 'project') {
+    /* AI 项目协作区的项目卡。架构 / 难点 / 约定都存 Markdown，
+       前台用 md.js 渲染；这里只做长度与协议校验。 */
+    out.slug = slug(d.slug);
+    out.name = str(d.name, '项目名', { max: 80 });
+    out.summary = str(d.summary, '一句话简介', { max: 500, required: false });
+    const st = str(d.status, '项目状态', { max: 20, required: false }) || 'active';
+    if (st !== 'active' && st !== 'paused' && st !== 'done' && st !== 'archived') {
+      throw bad('项目状态只能是 active（进行中）/ paused（暂停）/ done（完成）/ archived（归档）');
+    }
+    out.status = st;
+    out.stack = str(d.stack, '技术栈', { max: 300, required: false });
+    out.repo = optionalUrl(d.repo, '代码仓库');
+    out.site = optionalUrl(d.site, '项目地址');
+    out.goal = str(d.goal, '当前目标', { max: 2000, required: false });
+    out.architecture = str(d.architecture, '架构说明', { max: 20000, required: false });
+    out.painpoints = str(d.painpoints, '难点与坑', { max: 12000, required: false });
+    out.conventions = str(d.conventions, '约定与红线', { max: 12000, required: false });
+    out.author = str(d.author, '登记人', { max: 40, required: false });
+    out.at = isoAt(d.at);
+  } else if (type === 'project_log') {
+    /* 一条可追加的工作记录 / 决策 / 难点 / 交接 / 讨论。
+       讨论（message）允许不写标题，其余类型会自动补一个默认标题。 */
+    out.project = slug(d.project);
+    const k = str(d.kind, '记录类型', { max: 20, required: false }) || 'log';
+    if (k !== 'log' && k !== 'decision' && k !== 'pain' && k !== 'handoff' && k !== 'message') {
+      throw bad('记录类型只能是 log / decision / pain / handoff / message');
+    }
+    out.kind = k;
+    const label = { log: '工作记录', decision: '关键决策', pain: '难点', handoff: '交接说明', message: '讨论' };
+    out.title = str(d.title, '标题', { max: 160, required: false }) || label[k];
+    out.body = str(d.body, '内容', { max: 12000 });
+    out.author = str(d.author, '署名', { max: 40, required: false }) || '未署名 AI';
+    out.refs = str(d.refs, '关联（提交 / PR）', { max: 300, required: false });
+    out.tags = tags(d.tags);
+    out.at = isoAt(d.at);
   }
 
   return out;

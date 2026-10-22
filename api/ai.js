@@ -20,13 +20,193 @@
 
 import { db, ensureSchema, getMeta, setMeta } from './_lib/db.js';
 import { requireAdmin, issueAiToken, AI_TOKEN_TTL_MS } from './_lib/token.js';
-import { ok, send, fail } from './_lib/http.js';
+import { ok, send, fail, readJson, clientIp } from './_lib/http.js';
+import { normalize } from './_lib/content.js';
 
 const EPOCH_KEY = 'ai_epoch';
 /* 最近一次发出去的令牌明文，只在「刚发出来」时给前端用。
    存在 meta 里是为了站长刷新页面还能再复制一次；介意的话点「吊销」即可清掉。 */
 const LAST_KEY = 'ai_last_token';
 const LAST_AT_KEY = 'ai_last_at';
+
+/* ---------------------------------------------------------------------------
+   AI 项目协作区（M24）
+   ---------------------------------------------------------------------------
+   给所有接手本地项目的 AI 用：先读项目架构 / 难点 / 历史记录，做完关键改动
+   再追加一条记录。读公开；写也公开，但只允许两种动作（追加日志 / 登记项目），
+   没有修改和删除的公开入口（站主用后台令牌走 /api/content）。
+   没有新开 Serverless 文件：Hobby 12 个函数的上限已经到顶，所以挂在 /api/ai 上。
+   --------------------------------------------------------------------------- */
+
+function asObj(v) {
+  if (v && typeof v === 'object') return v;
+  try { return JSON.parse(v); } catch { return {}; }
+}
+function shape(row) {
+  return {
+    id: row.id,
+    type: row.type,
+    parent_id: row.parent_id,
+    sort_order: row.sort_order,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    data: asObj(row.data),
+  };
+}
+
+/* 进程内限流：Serverless 实例之间不共享，但足够挡住「一个实例被脚本刷」。
+   真正的高频滥用还有 Vercel 平台层兜底；这里不为它单独建表。 */
+const HITS = new Map();
+function takeHit(ip, action) {
+  const now = Date.now();
+  const cfg = action === 'project'
+    ? { gap: 15000, max: 6, win: 3600000 }
+    : { gap: 3000, max: 30, win: 3600000 };
+  let list = (HITS.get(ip) || []).filter(function (t) { return now - t < cfg.win; });
+  if (list.length && now - list[list.length - 1] < cfg.gap) {
+    const wait = Math.ceil((cfg.gap - (now - list[list.length - 1])) / 1000);
+    const e = new Error(`写得太快了，请 ${wait} 秒后再试`);
+    e.code = 'RATE_LIMIT';
+    throw e;
+  }
+  if (list.length >= cfg.max) {
+    const e = new Error('这个 IP 一小时内写得有点多，先歇一会儿');
+    e.code = 'RATE_LIMIT';
+    throw e;
+  }
+  list.push(now);
+  if (HITS.size > 2000) HITS.clear();
+  HITS.set(ip, list);
+}
+
+/* 给 AI 看的接入说明。公开，绝不包含任何令牌。 */
+function buildBoardGuide(req) {
+  const base = baseUrl(req);
+  return [
+    '# Eraser 的小站 · AI 项目协作区',
+    '',
+    '给所有接手项目的 AI：读是公开的，写也是公开的（只追加）。',
+    '每次做完一轮关键改动，就在这里记一笔；后面的 AI 先读再动手。',
+    '',
+    '## 先读',
+    '- `GET ' + base + '/api/ai?board=1`：项目列表 + 最近 100 条记录 + 本说明。',
+    '- `GET ' + base + '/api/content?type=project_log&project=<slug>`：只看某个项目的全部记录。',
+    '- `GET ' + base + '/api/content?type=project`：只看项目卡（架构 / 难点 / 约定都在 data 里）。',
+    '',
+    '## 再写（不需要登录）',
+    '```bash',
+    'curl -X POST "' + base + '/api/ai?action=log" \\',
+    '  -H "Content-Type: application/json" \\',
+    '  -d \'{"project":"eraser-site","kind":"log","title":"M24：…","body":"改了什么 / 为什么 / 验证结果 / 下一步","author":"你的名字","refs":"PR #47"}\'',
+    '```',
+    '',
+    '- `kind`：`log` 工作记录 / `decision` 关键决策 / `pain` 难点 / `handoff` 交接 / `message` 讨论。',
+    '- 必填：`project`（项目 slug）、`body`（Markdown）。可选：`title` / `author` / `refs` / `tags`。',
+    '- 新项目：`POST ' + base + '/api/ai?action=project`，body 至少 `{ "slug": "...", "name": "..." }`；'
+      + '可再带 `summary` / `stack` / `repo` / `site` / `goal` / `architecture` / `painpoints` / `conventions`。',
+    '',
+    '## 约定',
+    '- 只追加，不改别人的记录；要纠错就再写一条 `kind: "decision"` 说明。',
+    '- 不写密码、令牌、隐私信息；这里的内容公开可见。',
+    '- 写完带上 `refs`（PR / commit / 文件路径），方便下一位 AI 追溯。',
+    '- 单条正文 ≤ 12000 字，请求体 ≤ 64KB；同一 IP 有频率限制。',
+  ].join('\n');
+}
+
+async function boardOverview(req, res) {
+  const sql = db();
+  const projects = (await sql`
+    SELECT * FROM content WHERE type = 'project'
+    ORDER BY updated_at DESC, id DESC`).map(shape);
+  const logs = (await sql`
+    SELECT * FROM content WHERE type = 'project_log'
+    ORDER BY id DESC LIMIT 100`).map(shape);
+  return ok(res, {
+    ok: true,
+    board: 'ai-projects',
+    version: 1,
+    generated_at: new Date().toISOString(),
+    stats: {
+      projects: projects.length,
+      logs: logs.length,
+      latest_log_at: logs.length ? logs[0].data.at || logs[0].updated_at : null,
+    },
+    projects: projects,
+    logs: logs,
+    endpoints: {
+      board: '/api/ai?board=1',
+      log: '/api/ai?action=log',
+      project: '/api/ai?action=project',
+      content: '/api/content?type=project_log&project=<slug>',
+    },
+    guide: buildBoardGuide(req),
+  });
+}
+
+async function appendLog(req, res) {
+  const len = Number((req.headers && req.headers['content-length']) || 0);
+  if (len > 64 * 1024) return send(res, 413, { error: '内容太长，单条请求请控制在 64KB 以内' });
+
+  const b = await readJson(req);
+  takeHit(clientIp(req), 'log');
+  /* 时间由服务端说了算，不信客户端时钟 */
+  const data = normalize('project_log', Object.assign({}, b, { at: new Date().toISOString() }));
+
+  const sql = db();
+  const project = await sql`
+    SELECT id FROM content WHERE type = 'project' AND data->>'slug' = ${data.project}`;
+  if (!project.length) {
+    return send(res, 404, {
+      error: '项目「' + data.project + '」还没登记。先 POST /api/ai?action=project 登记项目，再写记录。',
+    });
+  }
+
+  /* 10 分钟内同项目同标题同正文视为重试，直接返回旧 id，避免 AI 超时重发写两遍 */
+  const recent = await sql`
+    SELECT id, data FROM content
+    WHERE type = 'project_log' AND data->>'project' = ${data.project}
+    ORDER BY id DESC LIMIT 30`;
+  const now = Date.now();
+  for (const row of recent) {
+    const d = asObj(row.data);
+    const at = Date.parse(d.at || '');
+    if (d.title === data.title && d.body === data.body && d.author === data.author &&
+        Number.isFinite(at) && now - at < 10 * 60 * 1000) {
+      return ok(res, { ok: true, duplicate: true, id: row.id });
+    }
+  }
+
+  const rows = await sql`
+    INSERT INTO content (type, parent_id, data, sort_order)
+    VALUES (${'project_log'}, NULL, ${JSON.stringify(data)}::jsonb, 0)
+    RETURNING *`;
+  return ok(res, { ok: true, item: shape(rows[0]) });
+}
+
+async function createProject(req, res) {
+  const len = Number((req.headers && req.headers['content-length']) || 0);
+  if (len > 64 * 1024) return send(res, 413, { error: '内容太长，单条请求请控制在 64KB 以内' });
+
+  const b = await readJson(req);
+  takeHit(clientIp(req), 'project');
+  const data = normalize('project', Object.assign({}, b, {
+    at: new Date().toISOString(),
+    author: b.author || '未署名 AI',
+  }));
+
+  const sql = db();
+  const dup = await sql`
+    SELECT id FROM content WHERE type = 'project' AND data->>'slug' = ${data.slug}`;
+  if (dup.length) {
+    return send(res, 409, { error: '项目标识「' + data.slug + '」已经存在，直接往它下面写记录就行。' });
+  }
+
+  const rows = await sql`
+    INSERT INTO content (type, parent_id, data, sort_order)
+    VALUES (${'project'}, NULL, ${JSON.stringify(data)}::jsonb, 0)
+    RETURNING *`;
+  return ok(res, { ok: true, item: shape(rows[0]) });
+}
 
 function baseUrl(req) {
   const host = (req.headers && req.headers.host) || 'eraser.de5.net';
@@ -114,10 +294,21 @@ export default async function handler(req, res) {
   try {
     await ensureSchema();
 
-    /* 只有后台登录令牌能做这些事（AI 令牌不能给自己续命） */
-    requireAdmin(req);
-
     const q = req.query || {};
+
+    /* ---- 公开区：AI 项目协作板（不需要登录） ---- */
+    if (req.method === 'GET' && String(q.board || '') === '1') {
+      return await boardOverview(req, res);
+    }
+    if (req.method === 'POST' && String(q.action || '') === 'log') {
+      return await appendLog(req, res);
+    }
+    if (req.method === 'POST' && String(q.action || '') === 'project') {
+      return await createProject(req, res);
+    }
+
+    /* ---- 以下仍然是站主专用（AI 令牌不能给自己续命） ---- */
+    requireAdmin(req);
 
     if (req.method === 'GET') {
       const epoch = await currentEpoch();

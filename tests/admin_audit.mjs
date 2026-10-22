@@ -169,7 +169,11 @@ console.log('\n=== 内容管理（导航 / 博客 / 页面 / 追更 / 学习）=
   catch (e) { check('admin/content.js 语法正确', false, e.message); }
 
   const cMust = [
-    ['六种内容都有字段定义', /nav_category:[\s\S]*nav_link:[\s\S]*post:[\s\S]*page:[\s\S]*media:[\s\S]*learn_map:/],
+    ['八种内容都有字段定义', /nav_category:[\s\S]*nav_link:[\s\S]*post:[\s\S]*page:[\s\S]*media:[\s\S]*learn_map:[\s\S]*project:[\s\S]*project_log:/],
+    ['AI 项目：架构 / 难点 / 约定用 Markdown 编辑器',
+      /architecture"[\s\S]{0,200}?t: "md"[\s\S]*?painpoints"[\s\S]{0,200}?t: "md"[\s\S]*?conventions"[\s\S]{0,200}?t: "md"/],
+    ['AI 记录：五种类型都在下拉框里',
+      /\["log"[\s\S]*?\["decision"[\s\S]*?\["pain"[\s\S]*?\["handoff"[\s\S]*?\["message"/],
     ['学习地图：有状态下拉框（在学/学完/归档）', /\{ k: "status", l: "状态", t: "select"[\s\S]*\["active"[\s\S]*\["done"[\s\S]*\["archived"/],
     ['学习地图：走 /api/learn 而不是 /api/content', /api\("learn\?action=toggleNode"|api\("learn\?action=updateNode"/],
     ['学习地图：节点文字可编辑', /var t = el\("input", "lmt"\)/],

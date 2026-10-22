@@ -13,9 +13,9 @@ const read = (f) => fs.readFileSync(path.join(REPO, f), 'utf8');
 
 const PAGES = ['index.html', 'nav/index.html', 'blog/index.html', 'blog/post.html',
                'about/index.html', 'tools/index.html',
-               'collect/index.html', 'learn/index.html'];
+               'collect/index.html', 'learn/index.html', 'ai/index.html'];
 
-console.log('=== 所有页面（8 个）：结构与语法 ===');for (const f of PAGES) {
+console.log('=== 所有页面（9 个）：结构与语法 ===');for (const f of PAGES) {
   const html = read(f);
   const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
   let ok = true, err = '';
@@ -25,7 +25,7 @@ console.log('=== 所有页面（8 个）：结构与语法 ===');for (const f of
   check(`${f} 内联脚本语法正确（${scripts.length} 段）`, ok, err);
 }
 
-console.log('\n=== 所有页面（8 个）：零站外资源 ===');
+console.log('\n=== 所有页面（9 个）：零站外资源 ===');
 for (const f of PAGES) {
   const html = read(f);
   /* 只算「会被加载的资源」。普通的外链 <a href> 是内容，不是资源，不算 */
@@ -46,7 +46,7 @@ for (const f of PAGES) {
         unsafe.map(a => a[1]).join(', '));
 }
 
-console.log('\n=== 所有页面（8 个）：只请求同源接口 ===');
+console.log('\n=== 所有页面（9 个）：只请求同源接口 ===');
 for (const f of PAGES) {
   const html = read(f);
   const fetches = [...html.matchAll(/fetch\(\s*["'`]([^"'`]+)/g)].map(m => m[1]);
@@ -56,11 +56,12 @@ for (const f of PAGES) {
   check(`${f} 没有用其它网络 API`, other.length === 0, other.map(m => m[1]).join(', '));
 }
 
-console.log('\n=== 所有页面（8 个）：导航栏统一 ===');
+console.log('\n=== 所有页面（9 个）：导航栏统一 ===');
 for (const f of PAGES) {
   const html = read(f);
   check(`${f} 品牌名统一`, /<span class="logo">🧩 Eraser 的小站<\/span>/.test(html));
   check(`${f} 菜单含「搜索」`, /搜索<\/a>/.test(html));
+  check(`${f} 菜单含「AI 协作」入口`, />AI 协作<\/a>/.test(html));
   check(`${f} 导航没有多余的「首页」入口`, !/>首页<\/a>/.test(html));
   check(`${f} 引用全站 style.css`, /<link[^>]*href="[^"]*style\.css"/.test(html));
   check(`${f} 标了当前页 active`, /class="active"/.test(html));
@@ -127,7 +128,7 @@ for (const f of PAGES) {
   check(`${f} 标题分隔符统一为 ·`, /<title>[^<]* · Eraser 的小站<\/title>/.test(html));
 }
 check('skip-link 样式在 style.css 里', /\.skip-link\s*\{/.test(read('style.css')));
-check('sw.js 缓存版本号已升级到 v9', /VERSION = 'eraser-v9'/.test(read('sw.js')));
+check('sw.js 缓存版本号已升级到 v10', /VERSION = 'eraser-v10'/.test(read('sw.js')));
 check('sw.js 预缓存站内播放器与工作台逻辑', /PRECACHE = \[[\s\S]*?'\/watch\.js'/.test(read('sw.js')) && /PRECACHE = \[[\s\S]*?'\/workbench\.js'/.test(read('sw.js')));
 check('移动端顶栏：控件与品牌同排、导航整行下移',
       /@media \(max-width: 768px\)[\s\S]*?\.navbar nav\s*\{\s*order:\s*3;\s*flex-basis:\s*100%;/.test(read('style.css')));
@@ -461,7 +462,8 @@ console.log('\n=== 开发交接页（dev/，给接手的 AI）===');
   check('M14–M18 批次记录在', /M14/.test(html) && /M16/.test(html) && /M17/.test(html) && /M18/.test(html));
   check('M19 站内播放批次记录在', /M19/.test(html) && /watch\.js/.test(html) && /position/.test(html) && /B 站/.test(html));
   check('M20 工作台批次记录在', /M20/.test(html) && /workbench\.js/.test(html) && /airday/.test(html) && /接着看/.test(html) && /本周放送/.test(html));
-  check('M23 写作便利批次记录在', /M23/.test(html) && /draft\.v2/.test(html) && /拖入图片/.test(html) && /写文章/.test(html) && /eraser-v9/.test(html));
+  check('M23 写作便利批次记录在', /M23/.test(html) && /draft\.v2/.test(html) && /拖入图片/.test(html) && /写文章/.test(html) && /v9/.test(html));
+  check('M24 AI 协作区批次记录在', /M24/.test(html) && /board=1/.test(html) && /project_log/.test(html) && /eraser-v10/.test(html) && /2248/.test(html));
   check('后台标签数已更新为 9', /9 个标签/.test(html) || /9 标签/.test(html));
   check('本机坑位补充了 BOM / PowerShell / gh PR 退出码', /BOM/.test(html) && /PowerShell/.test(html) && /SIGTERM/.test(html));
   check('待办里写明 M10 主线B 搁置原因', /主线 B/.test(html) && /(0 篇|博客 0)/.test(html));
@@ -475,6 +477,35 @@ console.log('\n=== 开发交接页（dev/，给接手的 AI）===');
     ...html.matchAll(/<img[^>]*\ssrc\s*=\s*["']((?:https?:)?\/\/[^"']+)["']/gi),
   ].map(m => m[1]);
   check('没有站外资源（脚本/样式/图片）', ext.length === 0, ext.join(', '));
+}
+
+console.log('\n=== AI 项目协作区（M24） ===');
+{
+  const html = read('ai/index.html');
+  check('页面不收录进搜索引擎（noindex）', /<meta name="robots" content="noindex">/.test(html));
+  check('说明公开读接口 board=1', /\/api\/ai\?board=1/.test(html));
+  check('说明公开追加记录', /\/api\/ai\?action=log/.test(html));
+  check('说明公开登记项目', /\/api\/ai\?action=project/.test(html));
+  check('页面里没有写死令牌 / 鉴权头', !/Bearer/.test(html));
+  check('Markdown 渲染统一走 MD.render（内部转义）',
+        /innerHTML = MD\.render/.test(html) && !/innerHTML\s*=\s*d\./.test(html));
+  check('其余数据用 textContent 构建', /function el\(tag, cls, text\)/.test(html)
+        && /e\.textContent = text/.test(html));
+  check('站主令牌只用来显示编辑按钮', /if \(window\.Owner && Owner\.hasToken\(\)\)/.test(html)
+        && /ownerButtons\("project_log"/.test(html));
+  check('编辑时按需加载共享编辑器', /Owner\.ensureEditor\(\)/.test(html)
+        && /CA\.openItem\(kind, item/.test(html)
+        && /ownerButtons\("project", p\)/.test(html) && /ownerButtons\("project_log", l\)/.test(html));
+  check('署名存本地，下次自动带出', /eraser\.ai\.author/.test(html)
+        && /localStorage\.getItem\(AUTHOR_KEY\)/.test(html));
+  check('支持 ?p=slug 深链', /URLSearchParams\(location\.search\)\.get\("p"\)/.test(html));
+  check('加载失败有重试', /加载失败：/.test(html) && /setState\([^)]*true\)/.test(html));
+  check('空板有引导而不是白屏', /还没有项目/.test(html) && /还没有记录/.test(html));
+  check('窄屏单列布局', /@media \(max-width: 860px\)/.test(html) && /grid-template-columns:\s*1fr/.test(html));
+  check('暗色模式单独适配', /html\[data-theme="dark"\] .ai-/.test(html));
+  check('尊重减弱动态偏好', /prefers-reduced-motion: reduce/.test(html));
+  check('命令面板与 g 快捷键都能到 AI 协作',
+        /name: "AI 协作", href: "ai\/index\.html", key: "i"/.test(read('shell.js')));
 }
 
 console.log('\n=== PWA 可安装（manifest + 图标 + Service Worker，M10） ===');
